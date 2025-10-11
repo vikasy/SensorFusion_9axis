@@ -1,0 +1,92 @@
+# Build artifacts
+build/cmake/
+build/obj/
+build/bin/*
+!build/bin/.gitkeep
+build/lib/*
+!build/lib/.gitkeep
+*.o
+*.a
+*.exe
+*.so
+*.dylib
+*.dll
+
+# CMake build artifacts (detailed)
+build/cmake/CMakeFiles/
+build/cmake/CMakeCache.txt
+build/cmake/Makefile
+build/cmake/cmake_install.cmake
+build/cmake/*.cmake
+build/cmake/CMakeFiles/**/*.d
+build/cmake/CMakeFiles/**/*.o
+build/cmake/CMakeFiles/**/*.cmake
+build/cmake/CMakeFiles/**/*.make
+build/cmake/CMakeFiles/**/*.ts
+build/cmake/CMakeFiles/**/*.txt
+build/cmake/CMakeFiles/**/*.json
+build/cmake/CMakeFiles/**/*.bin
+build/cmake/CMakeFiles/**/*.c
+build/cmake/CMakeFiles/**/*.out
+
+# Python cache and compiled files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.py[cod]
+*$py.class
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv/
+
+# IDE files
+.vscode/settings.json
+.idea/
+*.swp
+*.tmp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# CMake artifacts (general)
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+*.d
+
+# Specific build artifacts
+build/bin/SensorFusion
+build/lib/libsensorfusion.a
+build/obj/*.o
+
+# Test artifacts
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+*.pkl
+
+# Logs and temporary files
+*.log
+
+# Backup files
+*~
+*.bak
+*.orig
+
+# MATLAB temporary files
+*.m~
+*.asv
+
+# Personal directories
+Sources_org/
+
+

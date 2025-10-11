@@ -1,0 +1,9 @@
+# SensorFusion Python Dependencies
+numpy>=1.20.0
+scipy>=1.7.0
+matplotlib>=3.5.0
+
+# Optional development dependencies
+# pytest>=6.0.0
+# black>=22.0.0
+# flake8>=4.0.0

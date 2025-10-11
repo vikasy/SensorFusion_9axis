@@ -1,0 +1,82 @@
+{
+    "configurations": [
+        {
+            "name": "macOS",
+            "includePath": [
+                "${workspaceFolder}/**",
+                "${workspaceFolder}/code/algo/inc",
+                "${workspaceFolder}/code/app/inc", 
+                "${workspaceFolder}/test/inc",
+                "/usr/include",
+                "/usr/local/include"
+            ],
+            "defines": [
+                "_POSIX_C_SOURCE=199309L",
+                "__APPLE_USE_RFC_3542"
+            ],
+            "macFrameworkPath": [
+                "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks"
+            ],
+            "compilerPath": "/usr/bin/gcc",
+            "cStandard": "c99",
+            "cppStandard": "c++14",
+            "intelliSenseMode": "macos-gcc-x64",
+            "browse": {
+                "path": [
+                    "${workspaceFolder}/code",
+                    "/usr/include",
+                    "/usr/local/include"
+                ],
+                "limitSymbolsToIncludedHeaders": true,
+                "databaseFilename": ""
+            }
+        },
+        {
+            "name": "9-axis Fusion",
+            "includePath": [
+                "${workspaceFolder}/**",
+                "${workspaceFolder}/code/algo/inc",
+                "${workspaceFolder}/code/app/inc",
+                "${workspaceFolder}/test/inc",
+                "/usr/include",
+                "/usr/local/include"
+            ],
+            "defines": [
+                "_POSIX_C_SOURCE=199309L",
+                "__APPLE_USE_RFC_3542",
+                "USE_9AXIS_FUSION"
+            ],
+            "macFrameworkPath": [
+                "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks"
+            ],
+            "compilerPath": "/usr/bin/gcc",
+            "cStandard": "c99", 
+            "cppStandard": "c++14",
+            "intelliSenseMode": "macos-gcc-x64"
+        },
+        {
+            "name": "6-axis Fusion",
+            "includePath": [
+                "${workspaceFolder}/**",
+                "${workspaceFolder}/code/algo/inc",
+                "${workspaceFolder}/code/app/inc",
+                "${workspaceFolder}/test/inc",
+                "/usr/include",
+                "/usr/local/include"
+            ],
+            "defines": [
+                "_POSIX_C_SOURCE=199309L",
+                "__APPLE_USE_RFC_3542", 
+                "USE_6AXIS_FUSION"
+            ],
+            "macFrameworkPath": [
+                "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks"
+            ],
+            "compilerPath": "/usr/bin/gcc",
+            "cStandard": "c99",
+            "cppStandard": "c++14",
+            "intelliSenseMode": "macos-gcc-x64"
+        }
+    ],
+    "version": 4
+}
