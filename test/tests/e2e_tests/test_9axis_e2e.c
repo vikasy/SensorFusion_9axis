@@ -103,7 +103,7 @@ int parse_csv_line(char *line, imu_sample_t *sample) {
 }
 
 int main(int argc, char *argv[]) {
-    const char *filename = (argc > 1) ? argv[1] : "test/validation/TStick_Test02_Trial1.csv";
+    const char *filename = (argc > 1) ? argv[1] : "test/data/datasets/repoimu/TStick_Test02_Trial1.csv";
 
     printf("=======================================================\n");
     printf("9-AXIS END-TO-END VALIDATION WITH REPOIMU DATASET\n");
