@@ -290,7 +290,7 @@ static void sf_6xag_algo_tilt_rotmtx(const double accel_avg[3],
 
 	uint32_t  k;
 
-	mag_grav_yz_sq = (accel_avg[1] * accel_avg[1])*(accel_avg[2] * accel_avg[2]);
+	mag_grav_yz_sq = (accel_avg[1] * accel_avg[1]) + (accel_avg[2] * accel_avg[2]);
 	mag_grav_yz = sqrt(mag_grav_yz_sq);
 	mag_grav = sqrt((accel_avg[0] * accel_avg[0]) + mag_grav_yz_sq);
 	

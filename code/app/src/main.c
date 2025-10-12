@@ -95,7 +95,7 @@ int main(void)
 
 	algo_init_data.Acc_GPERCOUNT = MPU9250_FGPERCOUNT;
 	algo_init_data.Gyro_DPSPERCOUNT = MPU9250_FDPSPERCOUNT;
-	algo_init_data.Mag_UTPERCOUNT = MPU9250_FUTPERCOUNT;
+	algo_init_data.Mag_UTPERCOUNT = AK8963_FUTPERCOUNT;
 
 	// Initialize sensor fusion algorithm based on compile-time flag
 #ifdef USE_9AXIS_FUSION

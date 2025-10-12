@@ -275,7 +275,23 @@ static void sf_9xagm_algo_run_orig(state_vec_9XAGM_t *ptr_state_vec_9XAGM,
 
 	// if new magnetometer data is available, apply magnetometer measurement update
 	if ( ptr_state_vec_9XAGM->MagMeasupdtTS < ptr_state_vec_9XAGM->MagData.timestamp ) {
-		sf_9xagm_algo_measupdate_mag(ptr_state_vec_9XAGM, &(ptr_state_vec_9XAGM->MagData));
+		// Check for magnetic disturbances before applying update
+		double mag_measured[3];
+		for(uint32_t idx = CHX; idx <= CHZ; idx++) {
+			mag_measured[idx] = ptr_state_vec_9XAGM->MagData.CountAvg[idx] *
+			                   ptr_state_vec_9XAGM->MagData.ScaleFactor;
+		}
+
+		// Detect magnetic disturbance (threshold: 30% magnitude deviation)
+		int disturbance = sf_9xagm_detect_mag_disturbance(mag_measured,
+		                                                   ptr_state_vec_9XAGM->MagFieldRef,
+		                                                   0.3);
+
+		// Only apply magnetometer update if no disturbance detected
+		if (!disturbance) {
+			sf_9xagm_algo_measupdate_mag(ptr_state_vec_9XAGM, &(ptr_state_vec_9XAGM->MagData));
+		}
+
 		if (ptr_state_vec_9XAGM->MagData.timestamp < (curr_time_msec - SF_MAG_MAX_STALE_DUR)) {
 			// if magnetometer data used is stale, mark mode_op to degraded mag mode
 			ptr_state_vec_9XAGM->OpMode &= ~(SF_MAG_MASK);
@@ -527,26 +543,36 @@ void sf_9xagm_algo_nom_timeupdate(state_vec_9XAGM_t *ptr_state_vec_9XAGM)
 	//printf("nomupdt_ts =%d\n", ptr_state_vec_9XAGM->NomupdtTS);
 
 	if (ptr_state_vec_9XAGM->update_ErrCovMtx == 1) {
-		// Update posteriosi covariance matrix P_pri = A' *P_post *A + Qw
+		// Update posteriori covariance matrix P_pri = A' *P_post *A + Qw
 		// In other words, update Qw based on aposteriori error covariance matrix
 		// where Qw = a_fn(P_post) = f(P_post) + Qinit
+		// For 9-axis, this is a 4x4 block matrix (orientation, bias, lin_acc, mag_dist)
 		Cacc2 = ptr_state_vec_9XAGM->LinAccTC * ptr_state_vec_9XAGM->LinAccTC;
 
+		// Q[0][0]: Orientation error covariance
 		IdentityBlkMtx_3x3(&(ptr_state_vec_9XAGM->ProcNoiseVar[0][0]));
 		ScaleBlkMtx_3x3(ptr_state_vec_9XAGM->ProcNoiseVarOrient, &(ptr_state_vec_9XAGM->ProcNoiseVar[0][0]), &Atemp);
 		ScaleBlkMtx_3x3(delta_T*delta_T, &(ptr_state_vec_9XAGM->ErrCovMtxPost[1][1]), &Btemp);
 		AddBlkMtx_3x3(&Atemp, &(ptr_state_vec_9XAGM->ErrCovMtxPost[0][0]), &Ctemp);
 		AddBlkMtx_3x3(&Ctemp, &Btemp, &(ptr_state_vec_9XAGM->ProcNoiseVar[0][0]));
 
+		// Q[1][1]: Gyro bias error covariance
 		IdentityBlkMtx_3x3(&(ptr_state_vec_9XAGM->ProcNoiseVar[1][1]));
 		ScaleBlkMtx_3x3(ptr_state_vec_9XAGM->ProcNoiseVarBias, &(ptr_state_vec_9XAGM->ProcNoiseVar[1][1]), &Atemp);
 		AddBlkMtx_3x3(&Atemp, &(ptr_state_vec_9XAGM->ErrCovMtxPost[1][1]), &(ptr_state_vec_9XAGM->ProcNoiseVar[1][1]));
 
+		// Q[2][2]: Linear acceleration error covariance
 		IdentityBlkMtx_3x3(&(ptr_state_vec_9XAGM->ProcNoiseVar[2][2]));
 		ScaleBlkMtx_3x3(ptr_state_vec_9XAGM->ProcNoiseVarLinAcc, &(ptr_state_vec_9XAGM->ProcNoiseVar[2][2]), &Atemp);
 		ScaleBlkMtx_3x3(Cacc2, &(ptr_state_vec_9XAGM->ErrCovMtxPost[2][2]), &Btemp);
 		AddBlkMtx_3x3(&Atemp, &Btemp, &(ptr_state_vec_9XAGM->ProcNoiseVar[2][2]));
 
+		// Q[3][3]: Magnetic disturbance error covariance
+		IdentityBlkMtx_3x3(&(ptr_state_vec_9XAGM->ProcNoiseVar[3][3]));
+		ScaleBlkMtx_3x3(ptr_state_vec_9XAGM->ProcNoiseVarMagDist, &(ptr_state_vec_9XAGM->ProcNoiseVar[3][3]), &Atemp);
+		AddBlkMtx_3x3(&Atemp, &(ptr_state_vec_9XAGM->ErrCovMtxPost[3][3]), &(ptr_state_vec_9XAGM->ProcNoiseVar[3][3]));
+
+		// Q[0][1] and Q[1][0]: Cross-covariance between orientation and bias
 		IdentityBlkMtx_3x3(&(ptr_state_vec_9XAGM->ProcNoiseVar[0][1]));
 		ScaleBlkMtx_3x3(ptr_state_vec_9XAGM->ProcNoiseVarBiasOrient, &(ptr_state_vec_9XAGM->ProcNoiseVar[0][1]), &Atemp);
 		ScaleBlkMtx_3x3(-1 * delta_T, &(ptr_state_vec_9XAGM->ErrCovMtxPost[1][1]), &Btemp);
@@ -767,76 +793,382 @@ void sf_9xagm_algo_measupdate(state_vec_9XAGM_t *ptr_state_vec_9XAGM)
 
 /**
 * @brief: 9-axis magnetometer measurement update
-* Performs magnetometer-based measurement update for orientation correction
+* Performs full Kalman filter measurement update using magnetometer data
+* Following AN5023 implementation for proper magnetic field fusion
 */
 static void sf_9xagm_algo_measupdate_mag(state_vec_9XAGM_t *ptr_state_vec_9XAGM,
                                           phys_sensor_t     *ptr_mag_data)
 {
-	double mag_measured[3], mag_expected[3];
-	double mag_error[3];
-	double mag_norm_measured, mag_norm_expected;
-	uint32_t i;
+	blk_mtx_3x3_t        Atemp, Btemp;
+	blk_mtx_3x3_t        Ftemp[4], Gtemp, Ginv;
+	blk_mtx_3x3_t        Cmat[4];
+	blk_mtx_3x3_t        Qv_mat;
+	quaternion_double_t  QuatInt;
+	double               Mupdt[12];
+	double               gyro_corr[3];
+	double               mag_measured[3], mag_expected[3];
+	double               mag_error[3];
+	double               mag_norm;
+	double               orient_err;
+	uint32_t             inv_exist;
+	uint32_t             i, j, k;
+
+	inv_exist = 1;
 
 	// Get measured magnetometer data (average of buffered samples)
 	for(i = CHX; i <= CHZ; i++) {
 		mag_measured[i] = ptr_mag_data->CountAvg[i] * ptr_mag_data->ScaleFactor;
-	}
-
-	// Calculate expected magnetic field in body frame using current orientation
-	// mag_expected = R * mag_reference_field
-	// For simplicity, assume reference field is [mag_field_strength, 0, mag_inclination]
-	// This should ideally use the stored reference field from calibration
-	double mag_ref_field[3] = {ptr_state_vec_9XAGM->MagFieldRef[0], 
-	                          ptr_state_vec_9XAGM->MagFieldRef[1], 
-	                          ptr_state_vec_9XAGM->MagFieldRef[2]};
-	
-	for(i = CHX; i <= CHZ; i++) {
-		mag_expected[i] = 0.0;
-		for(uint32_t j = CHX; j <= CHZ; j++) {
-			mag_expected[i] += ptr_state_vec_9XAGM->RotMtxPost[i][j] * mag_ref_field[j];
-		}
-	}
-
-	// Apply calibration offset
-	for(i = CHX; i <= CHZ; i++) {
+		// Apply hard iron calibration offset
 		mag_measured[i] -= ptr_state_vec_9XAGM->MagCalOffset[i];
 	}
 
-	// Calculate measurement error
+	// Normalize measured magnetic field for direction-only comparison
+	mag_norm = sqrt(mag_measured[0]*mag_measured[0] +
+	               mag_measured[1]*mag_measured[1] +
+	               mag_measured[2]*mag_measured[2]);
+
+	if (mag_norm < EPSILON) {
+		// Invalid magnetometer reading, skip update
+		return;
+	}
+
+	for(i = CHX; i <= CHZ; i++) {
+		mag_measured[i] /= mag_norm;
+	}
+
+	// Calculate expected magnetic field in sensor frame using current orientation
+	// mag_expected_sensor = R * mag_reference_global
+	// Initialize reference field if not set (first run)
+	if (ptr_state_vec_9XAGM->MagFieldRef[0] == 0.0 &&
+	    ptr_state_vec_9XAGM->MagFieldRef[1] == 0.0 &&
+	    ptr_state_vec_9XAGM->MagFieldRef[2] == 0.0) {
+		// Use current measurement as initial reference (normalized)
+		// Transform to global frame: mag_global = R^T * mag_sensor
+		for(i = CHX; i <= CHZ; i++) {
+			ptr_state_vec_9XAGM->MagFieldRef[i] = 0.0;
+			for(j = CHX; j <= CHZ; j++) {
+				ptr_state_vec_9XAGM->MagFieldRef[i] += ptr_state_vec_9XAGM->RotMtxPost[j][i] * mag_measured[j];
+			}
+		}
+		// Normalize reference field
+		double ref_norm = sqrt(ptr_state_vec_9XAGM->MagFieldRef[0]*ptr_state_vec_9XAGM->MagFieldRef[0] +
+		                      ptr_state_vec_9XAGM->MagFieldRef[1]*ptr_state_vec_9XAGM->MagFieldRef[1] +
+		                      ptr_state_vec_9XAGM->MagFieldRef[2]*ptr_state_vec_9XAGM->MagFieldRef[2]);
+		if (ref_norm > EPSILON) {
+			for(i = CHX; i <= CHZ; i++) {
+				ptr_state_vec_9XAGM->MagFieldRef[i] /= ref_norm;
+			}
+		}
+	}
+
+	// Project reference magnetic field to sensor frame using current orientation
+	// mag_expected = R * mag_ref_global
+	for(i = CHX; i <= CHZ; i++) {
+		mag_expected[i] = 0.0;
+		for(j = CHX; j <= CHZ; j++) {
+			mag_expected[i] += ptr_state_vec_9XAGM->RotMtxPost[i][j] * ptr_state_vec_9XAGM->MagFieldRef[j];
+		}
+	}
+
+	// Compute measurement error (innovation)
 	for(i = CHX; i <= CHZ; i++) {
 		mag_error[i] = mag_measured[i] - mag_expected[i];
 	}
 
-	// Normalize both measured and expected for direction comparison
-	mag_norm_measured = sqrt(mag_measured[0]*mag_measured[0] + 
-	                        mag_measured[1]*mag_measured[1] + 
-	                        mag_measured[2]*mag_measured[2]);
-	
-	mag_norm_expected = sqrt(mag_expected[0]*mag_expected[0] + 
-	                        mag_expected[1]*mag_expected[1] + 
-	                        mag_expected[2]*mag_expected[2]);
+	// Compute the measurement matrix C using expected magnetic field
+	// C[0] corresponds to orientation error: dB/dθ = [B × ] (cross product matrix)
+	CrossPdctMtx_3x3(mag_expected, &Atemp);
+	ScaleBlkMtx_3x3(-DEG2RAD, &Atemp, &Cmat[0]);
 
-	// Simple proportional correction (in real implementation, this would use Kalman gain)
-	if (mag_norm_measured > 0.0 && mag_norm_expected > 0.0) {
-		double correction_gain = 0.1; // Tunable parameter
-		
-		// Apply correction to quaternion (simplified approach)
-		// In full implementation, this would properly compute Kalman gain and update covariance
-		for(i = CHX; i <= CHZ; i++) {
-			double correction = correction_gain * mag_error[i] / mag_norm_expected;
-			
-			// Apply small rotation correction (simplified)
-			if (i == CHX) ptr_state_vec_9XAGM->QuatPost.q1 += correction * 0.01;
-			if (i == CHY) ptr_state_vec_9XAGM->QuatPost.q2 += correction * 0.01;
-			if (i == CHZ) ptr_state_vec_9XAGM->QuatPost.q3 += correction * 0.01;
+	// C[1] corresponds to gyro bias: dB/db ≈ 0 (magnetometer not affected by gyro bias directly)
+	ZeroBlkMtx_3x3(&Cmat[1]);
+
+	// C[2] corresponds to linear acceleration: dB/da ≈ 0 (mag not affected by accel)
+	ZeroBlkMtx_3x3(&Cmat[2]);
+
+	// C[3] corresponds to magnetic disturbance: dB/dd = I (identity)
+	IdentityBlkMtx_3x3(&Cmat[3]);
+
+	/* Compute Kalman gain, K = Qw*C'*inv(C*Qw*C' + Qv)
+	 * F[4] = Qw[4][4]*C[4]'
+	 * G = C[4]*F[4] + Qv
+	 * Ginv = inv(G)
+	 * K[4] = F[4]*Ginv
+	 */
+
+	// F[4] = Qw[4][4]*C[4]'
+	for(i = 0; i < 4; i++) {
+		ZeroBlkMtx_3x3(&Ftemp[i]);
+		for(j = 0; j < 4; j++) {
+			TranspBlkMtx_3x3(&Cmat[j], &Atemp);
+			MultBlkMtx_3x3(&(ptr_state_vec_9XAGM->ProcNoiseVar[i][j]), &Atemp, &Btemp);
+			AddBlkMtx_3x3(&Ftemp[i], &Btemp, &Atemp);
+			SetBlkMtx_3x3(&Atemp, &Ftemp[i]);
 		}
-		
-		// Renormalize quaternion after correction
-		QuatNormal(&(ptr_state_vec_9XAGM->QuatPost), &(ptr_state_vec_9XAGM->QuatPost));
-		
-		// Update rotation matrix from corrected quaternion
-		Quat2RotMtx(&(ptr_state_vec_9XAGM->QuatPost), ptr_state_vec_9XAGM->RotMtxPost);
 	}
+
+	// G = C[4]*F[4] + Qv
+	IdentityBlkMtx_3x3(&Qv_mat);
+	ScaleBlkMtx_3x3(ptr_state_vec_9XAGM->MeasNoiseVarMag, &Qv_mat, &Gtemp);
+
+	for(i = 0; i < 4; i++) {
+		MultBlkMtx_3x3(&Cmat[i], &Ftemp[i], &Atemp);
+		AddBlkMtx_3x3(&Atemp, &Gtemp, &Btemp);
+		SetBlkMtx_3x3(&Btemp, &Gtemp);
+	}
+
+	// Ginv = inv(G)
+	inv_exist = InvBlkSymMtx1_3x3(&Gtemp, &Ginv);
+
+	// K[4] = F[4]*Ginv
+	if (inv_exist == 1) {
+		for(i = 0; i < 4; i++) {
+			MultBlkMtx_3x3(&Ftemp[i], &Ginv, &(ptr_state_vec_9XAGM->KalmanGain[i]));
+		}
+	} else {
+		// Matrix inversion failed, skip this update
+		return;
+	}
+
+	// Measurement Update of state vector, xe+ = xe- + K*ze
+	// Mupdt = K[4]*mag_error
+	for(k = 0; k < 4; k++) {
+		for(j = CHX; j <= CHZ; j++) {
+			Mupdt[3*k + j] = 0.0;
+			for(i = CHX; i <= CHZ; i++) {
+				Mupdt[3*k + j] += ptr_state_vec_9XAGM->KalmanGain[k].elem[j][i] * mag_error[i];
+			}
+		}
+	}
+
+	// Update the state error estimates
+	for(j = CHX; j <= CHZ; j++) {
+		ptr_state_vec_9XAGM->OrntErrPostS[j] = Mupdt[j];
+		ptr_state_vec_9XAGM->BiasErrPostS[j] = Mupdt[j+3];
+		ptr_state_vec_9XAGM->AccErrPostS[j] = Mupdt[j+6];
+		ptr_state_vec_9XAGM->MagDistErrPostS[j] = Mupdt[j+9];
+		gyro_corr[j] = -Mupdt[j] / SF_DELTA_T;
+	}
+
+	// Update the rotation matrix by rotating it back to remove error
+	// Integrate quaternion with correction
+	QuatIntegrate(&(ptr_state_vec_9XAGM->QuatPost), gyro_corr, SF_DELTA_T, &QuatInt);
+	// Normalize quaternion
+	QuatNormal(&QuatInt, &(ptr_state_vec_9XAGM->QuatPost));
+	// Update rotation matrix
+	Quat2RotMtx(&(ptr_state_vec_9XAGM->QuatPost), ptr_state_vec_9XAGM->RotMtxPost);
+
+	// Update aposteriori covariance matrix, P_post = (I12 - K*C)*Qw
+	//  Compute A = (I12 - K*C)
+	for(i = 0; i < 4; i++) {
+		for(j = 0; j < 4; j++) {
+			if (i == j) {
+				IdentityBlkMtx_3x3(&(ptr_state_vec_9XAGM->ErrCovMtxPost[i][j]));
+			} else {
+				ZeroBlkMtx_3x3(&(ptr_state_vec_9XAGM->ErrCovMtxPost[i][j]));
+			}
+			MultBlkMtx_3x3(&(ptr_state_vec_9XAGM->KalmanGain[i]), &Cmat[j], &Atemp);
+			ScaleBlkMtx_3x3(-1.0, &Atemp, &Btemp);
+			AddBlkMtx_3x3(&(ptr_state_vec_9XAGM->ErrCovMtxPost[i][j]), &Btemp, &Atemp);
+			SetBlkMtx_3x3(&Atemp, &(ptr_state_vec_9XAGM->ErrCovMtxPost[i][j]));
+		}
+	}
+
+	// Compute P_post = A*Qw (ensure symmetry)
+	for(i = 0; i < 4; i++) {
+		for(j = 0; j < 4; j++) {
+			ZeroBlkMtx_3x3(&Atemp);
+			for(k = 0; k < 4; k++) {
+				MultBlkMtx_3x3(&(ptr_state_vec_9XAGM->ErrCovMtxPost[i][k]), &(ptr_state_vec_9XAGM->ProcNoiseVar[k][j]), &Btemp);
+				AddBlkMtx_3x3(&Atemp, &Btemp, &Gtemp);
+				SetBlkMtx_3x3(&Gtemp, &Atemp);
+			}
+			TranspBlkMtx_3x3(&Atemp, &Btemp);
+			AddBlkMtx_3x3(&Atemp, &Btemp, &Gtemp);
+			ScaleBlkMtx_3x3(0.5, &Gtemp, &Atemp);
+			if (i == j) {
+				IdentityBlkMtx_3x3(&Gtemp);
+				ScaleBlkMtx_3x3(EPSILON, &Gtemp, &Btemp);
+			} else {
+				ZeroBlkMtx_3x3(&Btemp);
+			}
+			AddBlkMtx_3x3(&Atemp, &Btemp, &(ptr_state_vec_9XAGM->ErrCovMtxPost[i][j]));
+		}
+	}
+
+	// Check orientation error for covariance update control
+	orient_err = ptr_state_vec_9XAGM->ErrCovMtxPost[0][0].elem[0][0] * ptr_state_vec_9XAGM->ErrCovMtxPost[0][0].elem[0][0];
+	orient_err += ptr_state_vec_9XAGM->ErrCovMtxPost[0][0].elem[1][1] * ptr_state_vec_9XAGM->ErrCovMtxPost[0][0].elem[1][1];
+	orient_err += ptr_state_vec_9XAGM->ErrCovMtxPost[0][0].elem[2][2] * ptr_state_vec_9XAGM->ErrCovMtxPost[0][0].elem[2][2];
+	if((ptr_state_vec_9XAGM->update_ErrCovMtx == 0) && (orient_err < SF_MAX_ORIENT_ERR)) {
+		ptr_state_vec_9XAGM->update_ErrCovMtx = 1;
+	}
+
+	// Update gyro bias (magnetometer provides additional constraints)
+	for(j = CHX; j <= CHZ; j++) {
+		ptr_state_vec_9XAGM->BiasPostS[j] -= ptr_state_vec_9XAGM->BiasErrPostS[j];
+	}
+
+	// Store calibrated magnetometer data in sensor and global frames
+	for(j = CHX; j <= CHZ; j++) {
+		ptr_state_vec_9XAGM->MagPostS[j] = mag_measured[j] * mag_norm;
+		ptr_state_vec_9XAGM->MagPostG[j] = 0.0;
+		for(k = CHX; k <= CHZ; k++) {
+			ptr_state_vec_9XAGM->MagPostG[j] += ptr_state_vec_9XAGM->RotMtxPost[k][j] * ptr_state_vec_9XAGM->MagPostS[k];
+		}
+	}
+}
+
+/**
+* @brief: Apply magnetometer calibration (hard and soft iron correction)
+* Applies hard iron offset and soft iron matrix correction to raw magnetometer data
+*
+* @param[in]: mag_raw: raw magnetometer measurements [3]
+*             cal_offset: hard iron offset calibration [3]
+*             cal_matrix: soft iron correction matrix [3x3]
+* @param[out]: mag_cal: calibrated magnetometer measurements [3]
+*/
+void sf_9xagm_apply_mag_calibration(const double mag_raw[3],
+                                    const double cal_offset[3],
+                                    const double cal_matrix[3][3],
+                                    double       mag_cal[3])
+{
+	double mag_offset_corrected[3];
+	uint32_t i, j;
+
+	// Apply hard iron offset correction
+	for(i = CHX; i <= CHZ; i++) {
+		mag_offset_corrected[i] = mag_raw[i] - cal_offset[i];
+	}
+
+	// Apply soft iron matrix correction: mag_cal = cal_matrix * (mag_raw - cal_offset)
+	for(i = CHX; i <= CHZ; i++) {
+		mag_cal[i] = 0.0;
+		for(j = CHX; j <= CHZ; j++) {
+			mag_cal[i] += cal_matrix[i][j] * mag_offset_corrected[j];
+		}
+	}
+}
+
+/**
+* @brief: Compute magnetic declination correction
+* Applies magnetic declination correction to convert magnetic north to true north
+*
+* @param[in]: mag_declination: local magnetic declination in radians (positive = east)
+*             orientation_mag: orientation relative to magnetic north [3] (yaw, pitch, roll)
+* @param[out]: orientation_true: orientation relative to true north [3] (yaw, pitch, roll)
+*/
+void sf_9xagm_apply_declination(double mag_declination,
+                                const double orientation_mag[3],
+                                double       orientation_true[3])
+{
+	// Copy pitch and roll unchanged
+	orientation_true[1] = orientation_mag[1];  // pitch (theta)
+	orientation_true[2] = orientation_mag[2];  // roll (phi)
+
+	// Apply declination correction to yaw (psi)
+	// Positive declination means magnetic north is east of true north
+	orientation_true[0] = orientation_mag[0] + (mag_declination * RAD2DEG);
+
+	// Normalize yaw to [0, 360) range
+	if (orientation_true[0] < 0.0) {
+		orientation_true[0] += 360.0;
+	} else if (orientation_true[0] >= 360.0) {
+		orientation_true[0] -= 360.0;
+	}
+}
+
+/**
+* @brief: Detect magnetic disturbances
+* Analyzes magnetometer data to detect magnetic field disturbances
+* that could affect heading accuracy
+*
+* @param[in]: mag_data: current magnetometer measurements [3]
+*             mag_ref: reference magnetic field vector [3]
+*             threshold: disturbance detection threshold (normalized)
+* @param[out]: returns 1 if disturbance detected, 0 if field is clean
+*/
+int sf_9xagm_detect_mag_disturbance(const double mag_data[3],
+                                    const double mag_ref[3],
+                                    double       threshold)
+{
+	double mag_norm, ref_norm;
+	double mag_diff;
+	uint32_t i;
+
+	// Compute magnitudes
+	mag_norm = sqrt(mag_data[0]*mag_data[0] + mag_data[1]*mag_data[1] + mag_data[2]*mag_data[2]);
+	ref_norm = sqrt(mag_ref[0]*mag_ref[0] + mag_ref[1]*mag_ref[1] + mag_ref[2]*mag_ref[2]);
+
+	// Check for valid measurements
+	if (mag_norm < EPSILON || ref_norm < EPSILON) {
+		return 1;  // Invalid data treated as disturbance
+	}
+
+	// Compute magnitude difference (normalized)
+	mag_diff = fabs(mag_norm - ref_norm) / ref_norm;
+
+	// Check if magnitude difference exceeds threshold
+	if (mag_diff > threshold) {
+		return 1;  // Disturbance detected
+	}
+
+	// Also check direction consistency by computing dot product
+	// of normalized vectors
+	double dot_product = 0.0;
+	for(i = CHX; i <= CHZ; i++) {
+		dot_product += (mag_data[i] / mag_norm) * (mag_ref[i] / ref_norm);
+	}
+
+	// If vectors are significantly misaligned, flag as disturbance
+	// dot_product < cos(30°) ≈ 0.866 indicates > 30° angular difference
+	if (dot_product < 0.866) {
+		return 1;  // Disturbance detected (direction mismatch)
+	}
+
+	return 0;  // No disturbance detected
+}
+
+/**
+* @brief: Adaptive magnetometer fusion gain
+* Dynamically adjusts magnetometer fusion gain based on motion state
+* and magnetic field stability
+*
+* @param[in]: gyro_magnitude: current angular velocity magnitude (rad/s)
+*             accel_magnitude: current linear acceleration magnitude (m/s²)
+*             mag_stability: magnetometer field stability metric (0.0-1.0)
+* @param[out]: returns adaptive gain value (0.0 to 1.0)
+*/
+double sf_9xagm_adaptive_mag_gain(double gyro_magnitude,
+                                  double accel_magnitude,
+                                  double mag_stability)
+{
+	double gain = 1.0;
+
+	// Reduce gain during high angular velocity (likely rotating)
+	// Threshold: 0.5 rad/s (~28.6 deg/s)
+	if (gyro_magnitude > 0.5) {
+		double gyro_factor = exp(-5.0 * (gyro_magnitude - 0.5));
+		gain *= gyro_factor;
+	}
+
+	// Reduce gain during high linear acceleration (likely experiencing external forces)
+	// Threshold: deviation from 1g by more than 0.3g
+	double accel_dev = fabs(accel_magnitude / GTOMSEC2 - 1.0);
+	if (accel_dev > 0.3) {
+		double accel_factor = exp(-5.0 * (accel_dev - 0.3));
+		gain *= accel_factor;
+	}
+
+	// Reduce gain if magnetic field is unstable
+	// mag_stability should be 1.0 for stable field, 0.0 for unstable
+	gain *= mag_stability;
+
+	// Clamp gain to valid range [0.0, 1.0]
+	if (gain < 0.0) gain = 0.0;
+	if (gain > 1.0) gain = 1.0;
+
+	return gain;
 }
 
 void sf_9xagm_algo_stop(uintptr_t sf_algo_id)

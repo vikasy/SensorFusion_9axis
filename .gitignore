@@ -90,3 +90,8 @@ htmlcov/
 Sources_org/
 
 
+
+# CTest and test artifacts
+build/test_artifacts/
+build/CTestTestfile.cmake
+build/Testing/
