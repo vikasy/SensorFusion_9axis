@@ -73,7 +73,7 @@ uint32_t sf_6xag_data_preproc(uintptr_t        sf_algo_id,
 		// release sensor_data_sem if held
 		//printf("acc count = %d\n", acc_count);
 		acc_count = acc_count + 1;
-		if(acc_count > SF_OVERSAMPLE_RATIO) {
+		if(acc_count == SF_OVERSAMPLE_RATIO) {
 			acc_count = 0;
 			signal_sf_6xag_run = signal_sf_6xag_run | ACC_READY_BIT;
 		    float avg_wt = (ptr_state_vec_6XAG->AccData.ScaleFactor) / SF_OVERSAMPLE_RATIO;

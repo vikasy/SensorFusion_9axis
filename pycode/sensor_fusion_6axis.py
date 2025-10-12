@@ -65,7 +65,7 @@ SF_ACC_MISSING = 8
 SF_MAX_ORIENT_ERR = 100
 
 # Sampling constants
-SF_OVERSAMPLE_RATIO = 1
+SF_OVERSAMPLE_RATIO = 4  # Ratio of gyro/accel sampling frequency (must match C code)
 SF_GYRO_FS = 100  # Hz
 SF_GYRO_SAMP_INTVL = 1.0 / SF_GYRO_FS  # seconds
 SF_DELTA_T = SF_GYRO_SAMP_INTVL
@@ -150,6 +150,11 @@ class SensorFusion6Axis:
         self.rot_mtx_post = np.eye(3)
         self.quat_post = Quaternion()
         self.omega = np.zeros(3)
+
+        # Sample counters for oversampling buffer
+        self.acc_count = 0
+        self.gyro_count = 0
+        self.signal_sf_run = 0  # Bit 0=ACC_READY, Bit 1=GYRO_READY
 
         # Orientation angles (degrees)
         self.phi_post = 0.0    # Roll
@@ -316,27 +321,62 @@ class SensorFusion6Axis:
 
         return rot_mtx
 
-    def preprocess_sensor_data(self, sensor_id: int, sensor_data: np.ndarray, timestamp: int):
+    def preprocess_sensor_data(self, sensor_id: int, sensor_data: np.ndarray, timestamp: int) -> int:
         """
-        Preprocess incoming sensor data
+        Preprocess incoming sensor data - implements oversampling buffer
+        Collects SF_OVERSAMPLE_RATIO samples before signaling ready
 
         Args:
             sensor_id: Sensor ID (ACC=0, GYRO=1)
             sensor_data: Sensor measurements [x, y, z] in raw counts
             timestamp: Timestamp in nanoseconds
+
+        Returns:
+            Signal bits: 0x1=ACC_READY, 0x2=GYRO_READY, 0x3=BOTH_READY
         """
+        ACC_READY_BIT = 1
+        GYRO_READY_BIT = 2
+
         if sensor_id == SensorID.ACC:
-            # Update accelerometer data
-            self.acc_data.count_buff[0] = sensor_data.astype(np.int16)
-            self.acc_data.count_avg = sensor_data.astype(np.int16)
-            self.acc_data.timestamp = timestamp
-            self.sens_flags |= 1
+            # Buffer accelerometer sample (C code: lines 66-92)
+            self.acc_data.count_buff[self.acc_count] = sensor_data.astype(np.int16)
+            if self.acc_count == 0:
+                # Save timestamp of first sample in buffer
+                self.acc_data.timestamp = timestamp
+
+            self.acc_count += 1
+            if self.acc_count == SF_OVERSAMPLE_RATIO:
+                # Buffer full - compute average and signal ready
+                self.acc_count = 0
+                self.signal_sf_run |= ACC_READY_BIT
+
+                # Compute weighted average (matching C code lines 79-91)
+                avg_wt = self.acc_data.scale_factor / SF_OVERSAMPLE_RATIO
+                for k in range(3):
+                    self.acc_data.count_avg[k] = 0
+                    for i in range(SF_OVERSAMPLE_RATIO):
+                        self.acc_data.count_avg[k] += self.acc_data.count_buff[i, k]
+                    # Rounding (matching C)
+                    if self.acc_data.count_avg[k] > 0:
+                        self.acc_data.count_avg[k] += SF_OVERSAMPLE_RATIO // 2
+                    else:
+                        self.acc_data.count_avg[k] -= SF_OVERSAMPLE_RATIO // 2
+                    self.acc_data.count_avg[k] *= avg_wt
+
         elif sensor_id == SensorID.GYRO:
-            # Update gyroscope data
-            self.gyro_data.count_buff[0] = sensor_data.astype(np.int16)
-            self.gyro_data.count_avg = sensor_data.astype(np.int16)
-            self.gyro_data.timestamp = timestamp
-            self.sens_flags |= 2
+            # Buffer gyroscope sample (C code: lines 96-109)
+            self.gyro_data.count_buff[self.gyro_count] = sensor_data.astype(np.int16)
+            if self.gyro_count == 0:
+                # Save timestamp of first sample in buffer
+                self.gyro_data.timestamp = timestamp
+
+            self.gyro_count += 1
+            if self.gyro_count == SF_OVERSAMPLE_RATIO:
+                # Buffer full - signal ready
+                self.gyro_count = 0
+                self.signal_sf_run |= GYRO_READY_BIT
+
+        return self.signal_sf_run
 
     def time_update(self):
         """
@@ -350,7 +390,7 @@ class SensorFusion6Axis:
             # Compute angular velocity (bias-corrected) in deg/s
             for i in range(3):
                 self.omega[i] = self.gyro_data.count_buff[k, i] * self.gyro_data.scale_factor
-                self.omega[i] -= self.bias_post_s[i]  # Use bias_post_s, not bias_err_post_s
+                self.omega[i] -= self.bias_post_s[i]
                 self.ang_rate_prev[i] = self.omega[i]
 
             # Integrate quaternion
@@ -616,6 +656,9 @@ class SensorFusion6Axis:
         output.mode = self.op_mode
         output.timestamp_ns = curr_time_msec * NSEC2MSEC
 
+        # Clear signal flags after processing
+        self.signal_sf_run = 0
+
         return output
 
 
@@ -731,24 +774,24 @@ def rotation_matrix_to_angles(rot_mtx: np.ndarray, prev_theta: float, prev_psi: 
     """
     MAX_POS_PITCH_DEG = 179.9999
 
-    # Roll angle [-90, 90)
-    phi = np.arcsin(rot_mtx[0, 2]) * RAD2DEG
+    # Pitch angle [-90, 90) - AN5017 NED: θ = asin(-R[0][2])
+    theta = np.arcsin(-rot_mtx[0, 2]) * RAD2DEG
 
     # Initialize with previous values
-    theta = prev_theta
+    phi = prev_theta  # using prev_theta as temporary storage for roll
     psi = prev_psi
 
-    # Pitch and yaw angles (avoiding gimbal lock)
+    # Roll and yaw angles (avoiding gimbal lock) - AN5017 NED
     if (rot_mtx[0, 2] < (1 - EPSILON)) and (rot_mtx[0, 2] > -(1 - EPSILON)):
-        theta = np.arctan2(-rot_mtx[1, 2], rot_mtx[2, 2]) * RAD2DEG
-        psi = np.arctan2(-rot_mtx[0, 1], rot_mtx[0, 0]) * RAD2DEG
+        phi = np.arctan2(rot_mtx[1, 2], rot_mtx[2, 2]) * RAD2DEG  # AN5017: φ = atan2(R[1][2], R[2][2])
+        psi = np.arctan2(rot_mtx[0, 1], rot_mtx[0, 0]) * RAD2DEG  # AN5017: ψ = atan2(R[0][1], R[0][0])
     else:
-        # Gimbal lock resolution
+        # Gimbal lock at pitch = ±90° (AN5017 Section 2.6, Eqs 23-24)
         angle_val = np.arctan2(rot_mtx[1, 0], rot_mtx[1, 1]) * RAD2DEG
-        if rot_mtx[0, 2] >= (1 - EPSILON):
-            psi = angle_val - theta
-        else:
-            psi = angle_val + theta
+        if rot_mtx[0, 2] <= -(1 - EPSILON):  # pitch = +90°
+            psi = angle_val - phi  # tan(ψ - φ) = R[1][0]/R[1][1]
+        else:  # pitch = -90°
+            psi = angle_val + phi  # tan(ψ + φ) = -R[1][0]/R[1][1]
 
     # Normalize angles
     if theta > MAX_POS_PITCH_DEG:

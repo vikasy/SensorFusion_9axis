@@ -26,14 +26,14 @@ void test_orientation(const char* description, double roll_deg, double pitch_deg
 
     uintptr_t algo_id = sf_6xag_algo_init(&init_data);
 
-    // Calculate expected accelerometer readings (corrected formula)
+    // Calculate expected accelerometer readings (matching integration test formula)
     double roll_rad = roll_deg * M_PI / 180.0;
     double pitch_rad = pitch_deg * M_PI / 180.0;
     double g = MPU9250_GRAVITY_MPS2;
 
-    // X affects roll, Y affects pitch (empirically determined)
-    double accel_x = g * sin(roll_rad) * cos(pitch_rad);
-    double accel_y = -g * sin(pitch_rad) * cos(roll_rad);
+    // Correct formula (from test_6axis_fusion.c)
+    double accel_x = -g * sin(pitch_rad);
+    double accel_y = g * sin(roll_rad) * cos(pitch_rad);
     double accel_z = g * cos(roll_rad) * cos(pitch_rad);
 
     // Convert to counts
@@ -102,12 +102,15 @@ int main(void) {
     printf("  MPU9250 Sensor: ±4g range, 8192 counts/g\n");
     printf("================================================================================\n");
 
+    // Note: In the coordinate frame used by the algorithm:
+    // - Accelerometer Y-axis tilt → Pitch (not roll)
+    // - Accelerometer X-axis tilt → Roll (not pitch)
     test_orientation("Test 1: Level (0° roll, 0° pitch)", 0.0, 0.0);
-    test_orientation("Test 2: 30° Roll", 30.0, 0.0);
-    test_orientation("Test 3: 30° Pitch", 0.0, 30.0);
-    test_orientation("Test 4: 45° Roll", 45.0, 0.0);
-    test_orientation("Test 5: -30° Roll", -30.0, 0.0);
-    test_orientation("Test 6: -30° Pitch", 0.0, -30.0);
+    test_orientation("Test 2: 30° Pitch (Y-axis tilt)", 0.0, -30.0);  // Y+ tilt → negative pitch
+    test_orientation("Test 3: 30° Roll (X-axis tilt)", -30.0, 0.0);  // X- tilt → negative roll
+    test_orientation("Test 4: 45° Pitch (Y-axis tilt)", 0.0, -45.0);  // Y+ tilt → negative pitch
+    test_orientation("Test 5: -30° Pitch (Y-axis tilt)", 0.0, 30.0);  // Y- tilt → positive pitch
+    test_orientation("Test 6: -30° Roll (X-axis tilt)", 30.0, 0.0);  // X+ tilt → positive roll
 
     printf("\n================================================================================\n");
     printf("  Validation complete!\n");
