@@ -288,8 +288,8 @@ class SensorFusion6Axis:
         # gravity vector [0, 0, -1] to the measured gravity direction
 
         # Third column of rotation matrix is the down direction
-        # For level device with gravity in -Z: R[:,2] = -grav_norm
-        V3 = -grav_norm
+        # For level device with gravity in +Z: R[:,2] = grav_norm
+        V3 = grav_norm
 
         # Find orthogonal vectors for X and Y axes
         # Choose X axis to be perpendicular to gravity, favoring [1,0,0]

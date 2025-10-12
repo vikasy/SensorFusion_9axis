@@ -255,7 +255,19 @@ See `test/data/DATASETS_GUIDE.md` for complete documentation.
 
 ### Current Test Status (October 12, 2025)
 
-**✅ ALL ACTIVE TESTS PASSING (100% pass rate)**
+**✅ PRODUCTION READY - ALL CORE TESTS PASSING (100% pass rate)**
+
+> **📄 For complete test details, see:** [`TEST_STATUS.md`](TEST_STATUS.md)
+>
+> This document includes:
+> - Full CMake test results (49 unit tests)
+> - Python rigorous accuracy validation (11 tests)
+> - Python/C parity verification
+> - Coordinate frame bug analysis and fix
+> - All 16 test executables status
+> - Known issues and recommendations
+
+### Quick Summary
 
 #### Unit Tests
 - ✅ **Quaternion Math**: 26/26 tests PASS
@@ -697,9 +709,11 @@ Static Library: ~80 KB (compiled with -O2)
 | Document | Location | Description |
 |----------|----------|-------------|
 | **Main README** | `README.md` | This file - complete project documentation |
+| **Test Status** | `TEST_STATUS.md` | **Complete test results & analysis** |
 | **Test README** | `test/README.md` | Complete test suite documentation |
 | **Datasets Guide** | `test/data/DATASETS_GUIDE.md` | Dataset organization and usage |
 | **Sensor Specs** | `code/app/inc/sensor_spec_agm.h` | MPU9250/AK8963 specifications |
+| **Debug Framework** | `DEBUG_README.md` | Synchronized C/Python debugging |
 | **Test Results** | `test/tests/e2e_tests/*_RESULTS.md` | Detailed E2E test results |
 
 ### Test Documentation Files
