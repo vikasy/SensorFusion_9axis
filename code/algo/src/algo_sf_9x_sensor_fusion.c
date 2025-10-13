@@ -1,13 +1,107 @@
 
-/*****
-* Author: Vikas Yadav
-* Date: 2020
-* 9-Axis Sensor Fusion (Accelerometer + Gyroscope + Magnetometer)
-*/
+/**
+ * @file algo_sf_9x_sensor_fusion.c
+ * @brief 9-Axis Extended Kalman Filter for Sensor Fusion (Accel + Gyro + Magnetometer)
+ * @author Vikas Yadav
+ * @date 2020
+ *
+ * @section ALGORITHM_OVERVIEW Algorithm Overview
+ *
+ * This module implements a 9-axis Extended Kalman Filter (EKF) for sensor fusion
+ * combining accelerometer, gyroscope, and magnetometer measurements to estimate
+ * device orientation with absolute heading (yaw) reference, gravity vector,
+ * linear acceleration, gyroscope bias, and magnetic field disturbance.
+ *
+ * @subsection STATE_VECTOR State Vector (12 DOF)
+ * The filter estimates a 12-dimensional state vector:
+ * - x[0:2]: Orientation error (3 DOF) - rotation angles in degrees
+ * - x[3:5]: Gyroscope bias (3 DOF) - bias error in deg/s
+ * - x[6:8]: Linear acceleration (3 DOF) - in m/s²
+ * - x[9:11]: Magnetic field disturbance (3 DOF) - in μT
+ *
+ * @subsection QUATERNION_REPRESENTATION Quaternion Representation
+ * Orientation is represented internally using unit quaternions to avoid gimbal lock
+ * and provide efficient rotation updates. The quaternion is converted to Euler angles
+ * and rotation matrix for output.
+ *
+ * @subsection EKF_EQUATIONS Extended Kalman Filter Equations
+ *
+ * Time Update (Prediction):
+ * - x_k = F * x_{k-1} + w_k
+ * - P_k = F * P_{k-1} * F^T + Q
+ *
+ * Measurement Update (Correction):
+ * - K = P * H^T * (H * P * H^T + R)^{-1}
+ * - x_k = x_k + K * (z - h(x_k))
+ * - P_k = (I - K * H) * P
+ *
+ * Where:
+ * - F: State transition matrix
+ * - Q: Process noise covariance matrix (4x4 blocks for 9-axis)
+ * - H: Measurement matrix
+ * - R: Measurement noise covariance matrix
+ * - K: Kalman gain
+ * - P: Error covariance matrix
+ *
+ * @subsection SENSOR_FUSION Sensor Fusion Strategy
+ * - Gyroscope: Used for time update (high frequency, drift accumulation)
+ * - Accelerometer: Used for measurement update (gravity reference, tilt correction)
+ * - Magnetometer: Used for measurement update (heading reference, yaw correction)
+ * - Magnetic disturbance detection prevents corruption from local magnetic fields
+ * - Fusion provides drift-free 3D orientation with absolute heading
+ *
+ * @subsection MAGNETOMETER_HANDLING Magnetometer Processing
+ * - Hard iron calibration: Removes constant magnetic offsets
+ * - Soft iron calibration: Corrects for sensor axis misalignment
+ * - Magnetic declination: Converts magnetic north to true north
+ * - Disturbance detection: 30% magnitude deviation threshold
+ * - Adaptive gain: Reduces magnetometer weight during motion/disturbance
+ *
+ * @subsection REFERENCES References
+ * - AN5023: NXP 9-Axis Sensor Fusion Implementation
+ * - AN5017: NXP Sensor Fusion Mathematics
+ * - Freescale Sensor Fusion Library
+ */
 
 #include "algo_sf_9x_sensor_fusion.h"
 #include "algo_sf_sensordata.h"
 
+/*==============================================================================
+ * Private Constants
+ *============================================================================*/
+
+/** @brief Maximum positive pitch angle before wrapping (degrees) */
+#define SF_9XAGM_MAX_POS_PITCH_DEG          (179.9999)
+
+/** @brief Gyroscope bias time averaging window (1 hour at gyro sample rate) */
+#define SF_9XAGM_GYRO_BIAS_TIME_AVG_LEN     (60*60*SF_GYRO_FS)
+
+/** @brief Magnitude check threshold for zero-detection */
+#define SF_9XAGM_MAGNITUDE_THRESHOLD        (1e-6)
+
+/** @brief Symmetry coefficient for covariance matrix averaging */
+#define SF_9XAGM_COVARIANCE_SYMMETRY_FACTOR (0.5)
+
+/** @brief Time constant for linear acceleration estimation model (seconds) */
+#define SF_9XAGM_LINEAR_ACC_TIME_CONSTANT   (0.5)
+
+/** @brief Magnetic disturbance angular deviation threshold (cos(30°) ≈ 0.866) */
+#define SF_9XAGM_MAG_DIRECTION_THRESHOLD    (0.866)
+
+/** @brief Angular velocity threshold for adaptive mag gain (rad/s) */
+#define SF_9XAGM_GYRO_MOTION_THRESHOLD      (0.5)
+
+/** @brief Linear acceleration deviation threshold for adaptive mag gain (g) */
+#define SF_9XAGM_ACCEL_DEVIATION_THRESHOLD  (0.3)
+
+/** @brief Exponential decay factor for adaptive gain computation */
+#define SF_9XAGM_ADAPTIVE_GAIN_DECAY_FACTOR (5.0)
+
+/*==============================================================================
+ * Private Function Prototypes
+ *============================================================================*/
+
+/* State Initialization Functions */
 static void sf_9xagm_algo_reset(state_vec_9XAGM_t *ptr_state_vec_9XAGM);
 static void sf_9xagm_algo_init_orient(state_vec_9XAGM_t *ptr_state_vec_9XAGM,
 	                                   phys_sensor_t     *ptr_accel_data,
@@ -18,8 +112,38 @@ static void sf_9xagm_algo_tilt_rotmtx(const double accel_avg[3],
 static void sf_9xagm_algo_measupdate_mag(state_vec_9XAGM_t *ptr_state_vec_9XAGM,
                                           phys_sensor_t     *ptr_mag_data);
 
+/*==============================================================================
+ * State Initialization Functions
+ *============================================================================*/
 
-
+/**
+ * @brief Resets the 9-axis sensor fusion algorithm state to initial conditions
+ *
+ * This function initializes all state variables to their default values:
+ * - Rotation matrix and quaternion to identity
+ * - Error covariance matrix P to zero (4x4 blocks for 9-axis)
+ * - Process noise covariance matrix Q to zero (off-diagonal blocks)
+ * - Magnetometer calibration parameters to defaults
+ * - Hard iron offset to zero, soft iron matrix to identity
+ * - Magnetic field reference to zero (initialized on first measurement)
+ * - All orientation angles (roll, pitch, yaw) to zero
+ * - Gravity vector to standard gravity (-9.80665 m/s² in Z-direction)
+ * - Linear acceleration and magnetic disturbance to zero
+ * - Gyroscope bias and error states to zero
+ * - Operation mode flags and timestamps to initial state
+ *
+ * @param[in,out] ptr_state_vec_9XAGM Pointer to 9-axis algorithm state structure
+ *
+ * @return None
+ *
+ * @note This function is called both during initialization and when a reset
+ *       is explicitly requested via the Reset flag
+ * @note The quaternion and rotation matrix are initialized to identity, but
+ *       will be properly initialized with real sensor data during the first
+ *       algorithm run via sf_9xagm_algo_init_orient()
+ * @note For 9-axis, the state vector is 12 DOF (orientation, bias, lin_acc, mag_dist)
+ *       requiring a 4x4 block matrix for error covariance
+ */
 static void sf_9xagm_algo_reset(state_vec_9XAGM_t *ptr_state_vec_9XAGM)
 {
     // initialize rotation matrix and quaternion to 1
@@ -116,21 +240,49 @@ static void sf_9xagm_algo_reset(state_vec_9XAGM_t *ptr_state_vec_9XAGM)
 
 } /* sf_9xagm_algo_reset */
 
-  /**
-  * @brief: This function is an interface between SF algorithm and algorithm manager.
-  * It is used by algoritm manager to create 6axis (accel+gyro) SF algorithm, which outputs
-  * gravity, lin acceleration, game rotation vector, and orientaton angle among other things.
-  * This function internally allocates the memory required for algo state data.
-  *
-  * @param[in]: algo_init_data: pointer to algo init data which include physical sensor
-  *                  information required for filter algo
-  *
-  * @param[out]: sf_algo_id: A unique id for this SF algo, to be used by algorithm manager
-  *                   for all other API based communication with SF algo, e.g. to send data
-  *                   to this algo, or to run this algo to get algo output, or to stop this algo.
-  *                   Returns 0 if invalid input or if no memory to allocate
-  *
-  */
+/*==============================================================================
+ * Public Interface Functions
+ *============================================================================*/
+
+/**
+ * @brief Initializes the 9-axis sensor fusion algorithm and allocates state memory
+ *
+ * This function is the interface between the sensor fusion algorithm and algorithm
+ * manager. It creates a new 9-axis (accelerometer + gyroscope + magnetometer) sensor
+ * fusion algorithm instance that outputs gravity, linear acceleration, rotation
+ * vector, orientation angles with absolute heading (yaw), and magnetic field data.
+ *
+ * The function performs the following initialization steps:
+ * 1. Validates input parameters
+ * 2. Allocates memory for algorithm state data structure
+ * 3. Configures sensor specifications (scale factors, sensor IDs)
+ * 4. Initializes Kalman filter noise parameters (Q and R matrices)
+ * 5. Sets magnetometer-specific noise parameters
+ * 6. Sets linear acceleration time constant
+ * 7. Resets all state variables to initial conditions
+ *
+ * @param[in] algo_init_data Pointer to algorithm initialization data containing:
+ *                           - Acc_GPERCOUNT: Accelerometer scale factor (g per count)
+ *                           - Gyro_DPSPERCOUNT: Gyroscope scale factor (deg/s per count)
+ *                           - Mag_UTPERCOUNT: Magnetometer scale factor (μT per count)
+ *
+ * @return Unique algorithm ID (pointer to state structure) for subsequent API calls
+ * @retval 0 If initialization failed (invalid input or memory allocation failure)
+ * @retval non-zero Valid algorithm ID to be used for all future API communications
+ *
+ * @note The returned algorithm ID must be saved by the algorithm manager and used
+ *       for all subsequent operations (data input, algorithm run, stop)
+ * @note Memory is dynamically allocated using calloc() and must be freed using
+ *       sf_9xagm_algo_stop() when algorithm is no longer needed
+ * @note Process noise matrix Q tuning parameters (9-axis):
+ *       - ProcNoiseVarOrient: Orientation error variance
+ *       - ProcNoiseVarBias: Gyroscope bias variance
+ *       - ProcNoiseVarBiasOrient: Cross-correlation between bias and orientation
+ *       - ProcNoiseVarLinAcc: Linear acceleration variance
+ *       - ProcNoiseVarMagDist: Magnetic disturbance variance (9-axis specific)
+ * @note Measurement noise matrices R are computed for both accelerometer and
+ *       magnetometer from sensor noise characteristics plus discretization error
+ */
 uintptr_t sf_9xagm_algo_init(sf_algo_init_data_t *algo_init_data)
 {
 	state_vec_9XAGM_t *ptr_state_vec_9XAGM;
@@ -175,7 +327,7 @@ uintptr_t sf_9xagm_algo_init(sf_algo_init_data_t *algo_init_data)
 	ptr_state_vec_9XAGM->MeasNoiseVarMag = SF_9XAGM_QVMAG + SF_9XAGM_QWMAG + ((SF_6XAG_QVGYRO + SF_6XAG_QWGYRO) * SF_DELTA_T_SQ);
 
 	// set time constant for linear acceleration estimation model
-	ptr_state_vec_9XAGM->LinAccTC = 0.5;
+	ptr_state_vec_9XAGM->LinAccTC = SF_9XAGM_LINEAR_ACC_TIME_CONSTANT;
 
 	// set the reset flag
 	sf_9xagm_algo_reset(ptr_state_vec_9XAGM);
@@ -190,6 +342,35 @@ uintptr_t sf_9xagm_algo_init(sf_algo_init_data_t *algo_init_data)
 
 } /* sf_9xagm_algo_init */
 
+/**
+ * @brief Initializes orientation state using accelerometer and magnetometer tilt/heading measurement
+ *
+ * This function performs the initial orientation lock using accelerometer and magnetometer
+ * data to establish the gravity reference frame and magnetic heading. It is called once
+ * during the first algorithm run to initialize the rotation matrix and quaternion from
+ * real sensor measurements rather than using the identity matrix.
+ *
+ * The initialization process:
+ * 1. Converts accelerometer and magnetometer counts to physical units
+ * 2. Computes tilt-compensated heading rotation matrix using both sensors
+ * 3. Converts rotation matrix to unit quaternion
+ * 4. Sets OrientInit flag to prevent re-initialization
+ *
+ * @param[in,out] ptr_state_vec_9XAGM Pointer to 9-axis algorithm state structure
+ * @param[in] ptr_accel_data Pointer to accelerometer sensor data containing:
+ *                           - CountAvg: Averaged accelerometer counts [3]
+ *                           - ScaleFactor: Accelerometer scale factor (g per count)
+ * @param[in] ptr_mag_data Pointer to magnetometer sensor data containing:
+ *                         - CountAvg: Averaged magnetometer counts [3]
+ *                         - ScaleFactor: Magnetometer scale factor (μT per count)
+ *
+ * @return None
+ *
+ * @note This function modifies RotMtxPost and QuatPost in the state structure
+ * @note The function assumes gravity is the dominant acceleration during initialization
+ * @note The magnetometer provides absolute heading reference (yaw), unlike 6-axis
+ * @note Uses tilt-compensated magnetometer to establish North-East-Down (NED) frame
+ */
 static void sf_9xagm_algo_init_orient(state_vec_9XAGM_t *ptr_state_vec_9XAGM,
 	                                 phys_sensor_t    *ptr_accel_data,
 	                                 phys_sensor_t    *ptr_mag_data)
@@ -211,12 +392,48 @@ static void sf_9xagm_algo_init_orient(state_vec_9XAGM_t *ptr_state_vec_9XAGM,
 	// clear the reset flag
 	ptr_state_vec_9XAGM->OrientInit = true;
 
-} /* sf_9xagm_algo_reset */
+} /* sf_9xagm_algo_init_orient */
 
-
-
-
-static void sf_9xagm_algo_run_orig(state_vec_9XAGM_t *ptr_state_vec_9XAGM, 
+/**
+ * @brief Main algorithm execution function (internal implementation)
+ *
+ * This is the core execution function that runs the 9-axis sensor fusion algorithm.
+ * It implements the complete Extended Kalman Filter cycle including time updates
+ * (prediction) and measurement updates (correction) for both accelerometer and
+ * magnetometer.
+ *
+ * Algorithm execution flow:
+ * 1. Check for reset request and reinitialize if needed
+ * 2. Perform one-time orientation initialization using accelerometer+magnetometer
+ * 3. Apply nominal time update when new gyroscope data is available
+ * 4. Apply accelerometer measurement update when new data is available
+ * 5. Apply magnetometer measurement update when new data is available (with disturbance check)
+ * 6. Check for stale or missing magnetometer data and update operation mode
+ * 7. Compute gravity vector from updated rotation matrix
+ * 8. Convert rotation matrix to Euler angles
+ * 9. Populate output structure with all estimated states
+ *
+ * @param[in,out] ptr_state_vec_9XAGM Pointer to 9-axis algorithm state structure
+ * @param[out] ptr_algo_out Pointer to algorithm output structure containing:
+ *                          - algo_type: Algorithm type identifier (SF_9AGM)
+ *                          - quat: Orientation quaternion (q0, q1, q2, q3)
+ *                          - orientation: Euler angles [yaw, pitch, roll] in degrees
+ *                          - gravity: Gravity vector in sensor frame [x, y, z] in m/s²
+ *                          - linear_acc: Linear acceleration in global frame [x, y, z] in m/s²
+ *                          - valid_flag: Output validity indicator
+ *                          - mode: Current operation mode flags
+ *                          - timestamp_ns: Output timestamp in nanoseconds
+ *
+ * @return None
+ *
+ * @note Time update is performed at gyroscope sampling rate (high frequency)
+ * @note Accelerometer measurement update at accelerometer sampling rate
+ * @note Magnetometer measurement update at magnetometer sampling rate (typically lower)
+ * @note Magnetic disturbance detection uses 30% magnitude deviation threshold
+ * @note Magnetometer updates are skipped during detected disturbances
+ * @note Function maintains timestamp tracking to detect stale/missing sensor data
+ */
+static void sf_9xagm_algo_run_orig(state_vec_9XAGM_t *ptr_state_vec_9XAGM,
 	                               sf_algo_output_t *ptr_algo_out)
 {
 	int64_t     curr_time_msec;
@@ -261,7 +478,7 @@ static void sf_9xagm_algo_run_orig(state_vec_9XAGM_t *ptr_state_vec_9XAGM,
 		// Detect magnetic disturbance (threshold: 30% magnitude deviation)
 		int disturbance = sf_9xagm_detect_mag_disturbance(mag_measured,
 		                                                   ptr_state_vec_9XAGM->MagFieldRef,
-		                                                   0.3);
+		                                                   SF_9XAGM_ACCEL_DEVIATION_THRESHOLD);
 
 		// Only apply magnetometer update if no disturbance detected
 		if (!disturbance) {
@@ -314,9 +531,44 @@ static void sf_9xagm_algo_run_orig(state_vec_9XAGM_t *ptr_state_vec_9XAGM,
 
 }
 
+/*==============================================================================
+ * Orientation Computation Functions
+ *============================================================================*/
 
-/*  Calculate tilt-compensated orientation matrix using accelerometer and magnetometer data 
-*/
+/**
+ * @brief Computes tilt-compensated heading rotation matrix from accelerometer and magnetometer
+ *
+ * This function calculates an initial orientation (rotation matrix) based on both
+ * accelerometer and magnetometer data. The algorithm establishes a North-East-Down (NED)
+ * coordinate frame by using the accelerometer to determine tilt and the magnetometer
+ * to determine heading.
+ *
+ * Algorithm steps:
+ * 1. Normalize gravity vector from accelerometer (down vector, Z-axis)
+ * 2. Normalize magnetometer reading
+ * 3. Remove tilt from magnetic field: project onto horizontal plane
+ * 4. Normalize horizontal magnetic field to get north vector (X-axis)
+ * 5. Compute east vector: east = down × north (cross product, Y-axis)
+ * 6. Construct rotation matrix R = [north east down]
+ *
+ * This establishes a full 3-DOF orientation including absolute heading (yaw),
+ * unlike the 6-axis case which can only determine tilt (roll and pitch).
+ *
+ * @param[in] accel_avg Averaged accelerometer measurements [x, y, z] in m/s²
+ *                      Expected to measure gravity vector (nominally -9.81 m/s² in Z)
+ * @param[in] mag_avg Averaged magnetometer measurements [x, y, z] in μT
+ *                    Expected to measure Earth's magnetic field
+ * @param[out] RotMtx Computed 3x3 rotation matrix representing device orientation
+ *                    Columns: [north east down] in NED frame
+ *
+ * @return None
+ *
+ * @note The function returns identity matrix if either sensor has invalid magnitude
+ * @note Tilt compensation is critical: horizontal mag field = mag - (mag·down)*down
+ * @note This provides absolute heading reference, eliminating yaw drift
+ * @note The rotation matrix maps global NED frame to sensor frame
+ * @note Fallback orientations are used if computed vectors are invalid
+ */
 static void sf_9xagm_algo_tilt_rotmtx(const double accel_avg[3],
 	                                 const double mag_avg[3],
 	                                 double       RotMtx[3][3])
@@ -382,14 +634,48 @@ static void sf_9xagm_algo_tilt_rotmtx(const double accel_avg[3],
 
 }
 
-/*  Update the orientation angles, compass heading, and tilt angles (in Deg) 
-*  based on the updated rotation matrix 
-*  Input: Rotation Matrix, cordinate frame, prev theta and psi angles 
-*  Output: -90 <= phi <= 90  
-*         -180 <= theta < 180 
-*          0 <= psi, rho, tilt < 360 
-*  Use prev values of theta and psi for resolving Gimbal lock condition 
-*/
+/**
+ * @brief Converts rotation matrix to Euler angles (roll, pitch, yaw) with gimbal lock handling
+ *
+ * This function extracts Euler angles from a rotation matrix using the NED (North-East-Down)
+ * convention. It handles gimbal lock singularities at roll = ±90° by using previous angle
+ * values to resolve ambiguities. The function provides compass heading and tilt angle in
+ * addition to standard Euler angles.
+ *
+ * Euler angle extraction (NED convention):
+ * - roll (φ): φ = asin(R[0][2])
+ * - pitch (θ): θ = atan2(-R[1][2], R[2][2])
+ * - yaw (ψ): ψ = atan2(-R[0][1], R[0][0])
+ *
+ * Gimbal lock handling (when |R[0][2]| ≈ 1):
+ * - At roll = +90°: ψ - θ = atan2(R[1][0], R[1][1])
+ * - At roll = -90°: ψ + θ = atan2(R[1][0], R[1][1])
+ * - Alternates between solving for ψ and θ using previous values
+ *
+ * Output angle ranges:
+ * - roll (φ): [-90°, +90°]
+ * - pitch (θ): [-180°, +180°)
+ * - yaw (ψ): [0°, 360°)
+ * - compass heading (ρ): [0°, 360°) - same as yaw for magnetic reference
+ * - tilt (χ): [0°, 180°] - angle from vertical
+ *
+ * @param[in] RotMtx 3x3 rotation matrix (sensor to global frame)
+ * @param[out] theta Pitch angle in degrees [-180, 180)
+ * @param[out] phi Roll angle in degrees [-90, 90]
+ * @param[out] psi Yaw angle in degrees [0, 360) - magnetic heading
+ * @param[out] rho Compass heading in degrees [0, 360) (same as psi for 9-axis)
+ * @param[out] chi Tilt angle from vertical in degrees [0, 180]
+ * @param[in] prev_theta Previous pitch angle for gimbal lock resolution
+ * @param[in] prev_psi Previous yaw angle for gimbal lock resolution
+ *
+ * @return None
+ *
+ * @note Gimbal lock occurs when |R[0][2]| > (1 - EPSILON), handled using previous values
+ * @note The function uses atan2_safe() for numerically stable arctangent computation
+ * @note Tilt angle χ = acos(R[2][2]) represents total tilt from vertical axis
+ * @note For 9-axis, yaw (ψ) has absolute reference from magnetometer
+ * @note Maximum positive pitch is clamped to SF_9XAGM_MAX_POS_PITCH_DEG (179.9999°)
+ */
 void sf_9xagm_algo_rotmtx2angles(const double RotMtx[3][3],
                                        double       *theta,
                                        double       *phi,
@@ -399,8 +685,6 @@ void sf_9xagm_algo_rotmtx2angles(const double RotMtx[3][3],
 	                                   double       prev_theta,
 	                                   double       prev_psi)
 {
-    #define MAX_POS_PITCH_DEG (179.9999)
-
 	static uint32_t prev_theta_used = 0;
 	double          angle_val;
 	uint32_t        angle_vld;
@@ -446,7 +730,7 @@ void sf_9xagm_algo_rotmtx2angles(const double RotMtx[3][3],
 		}
 	}
 
-	if (*theta > MAX_POS_PITCH_DEG) {
+	if (*theta > SF_9XAGM_MAX_POS_PITCH_DEG) {
 		*theta = -180.0;
 	}
 	if (*psi < 0.0) {
@@ -464,7 +748,48 @@ void sf_9xagm_algo_rotmtx2angles(const double RotMtx[3][3],
 
 }
 
+/*==============================================================================
+ * Kalman Filter Time Update (Prediction) Functions
+ *============================================================================*/
 
+/**
+ * @brief Performs Kalman filter time update (prediction step) using gyroscope data
+ *
+ * This function implements the Extended Kalman Filter (EKF) time update (prediction step)
+ * using gyroscope measurements. It propagates the state forward in time and updates the
+ * error covariance matrix. For 9-axis, this handles a 12-dimensional state vector.
+ *
+ * Time Update Equations:
+ * 1. State prediction: x_k = F * x_{k-1} + B * u_k
+ *    - Orientation: Quaternion integration using bias-corrected gyro rates
+ *    - Gyro bias: Propagated with process noise (random walk model)
+ *    - Linear acceleration: Decayed using time constant
+ *    - Magnetic disturbance: Propagated with process noise
+ *
+ * 2. Covariance prediction: P_k = F * P_{k-1} * F^T + Q
+ *    - Q: Process noise covariance (adaptive based on previous P)
+ *
+ * Algorithm steps:
+ * 1. Apply bias correction to gyroscope measurements
+ * 2. Integrate quaternion for all oversampled gyro measurements
+ * 3. Normalize quaternion to maintain unit constraint
+ * 4. Update rotation matrix from quaternion
+ * 5. Check for missing gyro data and update operation mode
+ * 6. Update process noise covariance Q as function of previous P (4x4 blocks)
+ * 7. Check orientation error threshold for covariance update control
+ *
+ * @param[in,out] ptr_state_vec_9XAGM Pointer to 9-axis algorithm state structure
+ *
+ * @return None
+ *
+ * @note Gyroscope measurements are processed with SF_OVERSAMPLE_RATIO samples per update
+ * @note Quaternion integration uses small angle approximation for efficiency
+ * @note Process noise Q is adaptive: Q = f(P) + Q_init, where f(P) accounts for
+ *       coupling between orientation, bias, linear acceleration, and magnetic disturbance
+ * @note If gyro data is missing for > SF_GYRO_MAX_MISS_DUR, covariance update is skipped
+ * @note Orientation error threshold SF_MAX_ORIENT_ERR triggers covariance freeze
+ * @note For 9-axis: 4x4 block matrix structure for P and Q (vs 3x3 for 6-axis)
+ */
 void sf_9xagm_algo_nom_timeupdate(state_vec_9XAGM_t *ptr_state_vec_9XAGM)
 {
 #ifdef GYRO_BIAS_TIME_AVG
@@ -579,7 +904,60 @@ void sf_9xagm_algo_nom_timeupdate(state_vec_9XAGM_t *ptr_state_vec_9XAGM)
 
 }
 
+/*==============================================================================
+ * Kalman Filter Measurement Update (Correction) Functions
+ *============================================================================*/
 
+/**
+ * @brief Performs Kalman filter measurement update (correction step) using accelerometer data
+ *
+ * This function implements the Extended Kalman Filter (EKF) measurement update (correction step)
+ * using accelerometer measurements. It compares predicted gravity with measured acceleration
+ * to correct orientation, gyro bias, linear acceleration, and (for 9-axis) magnetic disturbance
+ * estimates.
+ *
+ * Measurement Update Equations:
+ * 1. Innovation (measurement residual): z = y_measured - h(x_predicted)
+ *    - Gravity error: z_g = accel_measured - gravity_predicted
+ *
+ * 2. Kalman Gain: K = P * H^T * (H * P * H^T + R)^{-1}
+ *    - H: Measurement matrix (linearized observation model)
+ *    - R: Measurement noise covariance
+ *
+ * 3. State correction: x = x + K * z
+ *    - Orientation correction via quaternion rotation
+ *    - Gyro bias correction
+ *    - Linear acceleration update with time constant decay
+ *
+ * 4. Covariance correction: P = (I - K * H) * P
+ *    - Joseph form for numerical stability and symmetry enforcement
+ *
+ * Algorithm steps:
+ * 1. Compute gravity prediction from current rotation matrix
+ * 2. Compute innovation (gravity error) including linear acceleration compensation
+ * 3. Compute measurement matrix C (cross-product form for orientation)
+ * 4. Compute Kalman gain K = Q_w * C^T * inv(C * Q_w * C^T + Q_v)
+ * 5. Compute state correction vector
+ * 6. Update quaternion using correction (integrate and normalize)
+ * 7. Update rotation matrix from corrected quaternion
+ * 8. Update gyro bias
+ * 9. Update linear acceleration estimate
+ * 10. Update error covariance matrix with symmetry enforcement
+ *
+ * @param[in,out] ptr_state_vec_9XAGM Pointer to 9-axis algorithm state structure
+ *
+ * @return None
+ *
+ * @note Measurement matrix C[0] = -[g×] relates orientation error to gravity error
+ * @note Measurement matrix C[1] = δt*[g×] relates bias error to gravity error
+ * @note Measurement matrix C[2] = I relates linear acceleration to gravity error
+ * @note Linear acceleration uses first-order lag with time constant LinAccTC
+ * @note Covariance update uses Joseph form: P = (I-KC)*Q_w*(I-KC)^T + K*R*K^T
+ *       simplified to: P = (I-KC)*Q_w for computational efficiency
+ * @note Symmetry is enforced: P = 0.5*(P + P^T) + ε*I
+ * @note Missing accelerometer data for > SF_ACCEL_MAX_MISS_DUR sets degraded mode flag
+ * @note For 9-axis: measurement does not directly observe magnetic disturbance state
+ */
 void sf_9xagm_algo_measupdate(state_vec_9XAGM_t *ptr_state_vec_9XAGM)
 {
 	
@@ -755,7 +1133,7 @@ void sf_9xagm_algo_measupdate(state_vec_9XAGM_t *ptr_state_vec_9XAGM)
 			}
 			TranspBlkMtx_3x3(&Atemp, &Btemp);
 			AddBlkMtx_3x3(&Atemp, &Btemp, &Gtemp);
-			ScaleBlkMtx_3x3(0.5, &Gtemp, &Atemp);
+			ScaleBlkMtx_3x3(SF_9XAGM_COVARIANCE_SYMMETRY_FACTOR, &Gtemp, &Atemp);
 			if (i == j) {
 				IdentityBlkMtx_3x3(&Gtemp);
 				ScaleBlkMtx_3x3(EPSILON, &Gtemp, &Btemp);
@@ -792,10 +1170,52 @@ void sf_9xagm_algo_measupdate(state_vec_9XAGM_t *ptr_state_vec_9XAGM)
 }
 
 /**
-* @brief: 9-axis magnetometer measurement update
-* Performs full Kalman filter measurement update using magnetometer data
-* Following AN5023 implementation for proper magnetic field fusion
-*/
+ * @brief Performs Kalman filter measurement update (correction step) using magnetometer data
+ *
+ * This function implements the Extended Kalman Filter (EKF) measurement update for magnetometer
+ * observations, providing absolute heading (yaw) correction and magnetic disturbance estimation.
+ * This is the key differentiator between 6-axis and 9-axis sensor fusion.
+ *
+ * Magnetometer Measurement Model:
+ * - Measures Earth's magnetic field in sensor frame
+ * - Normalized for direction-only comparison (magnitude-invariant)
+ * - Compares measured field to expected field from current orientation
+ * - Provides absolute yaw reference, eliminating gyro drift in heading
+ *
+ * Algorithm steps:
+ * 1. Apply hard iron calibration offset to raw magnetometer data
+ * 2. Normalize measured magnetic field for direction comparison
+ * 3. Initialize or use existing magnetic field reference in global frame
+ * 4. Project reference field to sensor frame using current orientation
+ * 5. Compute measurement innovation (magnetic field error)
+ * 6. Build measurement matrix C for magnetometer observation model:
+ *    - C[0]: Orientation error coupling (cross-product with mag field)
+ *    - C[1]: Gyro bias coupling (zero - mag not affected by gyro bias)
+ *    - C[2]: Linear acceleration coupling (zero - mag not affected by accel)
+ *    - C[3]: Magnetic disturbance coupling (identity)
+ * 7. Compute Kalman gain K = Q_w * C^T * inv(C * Q_w * C^T + R_mag)
+ * 8. Apply state correction for all 12 states
+ * 9. Update quaternion and rotation matrix
+ * 10. Update error covariance matrix (4x4 blocks)
+ * 11. Store calibrated magnetometer data in sensor and global frames
+ *
+ * @param[in,out] ptr_state_vec_9XAGM Pointer to 9-axis algorithm state structure
+ * @param[in] ptr_mag_data Pointer to magnetometer sensor data containing:
+ *                         - CountAvg: Averaged magnetometer counts [3]
+ *                         - ScaleFactor: Magnetometer scale factor (μT per count)
+ *
+ * @return None
+ *
+ * @note First magnetometer measurement initializes magnetic field reference
+ * @note Magnetometer provides direction only; magnitude variations are ignored
+ * @note Measurement is skipped if magnetometer magnitude < EPSILON (invalid data)
+ * @note Reference field is transformed to sensor frame: B_sensor = R * B_global
+ * @note Magnetic disturbance state absorbs local field variations
+ * @note This update affects all states due to coupling in error covariance
+ * @note Measurement noise R_mag accounts for sensor noise and model uncertainty
+ * @note Covariance symmetry enforced: P = 0.5*(P + P^T) + ε*I
+ * @note Reference: AN5023 for 9-axis magnetometer fusion implementation
+ */
 static void sf_9xagm_algo_measupdate_mag(state_vec_9XAGM_t *ptr_state_vec_9XAGM,
                                           phys_sensor_t     *ptr_mag_data)
 {
@@ -985,7 +1405,7 @@ static void sf_9xagm_algo_measupdate_mag(state_vec_9XAGM_t *ptr_state_vec_9XAGM,
 			}
 			TranspBlkMtx_3x3(&Atemp, &Btemp);
 			AddBlkMtx_3x3(&Atemp, &Btemp, &Gtemp);
-			ScaleBlkMtx_3x3(0.5, &Gtemp, &Atemp);
+			ScaleBlkMtx_3x3(SF_9XAGM_COVARIANCE_SYMMETRY_FACTOR, &Gtemp, &Atemp);
 			if (i == j) {
 				IdentityBlkMtx_3x3(&Gtemp);
 				ScaleBlkMtx_3x3(EPSILON, &Gtemp, &Btemp);
@@ -1019,15 +1439,43 @@ static void sf_9xagm_algo_measupdate_mag(state_vec_9XAGM_t *ptr_state_vec_9XAGM,
 	}
 }
 
+/*==============================================================================
+ * Magnetometer Calibration and Utility Functions
+ *============================================================================*/
+
 /**
-* @brief: Apply magnetometer calibration (hard and soft iron correction)
-* Applies hard iron offset and soft iron matrix correction to raw magnetometer data
-*
-* @param[in]: mag_raw: raw magnetometer measurements [3]
-*             cal_offset: hard iron offset calibration [3]
-*             cal_matrix: soft iron correction matrix [3x3]
-* @param[out]: mag_cal: calibrated magnetometer measurements [3]
-*/
+ * @brief Applies magnetometer calibration (hard iron and soft iron correction)
+ *
+ * This function performs comprehensive magnetometer calibration to correct for both
+ * hard iron and soft iron distortions. Hard iron effects are constant magnetic offsets
+ * from ferromagnetic materials near the sensor. Soft iron effects are sensor axis
+ * misalignments and scale factor errors from ferromagnetic materials that distort
+ * the magnetic field.
+ *
+ * Calibration equation:
+ * B_calibrated = C * (B_raw - B_offset)
+ * Where:
+ * - B_raw: Raw magnetometer measurements
+ * - B_offset: Hard iron offset (3-vector)
+ * - C: Soft iron correction matrix (3x3)
+ * - B_calibrated: Calibrated magnetometer measurements
+ *
+ * @param[in] mag_raw Raw magnetometer measurements [x, y, z] in μT (uncalibrated)
+ * @param[in] cal_offset Hard iron offset calibration [x, y, z] in μT
+ *                       Constant bias from nearby ferromagnetic materials
+ * @param[in] cal_matrix Soft iron correction matrix [3x3] (dimensionless)
+ *                       Corrects for axis misalignment and scale factors
+ * @param[out] mag_cal Calibrated magnetometer measurements [x, y, z] in μT
+ *
+ * @return None
+ *
+ * @note Hard iron calibration is applied first: mag = mag_raw - offset
+ * @note Soft iron calibration is applied second: mag_cal = matrix * mag
+ * @note Calibration parameters should be determined through calibration procedure
+ * @note Typical hard iron offsets range from -50 to +50 μT
+ * @note Soft iron matrix is typically close to identity for quality sensors
+ * @note For uncalibrated sensors, use offset=[0,0,0] and matrix=I
+ */
 void sf_9xagm_apply_mag_calibration(const double mag_raw[3],
                                     const double cal_offset[3],
                                     const double cal_matrix[3][3],
@@ -1051,13 +1499,44 @@ void sf_9xagm_apply_mag_calibration(const double mag_raw[3],
 }
 
 /**
-* @brief: Compute magnetic declination correction
-* Applies magnetic declination correction to convert magnetic north to true north
-*
-* @param[in]: mag_declination: local magnetic declination in radians (positive = east)
-*             orientation_mag: orientation relative to magnetic north [3] (yaw, pitch, roll)
-* @param[out]: orientation_true: orientation relative to true north [3] (yaw, pitch, roll)
-*/
+ * @brief Applies magnetic declination correction to convert magnetic north to true north
+ *
+ * This function corrects for magnetic declination, which is the angle between magnetic
+ * north (measured by magnetometer) and true north (geographic north pole). Declination
+ * varies by location and changes over time, ranging from -180° to +180°.
+ *
+ * The correction adjusts only the yaw angle; pitch and roll remain unchanged as they
+ * are not affected by the difference between magnetic and true north.
+ *
+ * Declination convention:
+ * - Positive declination: Magnetic north is EAST of true north
+ * - Negative declination: Magnetic north is WEST of true north
+ *
+ * Example locations (approximate 2020 values):
+ * - New York, USA: -13° (west)
+ * - London, UK: -1° (west)
+ * - Tokyo, Japan: -7° (west)
+ * - Sydney, Australia: +12° (east)
+ *
+ * @param[in] mag_declination Local magnetic declination in radians (positive = east of true north)
+ *                            Typical range: -π to +π radians (-180° to +180°)
+ * @param[in] orientation_mag Orientation relative to magnetic north [yaw, pitch, roll] in degrees
+ *                            - yaw: [0, 360°) relative to magnetic north
+ *                            - pitch: [-180°, 180°)
+ *                            - roll: [-90°, 90°]
+ * @param[out] orientation_true Orientation relative to true north [yaw, pitch, roll] in degrees
+ *                              - yaw: [0, 360°) relative to true north
+ *                              - pitch: unchanged
+ *                              - roll: unchanged
+ *
+ * @return None
+ *
+ * @note Only yaw (heading) is affected by declination; pitch and roll are copied unchanged
+ * @note Declination is added to magnetic heading: yaw_true = yaw_mag + declination
+ * @note Result is normalized to [0, 360°) range
+ * @note Declination data can be obtained from NOAA's World Magnetic Model (WMM)
+ * @note Declination changes slowly over time (~0.1-0.5° per year at mid-latitudes)
+ */
 void sf_9xagm_apply_declination(double mag_declination,
                                 const double orientation_mag[3],
                                 double       orientation_true[3])
@@ -1079,15 +1558,44 @@ void sf_9xagm_apply_declination(double mag_declination,
 }
 
 /**
-* @brief: Detect magnetic disturbances
-* Analyzes magnetometer data to detect magnetic field disturbances
-* that could affect heading accuracy
-*
-* @param[in]: mag_data: current magnetometer measurements [3]
-*             mag_ref: reference magnetic field vector [3]
-*             threshold: disturbance detection threshold (normalized)
-* @param[out]: returns 1 if disturbance detected, 0 if field is clean
-*/
+ * @brief Detects magnetic field disturbances that could corrupt heading estimates
+ *
+ * This function analyzes magnetometer measurements to detect local magnetic disturbances
+ * from ferromagnetic objects, electrical equipment, or other magnetic sources. Such
+ * disturbances can temporarily corrupt the heading estimate and should be rejected.
+ *
+ * Detection strategy (two-stage):
+ * 1. Magnitude check: Compare field magnitude to reference (threshold deviation)
+ * 2. Direction check: Compare field direction to reference (angular deviation)
+ *
+ * A disturbance is flagged if EITHER:
+ * - Magnitude deviation > threshold (e.g., 30% = 0.3)
+ * - Angular deviation > SF_9XAGM_MAG_DIRECTION_THRESHOLD (30°)
+ *
+ * Common disturbance sources:
+ * - Ferromagnetic objects (tools, vehicles, buildings)
+ * - Electrical equipment (motors, transformers, power lines)
+ * - Electronic devices (speakers, hard drives)
+ * - Permanent magnets
+ *
+ * @param[in] mag_data Current magnetometer measurements [x, y, z] in μT
+ * @param[in] mag_ref Reference magnetic field vector [x, y, z] in μT
+ *                    Established during calibration or initialization
+ * @param[in] threshold Magnitude disturbance detection threshold (normalized, 0.0-1.0)
+ *                      Typical value: 0.3 (30% deviation)
+ *                      Lower = more sensitive, Higher = more tolerant
+ *
+ * @return Disturbance detection status
+ * @retval 1 Disturbance detected (measurements should be rejected)
+ * @retval 0 No disturbance (measurements are clean)
+ *
+ * @note Invalid data (magnitude < EPSILON) is treated as a disturbance
+ * @note Magnitude check: |mag_norm - ref_norm| / ref_norm > threshold
+ * @note Direction check: mag·ref / (|mag||ref|) < cos(30°) ≈ SF_9XAGM_MAG_DIRECTION_THRESHOLD
+ * @note Direction threshold corresponds to 30° angular deviation
+ * @note Earth's magnetic field ranges from ~25-65 μT depending on latitude
+ * @note Typical disturbances cause 20-50% magnitude changes
+ */
 int sf_9xagm_detect_mag_disturbance(const double mag_data[3],
                                     const double mag_ref[3],
                                     double       threshold)
@@ -1121,8 +1629,8 @@ int sf_9xagm_detect_mag_disturbance(const double mag_data[3],
 	}
 
 	// If vectors are significantly misaligned, flag as disturbance
-	// dot_product < cos(30°) ≈ 0.866 indicates > 30° angular difference
-	if (dot_product < 0.866) {
+	// dot_product < cos(30°) ≈ SF_9XAGM_MAG_DIRECTION_THRESHOLD indicates > 30° angular difference
+	if (dot_product < SF_9XAGM_MAG_DIRECTION_THRESHOLD) {
 		return 1;  // Disturbance detected (direction mismatch)
 	}
 
@@ -1130,15 +1638,47 @@ int sf_9xagm_detect_mag_disturbance(const double mag_data[3],
 }
 
 /**
-* @brief: Adaptive magnetometer fusion gain
-* Dynamically adjusts magnetometer fusion gain based on motion state
-* and magnetic field stability
-*
-* @param[in]: gyro_magnitude: current angular velocity magnitude (rad/s)
-*             accel_magnitude: current linear acceleration magnitude (m/s²)
-*             mag_stability: magnetometer field stability metric (0.0-1.0)
-* @param[out]: returns adaptive gain value (0.0 to 1.0)
-*/
+ * @brief Computes adaptive magnetometer fusion gain based on motion and stability
+ *
+ * This function dynamically adjusts the weight given to magnetometer measurements
+ * in the sensor fusion algorithm based on device motion and magnetic field stability.
+ * The gain is reduced during motion or magnetic disturbances to prevent corrupting
+ * the orientation estimate with unreliable magnetometer data.
+ *
+ * Adaptive gain strategy:
+ * - High gain (near 1.0): Stationary device, stable magnetic field
+ * - Low gain (near 0.0): High motion, unstable magnetic field
+ * - Exponential decay with SF_9XAGM_ADAPTIVE_GAIN_DECAY_FACTOR = 5.0
+ *
+ * Motion detection criteria:
+ * - Angular velocity > SF_9XAGM_GYRO_MOTION_THRESHOLD (0.5 rad/s ≈ 28.6°/s)
+ * - Linear acceleration deviation > SF_9XAGM_ACCEL_DEVIATION_THRESHOLD (0.3g)
+ *
+ * Gain computation:
+ * gain = exp(-5*(gyro-0.5)) * exp(-5*(|accel|/g-1-0.3)) * stability
+ *
+ * @param[in] gyro_magnitude Current angular velocity magnitude in rad/s
+ *                           Typical stationary: < 0.1 rad/s
+ *                           Typical motion: 0.5-5 rad/s
+ * @param[in] accel_magnitude Current linear acceleration magnitude in m/s²
+ *                            Typical stationary: ≈9.81 m/s² (1g)
+ *                            Typical motion: deviates from 1g
+ * @param[in] mag_stability Magnetometer field stability metric (0.0 to 1.0)
+ *                          1.0 = perfectly stable field
+ *                          0.0 = highly unstable/disturbed field
+ *
+ * @return Adaptive gain value
+ * @retval 0.0 to 1.0 Gain multiplier for magnetometer fusion weight
+ *                    1.0 = full trust, 0.0 = no trust
+ *
+ * @note Gyro threshold SF_9XAGM_GYRO_MOTION_THRESHOLD = 0.5 rad/s (28.6°/s)
+ * @note Accel threshold SF_9XAGM_ACCEL_DEVIATION_THRESHOLD = 0.3g
+ * @note Decay factor SF_9XAGM_ADAPTIVE_GAIN_DECAY_FACTOR = 5.0 (exponential)
+ * @note All factors are multiplied: gain = gyro_factor * accel_factor * stability
+ * @note Result is clamped to [0.0, 1.0] range
+ * @note This adaptive mechanism prevents magnetic disturbances from corrupting orientation
+ * @note Lower gain means less magnetometer influence, more reliance on gyroscope
+ */
 double sf_9xagm_adaptive_mag_gain(double gyro_magnitude,
                                   double accel_magnitude,
                                   double mag_stability)
@@ -1146,17 +1686,17 @@ double sf_9xagm_adaptive_mag_gain(double gyro_magnitude,
 	double gain = 1.0;
 
 	// Reduce gain during high angular velocity (likely rotating)
-	// Threshold: 0.5 rad/s (~28.6 deg/s)
-	if (gyro_magnitude > 0.5) {
-		double gyro_factor = exp(-5.0 * (gyro_magnitude - 0.5));
+	// Threshold: SF_9XAGM_GYRO_MOTION_THRESHOLD rad/s (~28.6 deg/s)
+	if (gyro_magnitude > SF_9XAGM_GYRO_MOTION_THRESHOLD) {
+		double gyro_factor = exp(-SF_9XAGM_ADAPTIVE_GAIN_DECAY_FACTOR * (gyro_magnitude - SF_9XAGM_GYRO_MOTION_THRESHOLD));
 		gain *= gyro_factor;
 	}
 
 	// Reduce gain during high linear acceleration (likely experiencing external forces)
-	// Threshold: deviation from 1g by more than 0.3g
+	// Threshold: deviation from 1g by more than SF_9XAGM_ACCEL_DEVIATION_THRESHOLD
 	double accel_dev = fabs(accel_magnitude / GTOMSEC2 - 1.0);
-	if (accel_dev > 0.3) {
-		double accel_factor = exp(-5.0 * (accel_dev - 0.3));
+	if (accel_dev > SF_9XAGM_ACCEL_DEVIATION_THRESHOLD) {
+		double accel_factor = exp(-SF_9XAGM_ADAPTIVE_GAIN_DECAY_FACTOR * (accel_dev - SF_9XAGM_ACCEL_DEVIATION_THRESHOLD));
 		gain *= accel_factor;
 	}
 

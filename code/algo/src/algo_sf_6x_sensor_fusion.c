@@ -1,36 +1,156 @@
 
-/*****
-* Author: Vikas Yadav
-* Date: 2020
-* 6-Axis Sensor Fusion (Accelerometer + Gyroscope)
-*/
+/**
+ * @file algo_sf_6x_sensor_fusion.c
+ * @brief 6-Axis Extended Kalman Filter for Sensor Fusion (Accelerometer + Gyroscope)
+ * @author Vikas Yadav
+ * @date 2020
+ *
+ * @section ALGORITHM_OVERVIEW Algorithm Overview
+ *
+ * This module implements a 6-axis Extended Kalman Filter (EKF) for sensor fusion
+ * combining accelerometer and gyroscope measurements to estimate device orientation,
+ * gravity vector, linear acceleration, and gyroscope bias.
+ *
+ * @subsection STATE_VECTOR State Vector (9 DOF)
+ * The filter estimates a 9-dimensional state vector:
+ * - x[0:2]: Orientation error (3 DOF) - rotation angles in degrees
+ * - x[3:5]: Gyroscope bias (3 DOF) - bias error in deg/s
+ * - x[6:8]: Linear acceleration (3 DOF) - in m/s²
+ *
+ * @subsection QUATERNION_REPRESENTATION Quaternion Representation
+ * Orientation is represented internally using unit quaternions to avoid gimbal lock
+ * and provide efficient rotation updates. The quaternion is converted to Euler angles
+ * and rotation matrix for output.
+ *
+ * @subsection EKF_EQUATIONS Extended Kalman Filter Equations
+ *
+ * Time Update (Prediction):
+ * - x_k = F * x_{k-1} + w_k
+ * - P_k = F * P_{k-1} * F^T + Q
+ *
+ * Measurement Update (Correction):
+ * - K = P * H^T * (H * P * H^T + R)^{-1}
+ * - x_k = x_k + K * (z - h(x_k))
+ * - P_k = (I - K * H) * P
+ *
+ * Where:
+ * - F: State transition matrix
+ * - Q: Process noise covariance matrix
+ * - H: Measurement matrix
+ * - R: Measurement noise covariance matrix
+ * - K: Kalman gain
+ * - P: Error covariance matrix
+ *
+ * @subsection SENSOR_FUSION Sensor Fusion Strategy
+ * - Gyroscope: Used for time update (high frequency, drift accumulation)
+ * - Accelerometer: Used for measurement update (low frequency, drift-free gravity reference)
+ * - Fusion combines gyroscope's fast response with accelerometer's stable reference
+ *
+ * @subsection REFERENCES References
+ * - AN5017: NXP Sensor Fusion Implementation
+ * - Freescale Sensor Fusion Library
+ */
 
 #include "algo_sf_fusion.h"
 #include "algo_sf_6x_sensor_fusion.h"
 
-// Global debug counter
+/*==============================================================================
+ * Private Constants
+ *============================================================================*/
+
+/** @brief Maximum positive pitch angle before wrapping (degrees) */
+#define SF_6XAG_MAX_POS_PITCH_DEG           (179.9999)
+
+/** @brief Gyroscope bias clamp limit (deg/s) to prevent unbounded growth */
+#define SF_6XAG_GYRO_BIAS_CLAMP_MAX         (5.0)
+#define SF_6XAG_GYRO_BIAS_CLAMP_MIN         (-5.0)
+
+/** @brief Time constant for linear acceleration estimation model (seconds) */
+#define SF_6XAG_LINEAR_ACC_TIME_CONSTANT    (0.5)
+
+/** @brief Magnitude check threshold for zero-detection */
+#define SF_6XAG_MAGNITUDE_THRESHOLD         (1e-6)
+
+/** @brief Numerical threshold for vector normalization */
+#define SF_6XAG_NORMALIZATION_THRESHOLD     (1e-6)
+
+/** @brief Gram-Schmidt orthogonalization threshold for axis selection */
+#define SF_6XAG_GRAM_SCHMIDT_THRESHOLD      (0.9)
+
+/** @brief Symmetry coefficient for covariance matrix averaging */
+#define SF_6XAG_COVARIANCE_SYMMETRY_FACTOR  (0.5)
+
+/** @brief Debug sample count limit for detailed logging */
+#define SF_6XAG_DEBUG_SAMPLE_LIMIT          (22)
+
+/** @brief Gyroscope bias time averaging window (1 hour at gyro sample rate) */
+#define SF_6XAG_GYRO_BIAS_TIME_AVG_LEN      (60*60*SF_GYRO_FS)
+
+/** @brief Magnetic disturbance detection threshold (30% deviation) */
+#define SF_6XAG_MAG_DISTURBANCE_THRESHOLD   (0.3)
+
+/*==============================================================================
+ * Private Global Variables
+ *============================================================================*/
+
+/** @brief Global debug counter for sample tracking */
 static int global_sample_count = 0;
 
+/*==============================================================================
+ * Private Function Prototypes
+ *============================================================================*/
+
+/* State Initialization Functions */
 static void sf_6xag_algo_reset(state_vec_6XAG_t *ptr_state_vec_6XAG);
 static void sf_6xag_algo_init_orient(state_vec_6XAG_t *ptr_state_vec_6XAG,
-	                                 phys_sensor_t    *ptr_accel_data);
+                                      phys_sensor_t    *ptr_accel_data);
 static void sf_6xag_algo_tilt_rotmtx(const double accel_avg[3],
-	                                 double       RotMtx[3][3]);
+                                      double       RotMtx[3][3]);
 
+/* Kalman Filter Core Functions */
 void sf_6xag_algo_nom_timeupdate(state_vec_6XAG_t *ptr_state_vec_6XAG);
 void sf_6xag_algo_measupdate(state_vec_6XAG_t *ptr_state_vec_6XAG);
+
+/* Utility Functions */
 void sf_6xag_algo_rotmtx2angles(const double RotMtx[3][3],
-									   double       *theta,
-									   double       *phi,
-									   double       *psi,
-									   double       *rho,
-									   double       *chi,
-									   double       prev_theta,
-									   double       prev_psi);
+                                 double       *theta,
+                                 double       *phi,
+                                 double       *psi,
+                                 double       *rho,
+                                 double       *chi,
+                                 double       prev_theta,
+                                 double       prev_psi);
 
+static void sf_6xag_algo_run_orig(state_vec_6XAG_t *ptr_state_vec_6XAG,
+                                   sf_algo_output_t *ptr_algo_out);
 
+/*==============================================================================
+ * State Initialization Functions
+ *============================================================================*/
 
-
+/**
+ * @brief Resets the 6-axis sensor fusion algorithm state to initial conditions
+ *
+ * This function initializes all state variables to their default values:
+ * - Rotation matrix and quaternion to identity
+ * - Error covariance matrix P to zero
+ * - Process noise covariance matrix Q to zero (off-diagonal blocks)
+ * - All orientation angles (roll, pitch, yaw) to zero
+ * - Gravity vector to standard gravity (-9.80665 m/s² in Z-direction)
+ * - Linear acceleration to zero
+ * - Gyroscope bias and error states to zero
+ * - Operation mode flags and timestamps to initial state
+ *
+ * @param[in,out] ptr_state_vec_6XAG Pointer to 6-axis algorithm state structure
+ *
+ * @return None
+ *
+ * @note This function is called both during initialization and when a reset
+ *       is explicitly requested via the Reset flag
+ * @note The quaternion and rotation matrix are initialized to identity, but
+ *       will be properly initialized with real sensor data during the first
+ *       algorithm run via sf_6xag_algo_init_orient()
+ */
 static void sf_6xag_algo_reset(state_vec_6XAG_t *ptr_state_vec_6XAG)
 {
     // initialize rotation matrix and quaternion to 1
@@ -97,21 +217,46 @@ static void sf_6xag_algo_reset(state_vec_6XAG_t *ptr_state_vec_6XAG)
 
 } /* sf_6xag_algo_reset */
 
-  /**
-  * @brief: This function is an interface between SF algorithm and algorithm manager.
-  * It is used by algoritm manager to create 6axis (accel+gyro) SF algorithm, which outputs
-  * gravity, lin acceleration, game rotation vector, and orientaton angle among other things.
-  * This function internally allocates the memory required for algo state data.
-  *
-  * @param[in]: algo_init_data: pointer to algo init data which include physical sensor
-  *                  information required for filter algo
-  *
-  * @param[out]: sf_algo_id: A unique id for this SF algo, to be used by algorithm manager
-  *                   for all other API based communication with SF algo, e.g. to send data
-  *                   to this algo, or to run this algo to get algo output, or to stop this algo.
-  *                   Returns 0 if invalid input or if no memory to allocate
-  *
-  */
+/*==============================================================================
+ * Public Interface Functions
+ *============================================================================*/
+
+/**
+ * @brief Initializes the 6-axis sensor fusion algorithm and allocates state memory
+ *
+ * This function is the interface between the sensor fusion algorithm and algorithm
+ * manager. It creates a new 6-axis (accelerometer + gyroscope) sensor fusion
+ * algorithm instance that outputs gravity, linear acceleration, game rotation
+ * vector, and orientation angles.
+ *
+ * The function performs the following initialization steps:
+ * 1. Validates input parameters
+ * 2. Allocates memory for algorithm state data structure
+ * 3. Configures sensor specifications (scale factors, sensor IDs)
+ * 4. Initializes Kalman filter noise parameters (Q and R matrices)
+ * 5. Sets linear acceleration time constant
+ * 6. Resets all state variables to initial conditions
+ *
+ * @param[in] algo_init_data Pointer to algorithm initialization data containing:
+ *                           - Acc_GPERCOUNT: Accelerometer scale factor (g per count)
+ *                           - Gyro_DPSPERCOUNT: Gyroscope scale factor (deg/s per count)
+ *
+ * @return Unique algorithm ID (pointer to state structure) for subsequent API calls
+ * @retval 0 If initialization failed (invalid input or memory allocation failure)
+ * @retval non-zero Valid algorithm ID to be used for all future API communications
+ *
+ * @note The returned algorithm ID must be saved by the algorithm manager and used
+ *       for all subsequent operations (data input, algorithm run, stop)
+ * @note Memory is dynamically allocated using calloc() and must be freed using
+ *       sf_6xag_algo_stop() when algorithm is no longer needed
+ * @note Process noise matrix Q tuning parameters:
+ *       - ProcNoiseVarOrient: Orientation error variance
+ *       - ProcNoiseVarBias: Gyroscope bias variance
+ *       - ProcNoiseVarBiasOrient: Cross-correlation between bias and orientation
+ *       - ProcNoiseVarLinAcc: Linear acceleration variance
+ * @note Measurement noise matrix R is computed from accelerometer and gyroscope
+ *       noise characteristics plus discretization error
+ */
 uintptr_t sf_6xag_algo_init(sf_algo_init_data_t *algo_init_data)
 {
 	state_vec_6XAG_t *ptr_state_vec_6XAG;
@@ -150,7 +295,7 @@ uintptr_t sf_6xag_algo_init(sf_algo_init_data_t *algo_init_data)
 	ptr_state_vec_6XAG->MeasNoiseVarAcc = SF_6XAG_QVACC + SF_6XAG_QWACC + ((SF_6XAG_QVGYRO + SF_6XAG_QWGYRO) * SF_DELTA_T_SQ);
 
 	// set time constant for linear acceleration estimation model
-	ptr_state_vec_6XAG->LinAccTC = 0.5;
+	ptr_state_vec_6XAG->LinAccTC = SF_6XAG_LINEAR_ACC_TIME_CONSTANT;
 
 	// clear the reset flag
 	sf_6xag_algo_reset(ptr_state_vec_6XAG);
@@ -165,7 +310,35 @@ uintptr_t sf_6xag_algo_init(sf_algo_init_data_t *algo_init_data)
 
 } /* sf_6xag_algo_init */
 
-
+/**
+ * @brief Initializes orientation state using accelerometer tilt measurement
+ *
+ * This function performs the initial orientation lock using accelerometer data
+ * to establish the gravity reference frame. It is called once during the first
+ * algorithm run to initialize the rotation matrix and quaternion from real
+ * sensor measurements rather than using the identity matrix.
+ *
+ * The initialization process:
+ * 1. Checks if averaged accelerometer data is available
+ * 2. Uses either averaged samples or most recent raw sample
+ * 3. Converts accelerometer counts to physical units (m/s²)
+ * 4. Computes tilt-aligned rotation matrix using Gram-Schmidt orthogonalization
+ * 5. Converts rotation matrix to unit quaternion
+ * 6. Sets OrientInit flag to prevent re-initialization
+ *
+ * @param[in,out] ptr_state_vec_6XAG Pointer to 6-axis algorithm state structure
+ * @param[in] ptr_accel_data Pointer to accelerometer sensor data containing:
+ *                           - CountAvg: Averaged accelerometer counts [3]
+ *                           - CountBuff: Raw accelerometer sample buffer
+ *                           - ScaleFactor: Accelerometer scale factor (g per count)
+ *
+ * @return None
+ *
+ * @note This function modifies RotMtxPost and QuatPost in the state structure
+ * @note The function assumes gravity is the dominant acceleration during initialization
+ * @note A magnitude check (threshold 1e-6) is used to determine if CountAvg is populated
+ * @note If CountAvg is not available, the most recent sample from CountBuff[0] is used
+ */
 static void sf_6xag_algo_init_orient(state_vec_6XAG_t *ptr_state_vec_6XAG,
 	                                 phys_sensor_t    *ptr_accel_data)
 {
@@ -179,7 +352,7 @@ static void sf_6xag_algo_init_orient(state_vec_6XAG_t *ptr_state_vec_6XAG,
 		mag_check += val * val;
 	}
 
-	if (mag_check < 1e-6) {
+	if (mag_check < SF_6XAG_MAGNITUDE_THRESHOLD) {
 		// CountAvg not yet populated - use most recent raw count from buffer
 		for(i = CHX; i <= CHZ; i++) {
 			// Use most recent sample from buffer (index 0)
@@ -202,9 +375,40 @@ static void sf_6xag_algo_init_orient(state_vec_6XAG_t *ptr_state_vec_6XAG,
 
 } /* sf_6xag_algo_init_orient */
 
-
-
-
+/**
+ * @brief Main algorithm execution function (internal implementation)
+ *
+ * This is the core execution function that runs the 6-axis sensor fusion algorithm.
+ * It implements the complete Extended Kalman Filter cycle including time updates
+ * (prediction) and measurement updates (correction).
+ *
+ * Algorithm execution flow:
+ * 1. Check for reset request and reinitialize if needed
+ * 2. Perform one-time orientation initialization using accelerometer tilt
+ * 3. Apply nominal time update when new gyroscope data is available
+ * 4. Apply measurement update when new accelerometer data is available
+ * 5. Compute gravity vector from updated rotation matrix
+ * 6. Convert rotation matrix to Euler angles
+ * 7. Populate output structure with all estimated states
+ *
+ * @param[in,out] ptr_state_vec_6XAG Pointer to 6-axis algorithm state structure
+ * @param[out] ptr_algo_out Pointer to algorithm output structure containing:
+ *                          - algo_type: Algorithm type identifier (SF_6AG)
+ *                          - quat: Orientation quaternion (q0, q1, q2, q3)
+ *                          - orientation: Euler angles [yaw, pitch, roll] in degrees
+ *                          - gravity: Gravity vector in sensor frame [x, y, z] in m/s²
+ *                          - linear_acc: Linear acceleration in global frame [x, y, z] in m/s²
+ *                          - valid_flag: Output validity indicator
+ *                          - mode: Current operation mode flags
+ *                          - timestamp_ns: Output timestamp in nanoseconds
+ *
+ * @return None
+ *
+ * @note Time update is performed at gyroscope sampling rate (high frequency)
+ * @note Measurement update is performed at accelerometer sampling rate (typically lower)
+ * @note The function maintains timestamp tracking to detect missing sensor data
+ * @note Debug output is generated for the first 22 samples for validation purposes
+ */
 static void sf_6xag_algo_run_orig(state_vec_6XAG_t *ptr_state_vec_6XAG,
 	                              sf_algo_output_t *ptr_algo_out)
 {
@@ -269,8 +473,8 @@ static void sf_6xag_algo_run_orig(state_vec_6XAG_t *ptr_state_vec_6XAG,
 	ptr_algo_out->mode = ptr_state_vec_6XAG->OpMode;
 	ptr_algo_out->timestamp_ns = curr_time_msec / NSEC2MSEC;
 
-	// Print calculated quaternion and bias for first 22 runs
-	if (global_sample_count <= 22) {
+	// Print calculated quaternion and bias for first SF_6XAG_DEBUG_SAMPLE_LIMIT runs
+	if (global_sample_count <= SF_6XAG_DEBUG_SAMPLE_LIMIT) {
 		printf("C Run[%d]: Quat=[%.15f, %.15f, %.15f, %.15f], BiasPostS=[%.12f, %.12f, %.12f]\n",
 			global_sample_count,
 			ptr_algo_out->quat.q0, ptr_algo_out->quat.q1,
@@ -280,9 +484,39 @@ static void sf_6xag_algo_run_orig(state_vec_6XAG_t *ptr_state_vec_6XAG,
 
 } /* sf_6xag_algo_run_orig */
 
+/*==============================================================================
+ * Orientation Computation Functions
+ *============================================================================*/
 
-/*  Calculate orientation matrix based on accelerometer sensor data 
-*/
+/**
+ * @brief Computes tilt-aligned rotation matrix from accelerometer measurements
+ *
+ * This function calculates an initial orientation (rotation matrix) based solely
+ * on accelerometer data using the Gram-Schmidt orthogonalization process. The
+ * algorithm assumes that the accelerometer measures only gravity (no linear
+ * acceleration) during initialization.
+ *
+ * Algorithm steps (matching Python implementation):
+ * 1. Normalize gravity vector (V3 = third column of rotation matrix)
+ * 2. Choose reference vector V1 based on gravity direction to avoid singularity
+ * 3. Apply Gram-Schmidt orthogonalization: V1 = V1 - (V1·V3)V3
+ * 4. Normalize V1 to get first column of rotation matrix
+ * 5. Compute V2 = V3 × V1 (cross product) for second column
+ * 6. Construct rotation matrix R = [V1 V2 V3]
+ *
+ * @param[in] accel_avg Averaged accelerometer measurements [x, y, z] in m/s²
+ *                      Expected to measure gravity vector (nominally -9.81 m/s² in Z)
+ * @param[out] RotMtx Computed 3x3 rotation matrix representing device orientation
+ *                    Columns: [V1 V2 V3] where V3 aligns with gravity
+ *
+ * @return None
+ *
+ * @note The function returns identity matrix if gravity magnitude < 1e-6 (invalid data)
+ * @note Reference vector selection uses threshold 0.9 to avoid numerical instability
+ * @note This is a "tilt-only" orientation (2 DOF) - yaw remains unconstrained
+ * @note The rotation matrix maps global frame to sensor frame
+ * @note Implementation matches Python reference for consistency
+ */
 static void sf_6xag_algo_tilt_rotmtx(const double accel_avg[3],
 	                                 double       RotMtx[3][3])
 {
@@ -300,7 +534,7 @@ static void sf_6xag_algo_tilt_rotmtx(const double accel_avg[3],
 	                accel_avg[1] * accel_avg[1] +
 	                accel_avg[2] * accel_avg[2]);
 
-	if (mag_grav < 1e-6) {
+	if (mag_grav < SF_6XAG_MAGNITUDE_THRESHOLD) {
 		// No gravity - return identity
 		for(k = 0; k < 3; k++) {
 			for(uint32_t j = 0; j < 3; j++) {
@@ -316,7 +550,7 @@ static void sf_6xag_algo_tilt_rotmtx(const double accel_avg[3],
 	}
 
 	// Choose reference vector for V1
-	if (fabs(V3[0]) < 0.9) {
+	if (fabs(V3[0]) < SF_6XAG_GRAM_SCHMIDT_THRESHOLD) {
 		V1[0] = 1.0;
 		V1[1] = 0.0;
 		V1[2] = 0.0;
@@ -334,7 +568,7 @@ static void sf_6xag_algo_tilt_rotmtx(const double accel_avg[3],
 
 	// Normalize V1
 	V1_norm = sqrt(V1[0]*V1[0] + V1[1]*V1[1] + V1[2]*V1[2]);
-	if (V1_norm > 1e-6) {
+	if (V1_norm > SF_6XAG_NORMALIZATION_THRESHOLD) {
 		for(k = 0; k < 3; k++) {
 			V1[k] = V1[k] / V1_norm;
 		}
@@ -357,14 +591,46 @@ static void sf_6xag_algo_tilt_rotmtx(const double accel_avg[3],
 	}
 }
 
-/*  Update the orientation angles, compass heading, and tilt angles (in Deg) 
-*  based on the updated rotation matrix 
-*  Input: Rotation Matrix, cordinate frame, prev theta and psi angles 
-*  Output: -90 <= phi <= 90  
-*         -180 <= theta < 180 
-*          0 <= psi, rho, tilt < 360 
-*  Use prev values of theta and psi for resolving Gimbal lock condition 
-*/
+/**
+ * @brief Converts rotation matrix to Euler angles (roll, pitch, yaw) with gimbal lock handling
+ *
+ * This function extracts Euler angles from a rotation matrix using the NED (North-East-Down)
+ * convention as specified in AN5017. It handles gimbal lock singularities at pitch = ±90°
+ * by using previous angle values to resolve ambiguities.
+ *
+ * Euler angle extraction (AN5017 NED convention):
+ * - pitch (θ): θ = asin(-R[0][2])
+ * - roll (φ): φ = atan2(R[1][2], R[2][2])
+ * - yaw (ψ): ψ = atan2(R[0][1], R[0][0])
+ *
+ * Gimbal lock handling (when |R[0][2]| ≈ 1):
+ * - At pitch = +90°: ψ - φ = atan2(R[1][0], R[1][1])
+ * - At pitch = -90°: ψ + φ = atan2(-R[1][0], R[1][1])
+ * - Alternates between solving for ψ and φ using previous values
+ *
+ * Output angle ranges:
+ * - roll (φ): [-90°, +90°]
+ * - pitch (θ): [-180°, +180°)
+ * - yaw (ψ): [0°, 360°)
+ * - compass heading (ρ): [0°, 360°) - same as yaw for 6-axis
+ * - tilt (χ): [0°, 180°] - angle from vertical
+ *
+ * @param[in] RotMtx 3x3 rotation matrix (sensor to global frame)
+ * @param[out] theta Pitch angle in degrees [-180, 180)
+ * @param[out] phi Roll angle in degrees [-90, 90]
+ * @param[out] psi Yaw angle in degrees [0, 360)
+ * @param[out] rho Compass heading in degrees [0, 360) (same as psi for 6-axis)
+ * @param[out] chi Tilt angle from vertical in degrees [0, 180]
+ * @param[in] prev_theta Previous pitch angle for gimbal lock resolution
+ * @param[in] prev_psi Previous yaw angle for gimbal lock resolution
+ *
+ * @return None
+ *
+ * @note Gimbal lock occurs when |R[0][2]| > (1 - EPSILON), handled using previous values
+ * @note The function uses atan2_safe() for numerically stable arctangent computation
+ * @note Tilt angle χ = acos(R[2][2]) represents total tilt from vertical axis
+ * @note Reference: AN5017 Section 2.6 for gimbal lock resolution (Equations 23-24)
+ */
 void sf_6xag_algo_rotmtx2angles(const double RotMtx[3][3],
                                        double       *theta,
                                        double       *phi,
@@ -374,8 +640,6 @@ void sf_6xag_algo_rotmtx2angles(const double RotMtx[3][3],
 	                                   double       prev_theta,
 	                                   double       prev_psi)
 {
-    #define MAX_POS_PITCH_DEG (179.9999)
-
 	static uint32_t prev_theta_used = 0;
 	double          angle_val;
 	uint32_t        angle_vld;
@@ -421,7 +685,7 @@ void sf_6xag_algo_rotmtx2angles(const double RotMtx[3][3],
 		}
 	}
 
-	if (*theta > MAX_POS_PITCH_DEG) {
+	if (*theta > SF_6XAG_MAX_POS_PITCH_DEG) {
 		*theta = -180.0;
 	}
 	if (*psi < 0.0) {
@@ -439,7 +703,47 @@ void sf_6xag_algo_rotmtx2angles(const double RotMtx[3][3],
 
 }
 
+/*==============================================================================
+ * Kalman Filter Time Update (Prediction) Functions
+ *============================================================================*/
 
+/**
+ * @brief Performs Kalman filter time update (prediction step) using gyroscope data
+ *
+ * This function implements the Extended Kalman Filter (EKF) time update (prediction step)
+ * using gyroscope measurements. It propagates the state forward in time and updates the
+ * error covariance matrix.
+ *
+ * Time Update Equations:
+ * 1. State prediction: x_k = F * x_{k-1} + B * u_k
+ *    - Orientation: Quaternion integration using bias-corrected gyro rates
+ *    - Gyro bias: Propagated with process noise (random walk model)
+ *    - Linear acceleration: Decayed using time constant
+ *
+ * 2. Covariance prediction: P_k = F * P_{k-1} * F^T + Q
+ *    - Q: Process noise covariance (adaptive based on previous P)
+ *
+ * Algorithm steps:
+ * 1. Apply bias correction to gyroscope measurements
+ * 2. Integrate quaternion for all oversampled gyro measurements
+ * 3. Normalize quaternion to maintain unit constraint
+ * 4. Update rotation matrix from quaternion
+ * 5. Check for missing gyro data and update operation mode
+ * 6. Update process noise covariance Q as function of previous P
+ * 7. Check orientation error threshold for covariance update control
+ *
+ * @param[in,out] ptr_state_vec_6XAG Pointer to 6-axis algorithm state structure
+ *
+ * @return None
+ *
+ * @note Gyroscope measurements are processed with SF_OVERSAMPLE_RATIO samples per update
+ * @note Quaternion integration uses small angle approximation for efficiency
+ * @note Process noise Q is adaptive: Q = f(P) + Q_init, where f(P) accounts for
+ *       coupling between orientation and bias errors
+ * @note If gyro data is missing for > SF_GYRO_MAX_MISS_DUR, covariance update is skipped
+ * @note Orientation error threshold SF_MAX_ORIENT_ERR triggers covariance freeze
+ * @note BiasPostS contains accumulated bias estimate; BiasErrPostS is latest correction
+ */
 void sf_6xag_algo_nom_timeupdate(state_vec_6XAG_t *ptr_state_vec_6XAG)
 {
 #ifdef GYRO_BIAS_TIME_AVG
@@ -590,7 +894,59 @@ void sf_6xag_algo_nom_timeupdate(state_vec_6XAG_t *ptr_state_vec_6XAG)
 
 }
 
+/*==============================================================================
+ * Kalman Filter Measurement Update (Correction) Functions
+ *============================================================================*/
 
+/**
+ * @brief Performs Kalman filter measurement update (correction step) using accelerometer data
+ *
+ * This function implements the Extended Kalman Filter (EKF) measurement update (correction step)
+ * using accelerometer measurements. It compares predicted gravity with measured acceleration
+ * to correct orientation, gyro bias, and linear acceleration estimates.
+ *
+ * Measurement Update Equations:
+ * 1. Innovation (measurement residual): z = y_measured - h(x_predicted)
+ *    - Gravity error: z_g = accel_measured - gravity_predicted
+ *
+ * 2. Kalman Gain: K = P * H^T * (H * P * H^T + R)^{-1}
+ *    - H: Measurement matrix (linearized observation model)
+ *    - R: Measurement noise covariance
+ *
+ * 3. State correction: x = x + K * z
+ *    - Orientation correction via quaternion rotation
+ *    - Gyro bias correction with clamping to [-5, +5] deg/s
+ *    - Linear acceleration update with time constant decay
+ *
+ * 4. Covariance correction: P = (I - K * H) * P
+ *    - Joseph form for numerical stability and symmetry enforcement
+ *
+ * Algorithm steps:
+ * 1. Compute gravity prediction from current rotation matrix
+ * 2. Compute innovation (gravity error) including linear acceleration compensation
+ * 3. Compute measurement matrix C (cross-product form for orientation)
+ * 4. Compute Kalman gain K = Q_w * C^T * inv(C * Q_w * C^T + Q_v)
+ * 5. Compute state correction vector
+ * 6. Update quaternion using correction (integrate and normalize)
+ * 7. Update rotation matrix from corrected quaternion
+ * 8. Update gyro bias with clamping to prevent unbounded growth
+ * 9. Update linear acceleration estimate
+ * 10. Update error covariance matrix with symmetry enforcement
+ *
+ * @param[in,out] ptr_state_vec_6XAG Pointer to 6-axis algorithm state structure
+ *
+ * @return None
+ *
+ * @note Measurement matrix C[0] = -[g×] relates orientation error to gravity error
+ * @note Measurement matrix C[1] = δt*[g×] relates bias error to gravity error
+ * @note Measurement matrix C[2] = I relates linear acceleration to gravity error
+ * @note Gyro bias is clamped to [-5, +5] deg/s to prevent unbounded drift
+ * @note Linear acceleration uses first-order lag with time constant LinAccTC
+ * @note Covariance update uses Joseph form: P = (I-KC)*Q_w*(I-KC)^T + K*R*K^T
+ *       simplified to: P = (I-KC)*Q_w for computational efficiency
+ * @note Symmetry is enforced: P = 0.5*(P + P^T) + ε*I
+ * @note Missing accelerometer data for > SF_ACCEL_MAX_MISS_DUR sets degraded mode flag
+ */
 void sf_6xag_algo_measupdate(state_vec_6XAG_t *ptr_state_vec_6XAG)
 {
 
@@ -882,7 +1238,7 @@ void sf_6xag_algo_measupdate(state_vec_6XAG_t *ptr_state_vec_6XAG)
 			}
 			TranspBlkMtx_3x3(&Atemp, &Btemp);
 			AddBlkMtx_3x3(&Atemp, &Btemp, &Gtemp);
-			ScaleBlkMtx_3x3(0.5, &Gtemp, &Atemp);
+			ScaleBlkMtx_3x3(SF_6XAG_COVARIANCE_SYMMETRY_FACTOR, &Gtemp, &Atemp);
 			if (i == j) {
 				IdentityBlkMtx_3x3(&Gtemp);
 				ScaleBlkMtx_3x3(EPSILON, &Gtemp, &Btemp);
@@ -905,8 +1261,8 @@ void sf_6xag_algo_measupdate(state_vec_6XAG_t *ptr_state_vec_6XAG)
 	for( j = CHX; j <= CHZ; j++) {
 		ptr_state_vec_6XAG->BiasPostS[j] -= ptr_state_vec_6XAG->BiasErrPostS[j];
 		// Clamp gyro bias to prevent unbounded growth (from Sources_org/FS/fusion.c lines 1349-1350)
-		if (ptr_state_vec_6XAG->BiasPostS[j] < -5.0) ptr_state_vec_6XAG->BiasPostS[j] = -5.0;
-		if (ptr_state_vec_6XAG->BiasPostS[j] > 5.0) ptr_state_vec_6XAG->BiasPostS[j] = 5.0;
+		if (ptr_state_vec_6XAG->BiasPostS[j] < SF_6XAG_GYRO_BIAS_CLAMP_MIN) ptr_state_vec_6XAG->BiasPostS[j] = SF_6XAG_GYRO_BIAS_CLAMP_MIN;
+		if (ptr_state_vec_6XAG->BiasPostS[j] > SF_6XAG_GYRO_BIAS_CLAMP_MAX) ptr_state_vec_6XAG->BiasPostS[j] = SF_6XAG_GYRO_BIAS_CLAMP_MAX;
 		ptr_state_vec_6XAG->AccPostS[j] *= ptr_state_vec_6XAG->LinAccTC;
 		ptr_state_vec_6XAG->AccPostS[j] -= ptr_state_vec_6XAG->AccErrPostS[j];
 		//printf("u = %f and v = %f \n", ptr_state_vec_6XAG->AccErrPostS[j], ptr_state_vec_6XAG->AccPostS[j]);
