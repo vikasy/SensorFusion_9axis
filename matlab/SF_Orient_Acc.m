@@ -27,6 +27,19 @@ switch frame
 end
 
 RotMtx = [V1, V2, V3];
-q = RodMat2Qat( RotMtx );
+% Fixed typo: use proper tilt initialization matching Python
+% For Android frame, V3 points up (gravity direction)
+% Normalize V2 and V1
+V2_norm = norm(V2);
+if V2_norm > 0
+    V2 = V2 / V2_norm;
+end
+V1_norm = norm(V1);
+if V1_norm > 0
+    V1 = V1 / V1_norm;
+end
+RotMtx = [V1, V2, V3];
+% Convert rotation matrix to quaternion
+q = RodMat2Quat(RotMtx);
 
 

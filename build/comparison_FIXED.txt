@@ -1,0 +1,114 @@
+
+================================================================================
+C vs PYTHON SYNCHRONIZED COMPARISON
+================================================================================
+
+Loaded 4004 C samples
+Loaded 4004 Python samples
+
+================================================================================
+COMPARISON STATISTICS
+================================================================================
+
+Quaternion Distance (1 - |q1·q2|):
+  Mean:   0.477716
+  Median: 0.527229
+  Max:    0.999996
+  Min:    0.002189
+
+Angular Error (degrees):
+  Mean:   108.082°
+  Median: 123.571°
+  Max:    180.000°
+  Min:    7.584°
+
+Euler Angle Errors (degrees):
+  Roll:   mean=72.877°, max=179.984°
+  Pitch:  mean=23.313°, max=66.737°
+  Yaw:    mean=60.710°, max=178.678°
+
+Samples within tolerance:
+  Quat distance < 0.001: 0/4004 (0.0%)
+  Angle error < 1.0°:    0/4004 (0.0%)
+
+
+⚠️  Found 4004 samples with large errors
+
+First 10 samples with errors:
+
+Sample 0 (ts=72146875):
+  Quat distance: 0.002189, Angle error: 7.584°
+  C quat:      [0.999452, -0.032934, 0.003172, 0.000105]
+  Python quat: [0.999452, 0.032934, -0.003172, -0.000105]
+  C angles:      Roll=-3.77°, Pitch=0.36°, Yaw=360.00°
+  Python angles: Roll=-3.77°, Pitch=0.36°, Yaw=0.00°
+
+Sample 1 (ts=91883500):
+  Quat distance: 0.002189, Angle error: 7.584°
+  C quat:      [0.999452, -0.032934, 0.003172, 0.000105]
+  Python quat: [0.999452, 0.032934, -0.003172, -0.000105]
+  C angles:      Roll=-3.77°, Pitch=0.36°, Yaw=360.00°
+  Python angles: Roll=-3.77°, Pitch=0.36°, Yaw=0.00°
+
+Sample 2 (ts=111883625):
+  Quat distance: 0.002218, Angle error: 7.634°
+  C quat:      [0.999438, -0.033413, 0.002694, 0.000146]
+  Python quat: [0.999452, 0.032934, -0.003172, -0.000105]
+  C angles:      Roll=-3.83°, Pitch=0.31°, Yaw=0.01°
+  Python angles: Roll=-3.77°, Pitch=0.36°, Yaw=0.00°
+
+Sample 3 (ts=131883725):
+  Quat distance: 0.002277, Angle error: 7.734°
+  C quat:      [0.999408, -0.034366, 0.001742, 0.000228]
+  Python quat: [0.999452, 0.032934, -0.003172, -0.000105]
+  C angles:      Roll=-3.94°, Pitch=0.20°, Yaw=0.02°
+  Python angles: Roll=-3.77°, Pitch=0.36°, Yaw=0.00°
+
+Sample 4 (ts=151883825):
+  Quat distance: 0.002368, Angle error: 7.887°
+  C quat:      [0.999359, -0.035791, 0.000319, 0.000353]
+  Python quat: [0.999452, 0.032934, -0.003172, -0.000105]
+  C angles:      Roll=-4.10°, Pitch=0.04°, Yaw=0.04°
+  Python angles: Roll=-3.77°, Pitch=0.36°, Yaw=0.00°
+
+Sample 5 (ts=171884225):
+  Quat distance: 0.002484, Angle error: 8.078°
+  C quat:      [0.999289, -0.037680, -0.001568, 0.000519]
+  Python quat: [0.999457, 0.032775, -0.003332, -0.000102]
+  C angles:      Roll=-4.32°, Pitch=-0.18°, Yaw=0.07°
+  Python angles: Roll=-3.76°, Pitch=0.38°, Yaw=360.00°
+
+Sample 6 (ts=191884325):
+  Quat distance: 0.002616, Angle error: 8.290°
+  C quat:      [0.999211, -0.039550, -0.003438, 0.000685]
+  Python quat: [0.999457, 0.032775, -0.003332, -0.000102]
+  C angles:      Roll=-4.53°, Pitch=-0.39°, Yaw=0.09°
+  Python angles: Roll=-3.76°, Pitch=0.38°, Yaw=360.00°
+
+Sample 7 (ts=211884425):
+  Quat distance: 0.002754, Angle error: 8.506°
+  C quat:      [0.999128, -0.041402, -0.005285, 0.000853]
+  Python quat: [0.999457, 0.032775, -0.003332, -0.000102]
+  C angles:      Roll=-4.75°, Pitch=-0.60°, Yaw=0.12°
+  Python angles: Roll=-3.76°, Pitch=0.38°, Yaw=360.00°
+
+Sample 8 (ts=231884525):
+  Quat distance: 0.002895, Angle error: 8.721°
+  C quat:      [0.999040, -0.043212, -0.007089, 0.001029]
+  Python quat: [0.999457, 0.032774, -0.003332, -0.000102]
+  C angles:      Roll=-4.95°, Pitch=-0.81°, Yaw=0.15°
+  Python angles: Roll=-3.76°, Pitch=0.38°, Yaw=360.00°
+
+Sample 9 (ts=251884625):
+  Quat distance: 0.003026, Angle error: 8.917°
+  C quat:      [0.998948, -0.044977, -0.008847, 0.001213]
+  Python quat: [0.999462, 0.032617, -0.003489, -0.000099]
+  C angles:      Roll=-5.16°, Pitch=-1.01°, Yaw=0.18°
+  Python angles: Roll=-3.74°, Pitch=0.40°, Yaw=360.00°
+
+================================================================================
+❌ RESULT: C and Python implementations have SIGNIFICANT differences
+   Mean quaternion distance: 0.477716 (threshold: 0.001)
+   Mean angular error: 108.082° (threshold: 1.0°)
+================================================================================
+

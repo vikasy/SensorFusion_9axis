@@ -222,6 +222,9 @@ static void sf_6xag_algo_run_orig(state_vec_6XAG_t *ptr_state_vec_6XAG,
 	if (!ptr_state_vec_6XAG->OrientInit) {
 		printf("6-axis SF algo initial orientation lock\n");
 		sf_6xag_algo_init_orient(ptr_state_vec_6XAG, &(ptr_state_vec_6XAG->AccData));
+		printf("Quat after init_orient: [%.15f, %.15f, %.15f, %.15f]\n",
+			ptr_state_vec_6XAG->QuatPost.q0, ptr_state_vec_6XAG->QuatPost.q1,
+			ptr_state_vec_6XAG->QuatPost.q2, ptr_state_vec_6XAG->QuatPost.q3);
 	}
 
 	global_sample_count++;
@@ -231,35 +234,10 @@ static void sf_6xag_algo_run_orig(state_vec_6XAG_t *ptr_state_vec_6XAG,
 	// if new gyro data is available, apply nominal time udpate
 	if ( ptr_state_vec_6XAG->NomupdtTS < ptr_state_vec_6XAG->GyroData.timestamp ) {
 		sf_6xag_algo_nom_timeupdate(ptr_state_vec_6XAG);
-		if (ptr_state_vec_6XAG->GyroData.timestamp < (curr_time_msec - SF_GYRO_MAX_STALE_DUR)) {
-		    // if gyro data used is stale, mark mode_op to degraded gyro mode
-			ptr_state_vec_6XAG->OpMode &= ~(SF_GYRO_MASK);
-			ptr_state_vec_6XAG->OpMode |= SF_GYRO_STALE;
-		}
 	}
-	// if current time is greater than last nom update time by max miss duration, 
-	// mark missing gyro data
-	else if (ptr_state_vec_6XAG->NomupdtTS < ((curr_time_msec - SF_GYRO_MAX_MISS_DUR)) ) {
-		// if gyro data used is not available for a long time, mark mode_op to degraded gyro mode
-		ptr_state_vec_6XAG->OpMode &= ~(SF_GYRO_MASK);
-		ptr_state_vec_6XAG->OpMode |= SF_GYRO_MISSING;
-	}
-
 	// if new accel data is availabel apply measurement update
 	if ( ptr_state_vec_6XAG->MeasupdtTS < ptr_state_vec_6XAG->AccData.timestamp ) {
 		sf_6xag_algo_measupdate(ptr_state_vec_6XAG);
-		if (ptr_state_vec_6XAG->AccData.timestamp < (curr_time_msec - SF_ACCEL_MAX_STALE_DUR)) {
-			// if gyro data used is stale, mark mode_op to degraded gyro mode
-			ptr_state_vec_6XAG->OpMode &= ~(SF_ACC_MASK);
-			ptr_state_vec_6XAG->OpMode |= SF_ACC_STALE;
-		}
-	}
-	// if current time is greater than last nom update time by max miss duration, 
-	// mark missing accel data
-	else if (ptr_state_vec_6XAG->MeasupdtTS < ((curr_time_msec - SF_ACCEL_MAX_MISS_DUR))) {
-		// if gyro data used is not available for a long time, mark mode_op to degraded gyro mode
-		ptr_state_vec_6XAG->OpMode &= ~(SF_ACC_MASK);
-		ptr_state_vec_6XAG->OpMode |= SF_ACC_MISSING;
 	}
 
 	for(i = 0; i < 3; i++) {
@@ -290,6 +268,15 @@ static void sf_6xag_algo_run_orig(state_vec_6XAG_t *ptr_state_vec_6XAG,
 	ptr_algo_out->valid_flag = 0xFFFFFFFF;
 	ptr_algo_out->mode = ptr_state_vec_6XAG->OpMode;
 	ptr_algo_out->timestamp_ns = curr_time_msec / NSEC2MSEC;
+
+	// Print calculated quaternion and bias for first 22 runs
+	if (global_sample_count <= 22) {
+		printf("C Run[%d]: Quat=[%.15f, %.15f, %.15f, %.15f], BiasPostS=[%.12f, %.12f, %.12f]\n",
+			global_sample_count,
+			ptr_algo_out->quat.q0, ptr_algo_out->quat.q1,
+			ptr_algo_out->quat.q2, ptr_algo_out->quat.q3,
+			ptr_state_vec_6XAG->BiasPostS[0], ptr_state_vec_6XAG->BiasPostS[1], ptr_state_vec_6XAG->BiasPostS[2]);
+	}
 
 } /* sf_6xag_algo_run_orig */
 
@@ -471,23 +458,19 @@ void sf_6xag_algo_nom_timeupdate(state_vec_6XAG_t *ptr_state_vec_6XAG)
 	//delta_T = (double)(ptr_state_vec_6XAG->GyroData.timestamp - ptr_state_vec_6XAG->NomupdtTS);
 	delta_T = SF_GYRO_SAMP_INTVL;
 
-	// Debug sample 165
-	if (global_sample_count == 165) {
+	// Debug specific samples around divergence point
+	int debug_sample = (global_sample_count == 50);
+
+	if (debug_sample) {
 		printf("\n================================================================================\n");
 		printf("TIME_UPDATE - Sample %d (C)\n", global_sample_count);
 		printf("================================================================================\n");
-		printf("Input gyro counts: [%d, %d, %d]\n",
-			ptr_state_vec_6XAG->GyroData.CountBuff[SF_OVERSAMPLE_RATIO-1][0],
-			ptr_state_vec_6XAG->GyroData.CountBuff[SF_OVERSAMPLE_RATIO-1][1],
-			ptr_state_vec_6XAG->GyroData.CountBuff[SF_OVERSAMPLE_RATIO-1][2]);
-		printf("Gyro scale: %.15f\n", ptr_state_vec_6XAG->GyroData.ScaleFactor);
-		printf("BiasPostS: [%.8f, %.8f, %.8f]\n",
-			ptr_state_vec_6XAG->BiasPostS[0], ptr_state_vec_6XAG->BiasPostS[1], ptr_state_vec_6XAG->BiasPostS[2]);
-		printf("BiasErrPostS: [%.8f, %.8f, %.8f]\n",
-			ptr_state_vec_6XAG->BiasErrPostS[0], ptr_state_vec_6XAG->BiasErrPostS[1], ptr_state_vec_6XAG->BiasErrPostS[2]);
-		printf("Quat before: [%.8f, %.8f, %.8f, %.8f]\n",
+		printf("Timestamp: %lld\n", ptr_state_vec_6XAG->GyroData.timestamp);
+		printf("Quat BEFORE integration: [%.8f, %.8f, %.8f, %.8f]\n",
 			ptr_state_vec_6XAG->QuatPost.q0, ptr_state_vec_6XAG->QuatPost.q1,
 			ptr_state_vec_6XAG->QuatPost.q2, ptr_state_vec_6XAG->QuatPost.q3);
+		printf("BiasErrPostS: [%.8f, %.8f, %.8f]\n",
+			ptr_state_vec_6XAG->BiasErrPostS[0], ptr_state_vec_6XAG->BiasErrPostS[1], ptr_state_vec_6XAG->BiasErrPostS[2]);
 	}
 #if 0	
 	printf("a=%d, b=%f,c=%f,d=%f\n\n", ptr_state_vec_6XAG->GyroData.CountBuff[SF_OVERSAMPLE_RATIO - 1][0], ptr_state_vec_6XAG->GyroData.ScaleFactor,
@@ -508,37 +491,61 @@ void sf_6xag_algo_nom_timeupdate(state_vec_6XAG_t *ptr_state_vec_6XAG)
 				gyro_bias_time_avg_len = GYRO_BIAS_TIME_AVG_LEN;
 #endif /* GYRO_BIAS_TIME_AVG */
 			ptr_state_vec_6XAG->Omega[i] = ptr_state_vec_6XAG->GyroData.CountBuff[k][i] * ptr_state_vec_6XAG->GyroData.ScaleFactor;
-			ptr_state_vec_6XAG->Omega[i] -= ptr_state_vec_6XAG->BiasErrPostS[i];
+			ptr_state_vec_6XAG->Omega[i] -= ptr_state_vec_6XAG->BiasPostS[i];  // Fixed: Use BiasPostS (accumulated bias) not BiasErrPostS (latest correction)
 			ptr_state_vec_6XAG->AngRatePrev[i] = ptr_state_vec_6XAG->Omega[i];
-
-			if (global_sample_count == 165 && k == SF_OVERSAMPLE_RATIO-1) {
-				double omega_raw = ptr_state_vec_6XAG->GyroData.CountBuff[k][i] * ptr_state_vec_6XAG->GyroData.ScaleFactor;
-				printf("  Omega[%d]: raw=%.8f, BiasErrPostS=%.8f, corrected=%.8f\n",
-					i, omega_raw, ptr_state_vec_6XAG->BiasErrPostS[i], ptr_state_vec_6XAG->Omega[i]);
-			}
 		}
+
+		if (debug_sample) {
+			printf("  Buffer[%d] gyro_raw: [%d, %d, %d]\n", k,
+				ptr_state_vec_6XAG->GyroData.CountBuff[k][CHX],
+				ptr_state_vec_6XAG->GyroData.CountBuff[k][CHY],
+				ptr_state_vec_6XAG->GyroData.CountBuff[k][CHZ]);
+			printf("  Buffer[%d] omega (bias-corrected): [%.8f, %.8f, %.8f] deg/s\n", k,
+				ptr_state_vec_6XAG->Omega[CHX], ptr_state_vec_6XAG->Omega[CHY], ptr_state_vec_6XAG->Omega[CHZ]);
+			printf("  Quat before integrate[%d]: [%.8f, %.8f, %.8f, %.8f]\n", k,
+				ptr_state_vec_6XAG->QuatPost.q0, ptr_state_vec_6XAG->QuatPost.q1,
+				ptr_state_vec_6XAG->QuatPost.q2, ptr_state_vec_6XAG->QuatPost.q3);
+		}
+
 		QuatIntegrate(&(ptr_state_vec_6XAG->QuatPost), ptr_state_vec_6XAG->Omega, delta_T, &QuatInt);
 		ptr_state_vec_6XAG->QuatPost.q0 = QuatInt.q0;
 		ptr_state_vec_6XAG->QuatPost.q1 = QuatInt.q1;
 		ptr_state_vec_6XAG->QuatPost.q2 = QuatInt.q2;
 		ptr_state_vec_6XAG->QuatPost.q3 = QuatInt.q3;
+
+		if (debug_sample) {
+			printf("  Quat after integrate[%d]:  [%.8f, %.8f, %.8f, %.8f]\n", k,
+				ptr_state_vec_6XAG->QuatPost.q0, ptr_state_vec_6XAG->QuatPost.q1,
+				ptr_state_vec_6XAG->QuatPost.q2, ptr_state_vec_6XAG->QuatPost.q3);
+		}
 		//printf("quat tup =%f, %f, %f, %f \n", ptr_state_vec_6XAG->QuatPost.q0, ptr_state_vec_6XAG->QuatPost.q1, ptr_state_vec_6XAG->QuatPost.q2, ptr_state_vec_6XAG->QuatPost.q3);
 	}
 	// Normalize quaternion
 	QuatNormal(&QuatInt, &(ptr_state_vec_6XAG->QuatPost));
-	// Update rotation matrix as well
-	Quat2RotMtx( &(ptr_state_vec_6XAG->QuatPost), ptr_state_vec_6XAG->RotMtxPost);
-	ptr_state_vec_6XAG->NomupdtTS = (int64_t)clock(); // time in msec
 
-	if (global_sample_count == 165) {
-		printf("Quat after: [%.8f, %.8f, %.8f, %.8f]\n",
+	if (debug_sample) {
+		printf("Quat AFTER normalization: [%.8f, %.8f, %.8f, %.8f]\n",
 			ptr_state_vec_6XAG->QuatPost.q0, ptr_state_vec_6XAG->QuatPost.q1,
 			ptr_state_vec_6XAG->QuatPost.q2, ptr_state_vec_6XAG->QuatPost.q3);
-		printf("RotMtx after:\n");
-		printf("  [%10.7f, %10.7f, %10.7f]\n", ptr_state_vec_6XAG->RotMtxPost[0][0], ptr_state_vec_6XAG->RotMtxPost[0][1], ptr_state_vec_6XAG->RotMtxPost[0][2]);
-		printf("  [%10.7f, %10.7f, %10.7f]\n", ptr_state_vec_6XAG->RotMtxPost[1][0], ptr_state_vec_6XAG->RotMtxPost[1][1], ptr_state_vec_6XAG->RotMtxPost[1][2]);
-		printf("  [%10.7f, %10.7f, %10.7f]\n", ptr_state_vec_6XAG->RotMtxPost[2][0], ptr_state_vec_6XAG->RotMtxPost[2][1], ptr_state_vec_6XAG->RotMtxPost[2][2]);
 	}
+
+	// Update rotation matrix as well
+	Quat2RotMtx( &(ptr_state_vec_6XAG->QuatPost), ptr_state_vec_6XAG->RotMtxPost);
+	// Use gyro timestamp to maintain sync with sensor data
+	// Before updating, check for large time gap
+	if ( (ptr_state_vec_6XAG->GyroData.timestamp - ptr_state_vec_6XAG->NomupdtTS) > (SF_GYRO_MAX_MISS_DUR) ) {
+		// large time gap - skip error covariance update
+		ptr_state_vec_6XAG->update_ErrCovMtx = 0;
+		// if current time is greater than last nom update time by max miss duration, 
+	    // mark missing gyro data
+		ptr_state_vec_6XAG->OpMode &= ~(SF_GYRO_MASK);
+		ptr_state_vec_6XAG->OpMode |= SF_GYRO_MISSING;
+	} else {
+		ptr_state_vec_6XAG->update_ErrCovMtx = 1;
+		// if gyro data used is available, mark mode_op to normal gyro mode
+		ptr_state_vec_6XAG->OpMode &= ~(SF_GYRO_MASK);
+	}
+	ptr_state_vec_6XAG->NomupdtTS = ptr_state_vec_6XAG->GyroData.timestamp;
 	//printf("nomupdt_ts =%d\n", ptr_state_vec_6XAG->NomupdtTS);
 
 	if (ptr_state_vec_6XAG->update_ErrCovMtx == 1) {
@@ -565,8 +572,12 @@ void sf_6xag_algo_nom_timeupdate(state_vec_6XAG_t *ptr_state_vec_6XAG)
 		IdentityBlkMtx_3x3(&(ptr_state_vec_6XAG->ProcNoiseVar[0][1]));
 		ScaleBlkMtx_3x3(ptr_state_vec_6XAG->ProcNoiseVarBiasOrient, &(ptr_state_vec_6XAG->ProcNoiseVar[0][1]), &Atemp);
 		ScaleBlkMtx_3x3(-1 * delta_T, &(ptr_state_vec_6XAG->ErrCovMtxPost[1][1]), &Btemp);
-		SetBlkMtx_3x3(&Atemp, &(ptr_state_vec_6XAG->ProcNoiseVar[0][1]));
-		TranspBlkMtx_3x3(&Atemp, &Btemp);
+		// BUG FIX: Add Btemp to Atemp (was missing - Btemp was computed but never used!)
+		// This matches the original Freescale formula: Qw[0][1] = error_product - alpha*Qwb
+		// which corresponds to: I*ProcNoiseVarBiasOrient + (-delta_T)*ErrCovMtxPost[1][1]
+		AddBlkMtx_3x3(&Atemp, &Btemp, &Ctemp);
+		SetBlkMtx_3x3(&Ctemp, &(ptr_state_vec_6XAG->ProcNoiseVar[0][1]));
+		TranspBlkMtx_3x3(&Ctemp, &Btemp);
 		SetBlkMtx_3x3(&Btemp, &(ptr_state_vec_6XAG->ProcNoiseVar[1][0]));
 
 		orient_err = ptr_state_vec_6XAG->ProcNoiseVar[0][0].elem[0][0] * ptr_state_vec_6XAG->ProcNoiseVar[0][0].elem[0][0];
@@ -596,16 +607,48 @@ void sf_6xag_algo_measupdate(state_vec_6XAG_t *ptr_state_vec_6XAG)
 
 	inv_exist = 1;
 
-	if (global_sample_count == 165) {
+	int debug_meas = (global_sample_count == 50);  // Debug sample 50 where divergence is noticeable
+
+	if (debug_meas) {
 		printf("\n================================================================================\n");
 		printf("MEASUREMENT_UPDATE - Sample %d (C)\n", global_sample_count);
 		printf("================================================================================\n");
-		printf("Input acc counts: [%d, %d, %d]\n",
+		printf("Timestamp: %lld\n", ptr_state_vec_6XAG->AccData.timestamp);
+		printf("Quat BEFORE update: [%.15f, %.15f, %.15f, %.15f]\n",
+			ptr_state_vec_6XAG->QuatPost.q0, ptr_state_vec_6XAG->QuatPost.q1,
+			ptr_state_vec_6XAG->QuatPost.q2, ptr_state_vec_6XAG->QuatPost.q3);
+		printf("BiasErrPostS BEFORE: [%.15f, %.15f, %.15f]\n",
+			ptr_state_vec_6XAG->BiasErrPostS[0], ptr_state_vec_6XAG->BiasErrPostS[1], ptr_state_vec_6XAG->BiasErrPostS[2]);
+		printf("BiasPostS BEFORE: [%.15f, %.15f, %.15f]\n",
+			ptr_state_vec_6XAG->BiasPostS[0], ptr_state_vec_6XAG->BiasPostS[1], ptr_state_vec_6XAG->BiasPostS[2]);
+		printf("\nInput acc counts: [%d, %d, %d]\n",
 			ptr_state_vec_6XAG->AccData.CountBuff[SF_OVERSAMPLE_RATIO-1][0],
 			ptr_state_vec_6XAG->AccData.CountBuff[SF_OVERSAMPLE_RATIO-1][1],
 			ptr_state_vec_6XAG->AccData.CountBuff[SF_OVERSAMPLE_RATIO-1][2]);
 		printf("Acc scale: %.15f\n", ptr_state_vec_6XAG->AccData.ScaleFactor);
-		printf("\nGravity calculation:\n");
+
+		printf("\nProc Noise Var (Qw) for bias - ProcNoiseVar[1][*]:\n");
+		printf("Qw[1][0]:\n");
+		for(i = 0; i < 3; i++) {
+			printf("  [%.8e, %.8e, %.8e]\n",
+				ptr_state_vec_6XAG->ProcNoiseVar[1][0].elem[i][0],
+				ptr_state_vec_6XAG->ProcNoiseVar[1][0].elem[i][1],
+				ptr_state_vec_6XAG->ProcNoiseVar[1][0].elem[i][2]);
+		}
+		printf("Qw[1][1]:\n");
+		for(i = 0; i < 3; i++) {
+			printf("  [%.8e, %.8e, %.8e]\n",
+				ptr_state_vec_6XAG->ProcNoiseVar[1][1].elem[i][0],
+				ptr_state_vec_6XAG->ProcNoiseVar[1][1].elem[i][1],
+				ptr_state_vec_6XAG->ProcNoiseVar[1][1].elem[i][2]);
+		}
+		printf("Qw[1][2]:\n");
+		for(i = 0; i < 3; i++) {
+			printf("  [%.8e, %.8e, %.8e]\n",
+				ptr_state_vec_6XAG->ProcNoiseVar[1][2].elem[i][0],
+				ptr_state_vec_6XAG->ProcNoiseVar[1][2].elem[i][1],
+				ptr_state_vec_6XAG->ProcNoiseVar[1][2].elem[i][2]);
+		}
 	}
 
 	// Compute error in Gravity Vector
@@ -617,27 +660,38 @@ void sf_6xag_algo_measupdate(state_vec_6XAG_t *ptr_state_vec_6XAG)
 		ptr_state_vec_6XAG->GravErrPriS[i] *= ptr_state_vec_6XAG->AccData.ScaleFactor * GTOMSEC2;
 		ptr_state_vec_6XAG->GravErrPriS[i] += ptr_state_vec_6XAG->LinAccTC *ptr_state_vec_6XAG->AccPostS[i];
 		ptr_state_vec_6XAG->GravErrPriS[i] -= ptr_state_vec_6XAG->GravGyrPriS[i];
-
-		if (global_sample_count == 165) {
-			double acc_meas = -1.0 * ptr_state_vec_6XAG->AccData.CountBuff[SF_OVERSAMPLE_RATIO-1][i] * ptr_state_vec_6XAG->AccData.ScaleFactor * GTOMSEC2;
-			double lin_acc_term = ptr_state_vec_6XAG->LinAccTC * ptr_state_vec_6XAG->AccPostS[i];
-			printf("  Axis %d: GravGyr=%.4f, AccMeas=%.4f, LinAccTerm=%.4f, GravErr=%.4f\n",
-				i, ptr_state_vec_6XAG->GravGyrPriS[i], acc_meas, lin_acc_term, ptr_state_vec_6XAG->GravErrPriS[i]);
-		}
-
-		//printf("j=%d, k=%f, l=%f, m=%f\n\n", ptr_state_vec_6XAG->AccData.CountBuff[SF_OVERSAMPLE_RATIO - 1][i], ptr_state_vec_6XAG->AccData.ScaleFactor,
-		//	ptr_state_vec_6XAG->AccData.CountBuff[SF_OVERSAMPLE_RATIO - 1][i] * ptr_state_vec_6XAG->AccData.ScaleFactor *GTOMSEC2, ptr_state_vec_6XAG->AccPostS[i]);
-		//printf("n = %f \n", ptr_state_vec_6XAG->GravErrPriS[i]);
 	}
 
-	// Compute the measurement matrix, C using a priori gravity values 
+	if (debug_meas) {
+		printf("\nGravErrPriS: [%.8f, %.8f, %.8f]\n",
+			ptr_state_vec_6XAG->GravErrPriS[0], ptr_state_vec_6XAG->GravErrPriS[1], ptr_state_vec_6XAG->GravErrPriS[2]);
+		printf("GravGyrPriS: [%.8f, %.8f, %.8f]\n",
+			ptr_state_vec_6XAG->GravGyrPriS[0], ptr_state_vec_6XAG->GravGyrPriS[1], ptr_state_vec_6XAG->GravGyrPriS[2]);
+	}
+
+	// Compute the measurement matrix, C using a priori gravity values
 	CrossPdctMtx_3x3(ptr_state_vec_6XAG->GravGyrPriS, &Atemp);
 	ScaleBlkMtx_3x3(-DEG2RAD, &Atemp, &Cmat[0]);
 	ScaleBlkMtx_3x3((DEG2RAD * SF_DELTA_T), &Atemp, &Cmat[1]);
 	IdentityBlkMtx_3x3(&Cmat[2]);
-	//PrintBlkMtx_3x3(&Cmat[0],"Cmat0");
-	//PrintBlkMtx_3x3(&Cmat[1],"Cmat1");
-	//PrintBlkMtx_3x3(&Cmat[2],"Cmat2");
+
+	if (debug_meas) {
+		printf("\nMeasurement matrix C[0]:\n");
+		for(i = 0; i < 3; i++) {
+			printf("  [%.15e, %.15e, %.15e]\n",
+				Cmat[0].elem[i][0], Cmat[0].elem[i][1], Cmat[0].elem[i][2]);
+		}
+		printf("Measurement matrix C[1]:\n");
+		for(i = 0; i < 3; i++) {
+			printf("  [%.15e, %.15e, %.15e]\n",
+				Cmat[1].elem[i][0], Cmat[1].elem[i][1], Cmat[1].elem[i][2]);
+		}
+		printf("Measurement matrix C[2]:\n");
+		for(i = 0; i < 3; i++) {
+			printf("  [%.15e, %.15e, %.15e]\n",
+				Cmat[2].elem[i][0], Cmat[2].elem[i][1], Cmat[2].elem[i][2]);
+		}
+	}
 
 	/* Compute Kalman gain, K = Qw*C'*inv(C*Qw*C' + Qv) 
 	 * F[3] = Qw[3][3]*C[3]'
@@ -652,11 +706,26 @@ void sf_6xag_algo_measupdate(state_vec_6XAG_t *ptr_state_vec_6XAG)
 		for( j = CHX; j <= CHZ; j++) {
 			TranspBlkMtx_3x3(&Cmat[j], &Atemp);
 			MultBlkMtx_3x3(&(ptr_state_vec_6XAG->ProcNoiseVar[i][j]), &Atemp, &Btemp);
-			//PrintBlkMtx_3x3(&(ptr_state_vec_6XAG->ProcNoiseVar[i][j]),"Qwij");
-			//PrintBlkMtx_3x3(&Btemp,"Qwij*Cmati'");
 			AddBlkMtx_3x3(&Ftemp[i], &Btemp, &Atemp);
 			SetBlkMtx_3x3(&Atemp, &Ftemp[i]);
-			//PrintBlkMtx_3x3(&Ftemp[i],"Fi");
+		}
+	}
+
+	if (debug_meas) {
+		printf("\nF[0] (Qw[0][*] @ C[*].T):\n");
+		for(i = 0; i < 3; i++) {
+			printf("  [%.15e, %.15e, %.15e]\n",
+				Ftemp[0].elem[i][0], Ftemp[0].elem[i][1], Ftemp[0].elem[i][2]);
+		}
+		printf("F[1] (Qw[1][*] @ C[*].T):\n");
+		for(i = 0; i < 3; i++) {
+			printf("  [%.15e, %.15e, %.15e]\n",
+				Ftemp[1].elem[i][0], Ftemp[1].elem[i][1], Ftemp[1].elem[i][2]);
+		}
+		printf("F[2] (Qw[2][*] @ C[*].T):\n");
+		for(i = 0; i < 3; i++) {
+			printf("  [%.15e, %.15e, %.15e]\n",
+				Ftemp[2].elem[i][0], Ftemp[2].elem[i][1], Ftemp[2].elem[i][2]);
 		}
 	}
 	
@@ -679,6 +748,30 @@ void sf_6xag_algo_measupdate(state_vec_6XAG_t *ptr_state_vec_6XAG)
 	if (inv_exist == 1) {
 		for(  i = CHX; i <= CHZ; i++) {
 			MultBlkMtx_3x3(&Ftemp[i], &Ginv, &(ptr_state_vec_6XAG->KalmanGain[i]));
+		}
+	}
+
+	if (debug_meas) {
+		printf("\nKalman Gain K[0]:\n");
+		for(i = 0; i < 3; i++) {
+			printf("  [%.8f, %.8f, %.8f]\n",
+				ptr_state_vec_6XAG->KalmanGain[0].elem[i][0],
+				ptr_state_vec_6XAG->KalmanGain[0].elem[i][1],
+				ptr_state_vec_6XAG->KalmanGain[0].elem[i][2]);
+		}
+		printf("Kalman Gain K[1]:\n");
+		for(i = 0; i < 3; i++) {
+			printf("  [%.8f, %.8f, %.8f]\n",
+				ptr_state_vec_6XAG->KalmanGain[1].elem[i][0],
+				ptr_state_vec_6XAG->KalmanGain[1].elem[i][1],
+				ptr_state_vec_6XAG->KalmanGain[1].elem[i][2]);
+		}
+		printf("Kalman Gain K[2]:\n");
+		for(i = 0; i < 3; i++) {
+			printf("  [%.8f, %.8f, %.8f]\n",
+				ptr_state_vec_6XAG->KalmanGain[2].elem[i][0],
+				ptr_state_vec_6XAG->KalmanGain[2].elem[i][1],
+				ptr_state_vec_6XAG->KalmanGain[2].elem[i][2]);
 		}
 	}
 #if 0	
@@ -719,12 +812,26 @@ void sf_6xag_algo_measupdate(state_vec_6XAG_t *ptr_state_vec_6XAG)
 		}
 	}
 
+	if (debug_meas) {
+		printf("\nM_updt (full): [%.8f, %.8f, %.8f, %.8f, %.8f, %.8f, %.8f, %.8f, %.8f]\n",
+			Mupdt[0], Mupdt[1], Mupdt[2], Mupdt[3], Mupdt[4], Mupdt[5], Mupdt[6], Mupdt[7], Mupdt[8]);
+	}
+
 	// Update the following state information for next iteration
 	for(  j = CHX; j <= CHZ; j++) {
 		ptr_state_vec_6XAG->OrntErrPostS[j] = Mupdt[j];
 		ptr_state_vec_6XAG->BiasErrPostS[j] = Mupdt[j+3];
 		ptr_state_vec_6XAG->AccErrPostS[j] = Mupdt[j+6];
 		gyro_corr[j] = -Mupdt[j] / SF_DELTA_T;
+	}
+
+	if (debug_meas) {
+		printf("\nOrntErrPostS: [%.8f, %.8f, %.8f]\n",
+			ptr_state_vec_6XAG->OrntErrPostS[0], ptr_state_vec_6XAG->OrntErrPostS[1], ptr_state_vec_6XAG->OrntErrPostS[2]);
+		printf("BiasErrPostS AFTER: [%.8f, %.8f, %.8f]\n",
+			ptr_state_vec_6XAG->BiasErrPostS[0], ptr_state_vec_6XAG->BiasErrPostS[1], ptr_state_vec_6XAG->BiasErrPostS[2]);
+		printf("AccErrPostS: [%.8f, %.8f, %.8f]\n",
+			ptr_state_vec_6XAG->AccErrPostS[0], ptr_state_vec_6XAG->AccErrPostS[1], ptr_state_vec_6XAG->AccErrPostS[2]);
 	}
 
 	// Update the rotation matrix by rotating it back to remove error, as estimated
@@ -735,7 +842,18 @@ void sf_6xag_algo_measupdate(state_vec_6XAG_t *ptr_state_vec_6XAG)
 	QuatNormal(&QuatInt, &(ptr_state_vec_6XAG->QuatPost));
 	// Update rotation matrix
 	Quat2RotMtx(&(ptr_state_vec_6XAG->QuatPost), ptr_state_vec_6XAG->RotMtxPost);
-	ptr_state_vec_6XAG->MeasupdtTS = (int64_t)clock();
+	// Use accelerometer timestamp to maintain sync with sensor data
+	// Check for missing accel data
+	if( ptr_state_vec_6XAG->AccData.timestamp - ptr_state_vec_6XAG->MeasupdtTS > SF_ACCEL_MAX_MISS_DUR) {
+		// if accel data used is not available for a long time, mark mode_op to degraded accel mode
+		ptr_state_vec_6XAG->OpMode &= ~(SF_ACC_MASK);
+		ptr_state_vec_6XAG->OpMode |= SF_ACC_MISSING;
+	}
+	else {
+		// if accel data used is available, mark mode_op to normal accel mode
+		ptr_state_vec_6XAG->OpMode &= ~(SF_ACC_MASK);
+	}
+	ptr_state_vec_6XAG->MeasupdtTS = ptr_state_vec_6XAG->AccData.timestamp;
 
 	// Update aposteriori covariance matrix, P_post = (I9 - K*C)*Qw
 	//  Compute A= (I9 - K*C)
@@ -786,6 +904,9 @@ void sf_6xag_algo_measupdate(state_vec_6XAG_t *ptr_state_vec_6XAG)
 	// Update gyro bias and lin acc based on meas update
 	for( j = CHX; j <= CHZ; j++) {
 		ptr_state_vec_6XAG->BiasPostS[j] -= ptr_state_vec_6XAG->BiasErrPostS[j];
+		// Clamp gyro bias to prevent unbounded growth (from Sources_org/FS/fusion.c lines 1349-1350)
+		if (ptr_state_vec_6XAG->BiasPostS[j] < -5.0) ptr_state_vec_6XAG->BiasPostS[j] = -5.0;
+		if (ptr_state_vec_6XAG->BiasPostS[j] > 5.0) ptr_state_vec_6XAG->BiasPostS[j] = 5.0;
 		ptr_state_vec_6XAG->AccPostS[j] *= ptr_state_vec_6XAG->LinAccTC;
 		ptr_state_vec_6XAG->AccPostS[j] -= ptr_state_vec_6XAG->AccErrPostS[j];
 		//printf("u = %f and v = %f \n", ptr_state_vec_6XAG->AccErrPostS[j], ptr_state_vec_6XAG->AccPostS[j]);
@@ -798,19 +919,12 @@ void sf_6xag_algo_measupdate(state_vec_6XAG_t *ptr_state_vec_6XAG)
 	}
 	ptr_state_vec_6XAG->AccPostG[3] -= GTOMSEC2;
 
-	if (global_sample_count == 165) {
-		printf("\nAfter meas_update:\n");
-		printf("OrntErrPostS: [%.8f, %.8f, %.8f]\n",
-			ptr_state_vec_6XAG->OrntErrPostS[0], ptr_state_vec_6XAG->OrntErrPostS[1], ptr_state_vec_6XAG->OrntErrPostS[2]);
-		printf("BiasErrPostS: [%.8f, %.8f, %.8f]\n",
-			ptr_state_vec_6XAG->BiasErrPostS[0], ptr_state_vec_6XAG->BiasErrPostS[1], ptr_state_vec_6XAG->BiasErrPostS[2]);
-		printf("AccErrPostS: [%.8f, %.8f, %.8f]\n",
-			ptr_state_vec_6XAG->AccErrPostS[0], ptr_state_vec_6XAG->AccErrPostS[1], ptr_state_vec_6XAG->AccErrPostS[2]);
-		printf("BiasPostS (updated): [%.8f, %.8f, %.8f]\n",
-			ptr_state_vec_6XAG->BiasPostS[0], ptr_state_vec_6XAG->BiasPostS[1], ptr_state_vec_6XAG->BiasPostS[2]);
-		printf("Quat after correction: [%.8f, %.8f, %.8f, %.8f]\n",
+	if (debug_meas) {
+		printf("\nQuat AFTER update: [%.15f, %.15f, %.15f, %.15f]\n",
 			ptr_state_vec_6XAG->QuatPost.q0, ptr_state_vec_6XAG->QuatPost.q1,
 			ptr_state_vec_6XAG->QuatPost.q2, ptr_state_vec_6XAG->QuatPost.q3);
+		printf("Final BiasPostS (after update): [%.15f, %.15f, %.15f]\n",
+			ptr_state_vec_6XAG->BiasPostS[0], ptr_state_vec_6XAG->BiasPostS[1], ptr_state_vec_6XAG->BiasPostS[2]);
 	}
 
 }

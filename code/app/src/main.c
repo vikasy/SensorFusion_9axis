@@ -33,7 +33,7 @@
 //#include "AGMQ_AOPData_0930.h"
 //#include "test_vector_motionless.h"
 //#include "test_vector_moving.h"
-#include "test_input_output_0930.h"
+#include "test_input_output_0922.h"
 
 // Compatibility with old test data structure
 typedef test_sensor_sample_t test_data_sample;

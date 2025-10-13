@@ -242,35 +242,11 @@ static void sf_9xagm_algo_run_orig(state_vec_9XAGM_t *ptr_state_vec_9XAGM,
 	// if new gyro data is available, apply nominal time udpate
 	if ( ptr_state_vec_9XAGM->NomupdtTS < ptr_state_vec_9XAGM->GyroData.timestamp ) {
 		sf_9xagm_algo_nom_timeupdate(ptr_state_vec_9XAGM);
-		if (ptr_state_vec_9XAGM->GyroData.timestamp < (curr_time_msec - SF_GYRO_MAX_STALE_DUR)) {
-		    // if gyro data used is stale, mark mode_op to degraded gyro mode
-			ptr_state_vec_9XAGM->OpMode &= ~(SF_GYRO_MASK);
-			ptr_state_vec_9XAGM->OpMode |= SF_GYRO_STALE;
-		}
-	}
-	// if current time is greater than last nom update time by max miss duration, 
-	// mark missing gyro data
-	else if (ptr_state_vec_9XAGM->NomupdtTS < ((curr_time_msec - SF_GYRO_MAX_MISS_DUR)) ) {
-		// if gyro data used is not available for a long time, mark mode_op to degraded gyro mode
-		ptr_state_vec_9XAGM->OpMode &= ~(SF_GYRO_MASK);
-		ptr_state_vec_9XAGM->OpMode |= SF_GYRO_MISSING;
 	}
 
 	// if new accel data is availabel apply measurement update
 	if ( ptr_state_vec_9XAGM->MeasupdtTS < ptr_state_vec_9XAGM->AccData.timestamp ) {
 		sf_9xagm_algo_measupdate(ptr_state_vec_9XAGM);
-		if (ptr_state_vec_9XAGM->AccData.timestamp < (curr_time_msec - SF_ACCEL_MAX_STALE_DUR)) {
-			// if gyro data used is stale, mark mode_op to degraded gyro mode
-			ptr_state_vec_9XAGM->OpMode &= ~(SF_ACC_MASK);
-			ptr_state_vec_9XAGM->OpMode |= SF_ACC_STALE;
-		}
-	}
-	// if current time is greater than last nom update time by max miss duration, 
-	// mark missing accel data
-	else if (ptr_state_vec_9XAGM->MeasupdtTS < ((curr_time_msec - SF_ACCEL_MAX_MISS_DUR))) {
-		// if gyro data used is not available for a long time, mark mode_op to degraded gyro mode
-		ptr_state_vec_9XAGM->OpMode &= ~(SF_ACC_MASK);
-		ptr_state_vec_9XAGM->OpMode |= SF_ACC_MISSING;
 	}
 
 	// if new magnetometer data is available, apply magnetometer measurement update
@@ -539,7 +515,20 @@ void sf_9xagm_algo_nom_timeupdate(state_vec_9XAGM_t *ptr_state_vec_9XAGM)
 	QuatNormal(&QuatInt, &(ptr_state_vec_9XAGM->QuatPost));
 	// Update rotation matrix as well
 	Quat2RotMtx( &(ptr_state_vec_9XAGM->QuatPost), ptr_state_vec_9XAGM->RotMtxPost);
-	ptr_state_vec_9XAGM->NomupdtTS = (int64_t)clock(); // time in msec
+	// Use gyro timestamp to maintain sync with sensor data
+	// Check for missing gyro data
+	if( ptr_state_vec_9XAGM->GyroData.timestamp - ptr_state_vec_9XAGM->NomupdtTS > SF_GYRO_MAX_MISS_DUR) {
+		ptr_state_vec_9XAGM->update_ErrCovMtx = 1;
+		// if gyro data used is not available for a long time, mark mode_op to degraded gyro mode
+		ptr_state_vec_9XAGM->OpMode &= ~(SF_GYRO_MASK);
+		ptr_state_vec_9XAGM->OpMode |= SF_GYRO_MISSING;
+	}
+	else {
+		ptr_state_vec_9XAGM->update_ErrCovMtx = 1;
+		// if gyro data used is available, mark mode_op to normal gyro mode
+		ptr_state_vec_9XAGM->OpMode &= ~(SF_GYRO_MASK);
+	}
+	ptr_state_vec_9XAGM->NomupdtTS = ptr_state_vec_9XAGM->GyroData.timestamp;
 	//printf("nomupdt_ts =%d\n", ptr_state_vec_9XAGM->NomupdtTS);
 
 	if (ptr_state_vec_9XAGM->update_ErrCovMtx == 1) {
@@ -726,7 +715,18 @@ void sf_9xagm_algo_measupdate(state_vec_9XAGM_t *ptr_state_vec_9XAGM)
 	QuatNormal(&QuatInt, &(ptr_state_vec_9XAGM->QuatPost));
 	// Update rotation matrix
 	Quat2RotMtx(&(ptr_state_vec_9XAGM->QuatPost), ptr_state_vec_9XAGM->RotMtxPost);
-	ptr_state_vec_9XAGM->MeasupdtTS = (int64_t)clock();
+	// Use accelerometer timestamp to maintain sync with sensor data
+	// Check for missing accel data
+	if( ptr_state_vec_9XAGM->AccData.timestamp - ptr_state_vec_9XAGM->MeasupdtTS > SF_ACCEL_MAX_MISS_DUR) {
+		// if accel data used is not available for a long time, mark mode_op to degraded accel mode
+		ptr_state_vec_9XAGM->OpMode &= ~(SF_ACC_MASK);
+		ptr_state_vec_9XAGM->OpMode |= SF_ACC_MISSING;
+	}
+	else {
+		// if accel data used is available, mark mode_op to normal accel mode
+		ptr_state_vec_9XAGM->OpMode &= ~(SF_ACC_MASK);
+	}
+	ptr_state_vec_9XAGM->MeasupdtTS = ptr_state_vec_9XAGM->AccData.timestamp;
 
 	// Update aposteriori covariance matrix, P_post = (I9 - K*C)*Qw
 	//  Compute A= (I9 - K*C)

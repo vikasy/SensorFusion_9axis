@@ -367,6 +367,20 @@ if(BUILD_TESTS)
         RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/bin
     )
 
+    # Test: Compare C output against Python reference
+    add_executable(test_compare_python
+        ../test/test_compare_python.c
+        ${ALL_ALGO_SOURCES}
+    )
+    target_compile_definitions(test_compare_python PRIVATE USE_6AXIS_FUSION USE_9AXIS_FUSION)
+    target_link_libraries(test_compare_python m)
+    target_include_directories(test_compare_python PRIVATE
+        ../test/data/testdata/fusion
+    )
+    set_target_properties(test_compare_python PROPERTIES
+        RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/bin
+    )
+
     # # Test: Coordinate Frame Discovery
     # add_executable(test_coordinate_frame
     #     ../test/diagnostic/test_coordinate_frame.c

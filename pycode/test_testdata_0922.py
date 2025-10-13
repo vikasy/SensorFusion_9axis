@@ -57,9 +57,9 @@ def main():
     print(f"Loaded {len(expected_data)} expected outputs")
 
     # Initialize sensor fusion with same parameters as C code
-    # MPU9250: ±2g accel (1/16384 counts/g), ±250dps gyro (1/131 counts/dps)
+    # MPU9250: ±2g accel (1/16384 counts/g), ±1000dps gyro (1000/32767 dps/count)
     ACC_SCALE = 1.0 / 16384.0
-    GYRO_SCALE = 1.0 / 131.0
+    GYRO_SCALE = 1000.0 / 32767.0  # Must match C: MPU9250_FDPSPERCOUNT
 
     sf = SensorFusion6Axis(acc_scale=ACC_SCALE, gyro_scale=GYRO_SCALE)
 
@@ -74,6 +74,10 @@ def main():
     max_angle_err = 0.0
     quat_errors = []
     angle_errors = []
+
+    # Open CSV file for Python outputs
+    csv_file = open('../build/python_outputs_0922.csv', 'w')
+    csv_file.write('timestamp,q0,q1,q2,q3,roll,pitch,yaw\n')
 
     for i, sample in enumerate(sensor_data):
         sensor_id = sample['id']
@@ -99,6 +103,45 @@ def main():
         # Check if there's an expected output for this timestamp (C test approach)
         if output_idx < len(expected_data) and expected_data[output_idx]['ts'] == timestamp:
             expected = expected_data[output_idx]
+
+            # DEBUG: Print detailed state for first output sample
+            if output_idx == 0:
+                print("\n" + "="*80)
+                print("PYTHON DETAILED DEBUG - SAMPLE 0 (First Output)")
+                print("="*80)
+                print(f"Input sample index: {i}")
+                print(f"Timestamp: {timestamp}")
+                print(f"Sensor ID: {sensor_id} (0=ACC, 1=GYRO, 2=MAG)")
+                print(f"Sensor counts: [{sample['x']}, {sample['y']}, {sample['z']}]")
+                print(f"\nOutput Quaternion:")
+                print(f"  q0 = {output.quat.q0:.10f}")
+                print(f"  q1 = {output.quat.q1:.10f}")
+                print(f"  q2 = {output.quat.q2:.10f}")
+                print(f"  q3 = {output.quat.q3:.10f}")
+                pred_angles = output.orientation
+                print(f"\nOutput Orientation (degrees):")
+                print(f"  Roll  = {pred_angles[2]:.6f}")
+                print(f"  Pitch = {pred_angles[1]:.6f}")
+                print(f"  Yaw   = {pred_angles[0]:.6f}")
+                print(f"\nLinear Acceleration:")
+                print(f"  ax = {output.linear_acc[0]:.6f}")
+                print(f"  ay = {output.linear_acc[1]:.6f}")
+                print(f"  az = {output.linear_acc[2]:.6f}")
+                print(f"\nGravity:")
+                print(f"  gx = {output.gravity[0]:.6f}")
+                print(f"  gy = {output.gravity[1]:.6f}")
+                print(f"  gz = {output.gravity[2]:.6f}")
+                print(f"\nInternal State:")
+                print(f"  orient_init = {sf.orient_init}")
+                print(f"  acc_count = {sf.acc_count}")
+                print(f"  gyro_count = {sf.gyro_count}")
+                print(f"  nom_updt_ts = {sf.nom_updt_ts}")
+                print(f"  meas_updt_ts = {sf.meas_updt_ts}")
+                print("="*80 + "\n")
+
+            # Write Python output to CSV
+            pred_angles = output.orientation
+            csv_file.write(f"{timestamp},{output.quat.q0:.8f},{output.quat.q1:.8f},{output.quat.q2:.8f},{output.quat.q3:.8f},{pred_angles[2]:.3f},{pred_angles[1]:.3f},{pred_angles[0]:.3f}\n")
 
             # Only compare if we've run fusion at least once
             if sample_count > 0:
@@ -140,7 +183,11 @@ def main():
 
             output_idx += 1
 
-    print("\n" + "="*80)
+    # Close CSV file
+    csv_file.close()
+    print("\n✓ Python outputs written to ../build/python_outputs_0922.csv\n")
+
+    print("="*80)
     print("SUMMARY")
     print("="*80)
     print(f"Total fusion runs: {sample_count}")

@@ -47,17 +47,17 @@ def quat_to_rotation_matrix(q):
 
     # Row 1
     R[0, 0] = 2.0 * (q0*q0 + q1*q1) - 1.0
-    R[0, 1] = 2.0 * (q1*q2 - q0*q3)
-    R[0, 2] = 2.0 * (q1*q3 + q0*q2)
+    R[0, 1] = 2.0 * (q1*q2 + q0*q3)  # Fixed: was (q1*q2 - q0*q3)
+    R[0, 2] = 2.0 * (q1*q3 - q0*q2)  # Fixed: was (q1*q3 + q0*q2)
 
     # Row 2
-    R[1, 0] = 2.0 * (q1*q2 + q0*q3)
+    R[1, 0] = 2.0 * (q1*q2 - q0*q3)  # Fixed: was (q1*q2 + q0*q3)
     R[1, 1] = 2.0 * (q0*q0 + q2*q2) - 1.0
-    R[1, 2] = 2.0 * (q2*q3 - q0*q1)
+    R[1, 2] = 2.0 * (q2*q3 + q0*q1)  # Fixed: was (q2*q3 - q0*q1)
 
     # Row 3
-    R[2, 0] = 2.0 * (q1*q3 - q0*q2)
-    R[2, 1] = 2.0 * (q2*q3 + q0*q1)
+    R[2, 0] = 2.0 * (q1*q3 + q0*q2)  # Fixed: was (q1*q3 - q0*q2)
+    R[2, 1] = 2.0 * (q2*q3 - q0*q1)  # Fixed: was (q2*q3 + q0*q1)
     R[2, 2] = 2.0 * (q0*q0 + q3*q3) - 1.0
 
     return R

@@ -68,7 +68,7 @@ SF_MAX_ORIENT_ERR = 100
 SF_OVERSAMPLE_RATIO = 4  # Ratio of gyro/accel sampling frequency (must match C code)
 SF_GYRO_FS = 100  # Hz
 SF_GYRO_SAMP_INTVL = 1.0 / SF_GYRO_FS  # seconds
-SF_DELTA_T = SF_GYRO_SAMP_INTVL
+SF_DELTA_T = SF_OVERSAMPLE_RATIO * SF_GYRO_SAMP_INTVL  # Fixed: was missing SF_OVERSAMPLE_RATIO (interval between two KF runs)
 SF_DELTA_T_SQ = SF_DELTA_T * SF_DELTA_T
 
 # Channel indices
@@ -378,20 +378,31 @@ class SensorFusion6Axis:
 
         return self.signal_sf_run
 
-    def time_update(self):
+    def time_update(self, debug=False):
         """
         Nominal time update (prediction step) using gyroscope data
         Implements Kalman filter time propagation
         """
         delta_t = SF_GYRO_SAMP_INTVL
 
+        if debug:
+            print(f"\n=== TIME UPDATE (ts={self.gyro_data.timestamp}) ===")
+            print(f"Quat BEFORE integration: [{self.quat_post.q0:.8f}, {self.quat_post.q1:.8f}, {self.quat_post.q2:.8f}, {self.quat_post.q3:.8f}]")
+            print(f"bias_err_post_s: [{self.bias_err_post_s[0]:.8f}, {self.bias_err_post_s[1]:.8f}, {self.bias_err_post_s[2]:.8f}]")
+
         # Process all gyro samples in buffer
         for k in range(SF_OVERSAMPLE_RATIO):
             # Compute angular velocity (bias-corrected) in deg/s
+            # MATLAB line 48,51: omega = gyro - BiasErrPostS (NOT BiasPostS!)
             for i in range(3):
                 self.omega[i] = self.gyro_data.count_buff[k, i] * self.gyro_data.scale_factor
-                self.omega[i] -= self.bias_post_s[i]
+                self.omega[i] -= self.bias_err_post_s[i]  # MATLAB approach: use BiasErrPostS
                 self.ang_rate_prev[i] = self.omega[i]
+
+            if debug:
+                print(f"  Buffer[{k}] gyro_raw: [{self.gyro_data.count_buff[k, 0]}, {self.gyro_data.count_buff[k, 1]}, {self.gyro_data.count_buff[k, 2]}]")
+                print(f"  Buffer[{k}] omega (bias-corrected): [{self.omega[0]:.8f}, {self.omega[1]:.8f}, {self.omega[2]:.8f}] deg/s")
+                print(f"  Quat before integrate[{k}]: [{self.quat_post.q0:.8f}, {self.quat_post.q1:.8f}, {self.quat_post.q2:.8f}, {self.quat_post.q3:.8f}]")
 
             # Integrate quaternion
             quat_int = quaternion_integrate(
@@ -401,14 +412,20 @@ class SensorFusion6Axis:
             )
             self.quat_post.from_array(quat_int)
 
+            if debug:
+                print(f"  Quat after integrate[{k}]:  [{self.quat_post.q0:.8f}, {self.quat_post.q1:.8f}, {self.quat_post.q2:.8f}, {self.quat_post.q3:.8f}]")
+
         # Normalize quaternion
         quat_norm = quat_normalize(self.quat_post.to_array())
         self.quat_post.from_array(quat_norm)
 
+        if debug:
+            print(f"Quat AFTER normalization: [{self.quat_post.q0:.8f}, {self.quat_post.q1:.8f}, {self.quat_post.q2:.8f}, {self.quat_post.q3:.8f}]")
+
         # Update rotation matrix
         self.rot_mtx_post = quat_to_rotation_matrix(self.quat_post.to_array())
 
-        # Update timestamp to match sensor timestamp
+        # Update timestamp to sensor timestamp (to track when we last ran)
         self.nom_updt_ts = self.gyro_data.timestamp
 
         # Update error covariance matrix if enabled
@@ -439,6 +456,11 @@ class SensorFusion6Axis:
         )
 
         # Q[0][1] and Q[1][0]: Cross-covariance
+        # Matches original Freescale formula (fusion.c:741): Qw[0][3] = error_product - alpha*Qwb
+        # where alpha = 0.5 * DEG2RAD * OVERSAMPLE_RATIO / SENSORFS = 0.5 * DEG2RAD * SF_DELTA_T
+        # So the term -alpha*Qwb becomes: -0.5 * DEG2RAD * SF_DELTA_T * ProcNoiseVarBias
+        # Which simplifies to: -delta_t * (something involving bias error)
+        # Our adapted form: I*ProcNoiseVarBiasOrient - delta_t * ErrCovMtxPost[1][1]
         self.proc_noise_var[0, 1] = (
             np.eye(3) * self.proc_noise_var_bias_orient -
             delta_t * self.err_cov_mtx_post[1, 1]
@@ -454,11 +476,30 @@ class SensorFusion6Axis:
         if orient_err > SF_MAX_ORIENT_ERR:
             self.update_err_cov_mtx = 0
 
-    def measurement_update(self):
+    def measurement_update(self, debug=False):
         """
         Measurement update (correction step) using accelerometer data
         Implements Kalman filter measurement update
         """
+        if debug:
+            print(f"\n=== MEASUREMENT UPDATE (ts={self.acc_data.timestamp}) ===")
+            print(f"Quat BEFORE update: [{self.quat_post.q0:.15f}, {self.quat_post.q1:.15f}, {self.quat_post.q2:.15f}, {self.quat_post.q3:.15f}]")
+            print(f"BiasErrPostS BEFORE: [{self.bias_err_post_s[0]:.15f}, {self.bias_err_post_s[1]:.15f}, {self.bias_err_post_s[2]:.15f}]")
+            print(f"BiasPostS BEFORE: [{self.bias_post_s[0]:.15f}, {self.bias_post_s[1]:.15f}, {self.bias_post_s[2]:.15f}]")
+
+            print(f"\nInput acc counts: [{int(self.acc_data.count_buff[SF_OVERSAMPLE_RATIO-1, 0])}, {int(self.acc_data.count_buff[SF_OVERSAMPLE_RATIO-1, 1])}, {int(self.acc_data.count_buff[SF_OVERSAMPLE_RATIO-1, 2])}]")
+            print(f"Acc scale: {self.acc_data.scale_factor:.15f}")
+            print(f"\nRotMtxPost[*][2] (third column):")
+            print(f"  [{self.rot_mtx_post[0, 2]:.15f}, {self.rot_mtx_post[1, 2]:.15f}, {self.rot_mtx_post[2, 2]:.15f}]")
+
+            print(f"\nProc Noise Var (Qw) for bias - proc_noise_var[1][*]:")
+            print(f"Qw[1][0]:")
+            print(self.proc_noise_var[1, 0])
+            print(f"Qw[1][1]:")
+            print(self.proc_noise_var[1, 1])
+            print(f"Qw[1][2]:")
+            print(self.proc_noise_var[1, 2])
+
         # Compute gravity error
         # Following C code exactly:
         # GravErr = -AccCounts * Scale * G + LinAccTC * AccPostS - GravGyrPri
@@ -473,6 +514,10 @@ class SensorFusion6Axis:
             self.grav_err_pri_s[i] += self.lin_acc_tc * self.acc_post_s[i]
             self.grav_err_pri_s[i] -= self.grav_gyr_pri_s[i]
 
+        if debug:
+            print(f"\nGravErrPriS: [{self.grav_err_pri_s[0]:.8f}, {self.grav_err_pri_s[1]:.8f}, {self.grav_err_pri_s[2]:.8f}]")
+            print(f"GravGyrPriS: [{self.grav_gyr_pri_s[0]:.8f}, {self.grav_gyr_pri_s[1]:.8f}, {self.grav_gyr_pri_s[2]:.8f}]")
+
         # Compute measurement matrix C using cross product matrix
         C = np.zeros((3, 3, 3))
         cp_mat = cross_product_matrix(self.grav_gyr_pri_s)
@@ -480,14 +525,46 @@ class SensorFusion6Axis:
         C[1] = (DEG2RAD * SF_DELTA_T) * cp_mat
         C[2] = np.eye(3)
 
+        if debug:
+            print(f"\nMeasurement matrix C[0]:")
+            for i in range(3):
+                print(f"  [{C[0][i,0]:.15e}, {C[0][i,1]:.15e}, {C[0][i,2]:.15e}]")
+            print(f"Measurement matrix C[1]:")
+            for i in range(3):
+                print(f"  [{C[1][i,0]:.15e}, {C[1][i,1]:.15e}, {C[1][i,2]:.15e}]")
+            print(f"Measurement matrix C[2]:")
+            for i in range(3):
+                print(f"  [{C[2][i,0]:.15e}, {C[2][i,1]:.15e}, {C[2][i,2]:.15e}]")
+
         # Compute Kalman gain: K = Qw*C'*inv(C*Qw*C' + Qv)
         # F[3] = Qw[3][3]*C[3]'
+        if debug:
+            print(f"\n=== ACTUAL proc_noise_var[1][*] VALUES ===")
+            print(f"proc_noise_var[1][0]:\n{self.proc_noise_var[1, 0]}")
+            print(f"proc_noise_var[1][1]:\n{self.proc_noise_var[1, 1]}")
+            print(f"proc_noise_var[1][2]:\n{self.proc_noise_var[1, 2]}")
+
         F = np.zeros((3, 3, 3))
         for i in range(3):
             F[i] = np.zeros((3, 3))
             for j in range(3):
                 C_transp = C[j].T
-                F[i] += self.proc_noise_var[i, j] @ C_transp
+                term = self.proc_noise_var[i, j] @ C_transp
+                if debug and i == 1:
+                    print(f"\n  F[1] += Qw[1][{j}] @ C[{j}].T:")
+                    print(f"    Qw[1][{j}] @ C[{j}].T =\n{term}")
+                F[i] += term
+
+        if debug:
+            print(f"\nF[0] (Qw[0][*] @ C[*].T):")
+            for i in range(3):
+                print(f"  [{F[0][i,0]:.15e}, {F[0][i,1]:.15e}, {F[0][i,2]:.15e}]")
+            print(f"F[1] (Qw[1][*] @ C[*].T):")
+            for i in range(3):
+                print(f"  [{F[1][i,0]:.15e}, {F[1][i,1]:.15e}, {F[1][i,2]:.15e}]")
+            print(f"F[2] (Qw[2][*] @ C[*].T):")
+            for i in range(3):
+                print(f"  [{F[2][i,0]:.15e}, {F[2][i,1]:.15e}, {F[2][i,2]:.15e}]")
 
         # G = C[3]*F[3] + Qv
         G = np.eye(3) * self.meas_noise_var_acc
@@ -506,6 +583,14 @@ class SensorFusion6Axis:
             for i in range(3):
                 self.kalman_gain[i] = F[i] @ G_inv
 
+        if debug:
+            print(f"\nMeasurement matrix C[1] (for bias):\n{C[1]}")
+            print(f"inv_exist = {inv_exist}")
+            print(f"F[1] (should be Qw[1][*] @ C[*].T):\n{F[1]}")
+            print(f"\nKalman Gain K[0]:\n{self.kalman_gain[0]}")
+            print(f"Kalman Gain K[1]:\n{self.kalman_gain[1]}")
+            print(f"Kalman Gain K[2]:\n{self.kalman_gain[2]}")
+
         # Measurement update: xe+ = xe- + K*ze
         M_updt = np.zeros(9)
         for k in range(3):
@@ -514,10 +599,18 @@ class SensorFusion6Axis:
                 for i in range(3):
                     M_updt[3*k + j] += self.kalman_gain[k][j, i] * self.grav_err_pri_s[i]
 
+        if debug:
+            print(f"\nM_updt (full): {M_updt}")
+
         # Update state error estimates
         self.ornt_err_post_s = M_updt[0:3]
         self.bias_err_post_s = M_updt[3:6]
         self.acc_err_post_s = M_updt[6:9]
+
+        if debug:
+            print(f"\nOrntErrPostS: [{self.ornt_err_post_s[0]:.8f}, {self.ornt_err_post_s[1]:.8f}, {self.ornt_err_post_s[2]:.8f}]")
+            print(f"BiasErrPostS AFTER: [{self.bias_err_post_s[0]:.8f}, {self.bias_err_post_s[1]:.8f}, {self.bias_err_post_s[2]:.8f}]")
+            print(f"AccErrPostS: [{self.acc_err_post_s[0]:.8f}, {self.acc_err_post_s[1]:.8f}, {self.acc_err_post_s[2]:.8f}]")
 
         gyro_corr = -self.ornt_err_post_s / SF_DELTA_T
 
@@ -533,7 +626,7 @@ class SensorFusion6Axis:
         # Update rotation matrix
         self.rot_mtx_post = quat_to_rotation_matrix(self.quat_post.to_array())
 
-        # Update timestamp to match sensor timestamp
+        # Update timestamp to sensor timestamp (to track when we last ran)
         self.meas_updt_ts = self.acc_data.timestamp
 
         # Update aposteriori covariance matrix
@@ -541,6 +634,8 @@ class SensorFusion6Axis:
 
         # Update gyro bias and linear acceleration
         self.bias_post_s -= self.bias_err_post_s
+        # Clamp gyro bias to prevent unbounded growth (from Sources_org/FS/fusion.c lines 1349-1350)
+        self.bias_post_s = np.clip(self.bias_post_s, -5.0, 5.0)
         self.acc_post_s = self.lin_acc_tc * self.acc_post_s - self.acc_err_post_s
 
         # Transform acceleration to global frame
@@ -609,28 +704,29 @@ class SensorFusion6Axis:
         # Initialize orientation on first run
         if not self.orient_init:
             print("6-axis SF algo initial orientation lock")
-            accel_avg = self.acc_data.count_avg * self.acc_data.scale_factor * GTOMSEC2
+
+            # Check if count_avg has been populated (matches C code logic)
+            mag_check = 0.0
+            for i in range(3):
+                val = self.acc_data.count_avg[i] * self.acc_data.scale_factor * GTOMSEC2
+                mag_check += val * val
+
+            if mag_check < 1e-6:
+                # count_avg not yet populated - use most recent raw count from buffer
+                accel_avg = self.acc_data.count_buff[0] * self.acc_data.scale_factor * GTOMSEC2
+            else:
+                # Use averaged counts
+                accel_avg = self.acc_data.count_avg * self.acc_data.scale_factor * GTOMSEC2
+
             self._init_orient(accel_avg)
 
-        # Time update if new gyro data available
+        # Time update - run if new gyro data available (timestamp-based like C line 232)
         if self.nom_updt_ts < self.gyro_data.timestamp:
             self.time_update()
-            if self.gyro_data.timestamp < (curr_time_msec - SF_GYRO_MAX_STALE_DUR):
-                self.op_mode &= ~SF_GYRO_MASK
-                self.op_mode |= SF_GYRO_STALE
-        elif self.nom_updt_ts < (curr_time_msec - SF_GYRO_MAX_MISS_DUR):
-            self.op_mode &= ~SF_GYRO_MASK
-            self.op_mode |= SF_GYRO_MISSING
 
-        # Measurement update if new accel data available
+        # Measurement update - run if new accel data available (timestamp-based like C line 249)
         if self.meas_updt_ts < self.acc_data.timestamp:
             self.measurement_update()
-            if self.acc_data.timestamp < (curr_time_msec - SF_ACCEL_MAX_STALE_DUR):
-                self.op_mode &= ~SF_ACC_MASK
-                self.op_mode |= SF_ACC_STALE
-        elif self.meas_updt_ts < (curr_time_msec - SF_ACCEL_MAX_MISS_DUR):
-            self.op_mode &= ~SF_ACC_MASK
-            self.op_mode |= SF_ACC_MISSING
 
         # Update gravity vector
         for i in range(3):
@@ -723,6 +819,7 @@ def quaternion_integrate(quat: np.ndarray, omega: np.ndarray, delta_t: float) ->
 def rotation_matrix_to_quaternion(rot_mtx: np.ndarray) -> np.ndarray:
     """
     Convert rotation matrix to quaternion
+    Matches C implementation RotMtx2Quat (algo_sf_quatmath.c lines 57-102)
 
     Args:
         rot_mtx: 3x3 rotation matrix
@@ -730,34 +827,29 @@ def rotation_matrix_to_quaternion(rot_mtx: np.ndarray) -> np.ndarray:
     Returns:
         Quaternion [q0, q1, q2, q3]
     """
-    trace = rot_mtx[0, 0] + rot_mtx[1, 1] + rot_mtx[2, 2]
+    # Matrix A from C code (lines 65-68)
+    A = np.array([[0.25,  0.25,  0.25,  0.25],
+                  [0.25, -0.25, -0.25,  0.25],
+                  [-0.25,  0.25, -0.25,  0.25],
+                  [-0.25, -0.25,  0.25,  0.25]])
 
-    if trace > 0:
-        s = 0.5 / np.sqrt(trace + 1.0)
-        q0 = 0.25 / s
-        q1 = (rot_mtx[2, 1] - rot_mtx[1, 2]) * s
-        q2 = (rot_mtx[0, 2] - rot_mtx[2, 0]) * s
-        q3 = (rot_mtx[1, 0] - rot_mtx[0, 1]) * s
-    elif rot_mtx[0, 0] > rot_mtx[1, 1] and rot_mtx[0, 0] > rot_mtx[2, 2]:
-        s = 2.0 * np.sqrt(1.0 + rot_mtx[0, 0] - rot_mtx[1, 1] - rot_mtx[2, 2])
-        q0 = (rot_mtx[2, 1] - rot_mtx[1, 2]) / s
-        q1 = 0.25 * s
-        q2 = (rot_mtx[0, 1] + rot_mtx[1, 0]) / s
-        q3 = (rot_mtx[0, 2] + rot_mtx[2, 0]) / s
-    elif rot_mtx[1, 1] > rot_mtx[2, 2]:
-        s = 2.0 * np.sqrt(1.0 + rot_mtx[1, 1] - rot_mtx[0, 0] - rot_mtx[2, 2])
-        q0 = (rot_mtx[0, 2] - rot_mtx[2, 0]) / s
-        q1 = (rot_mtx[0, 1] + rot_mtx[1, 0]) / s
-        q2 = 0.25 * s
-        q3 = (rot_mtx[1, 2] + rot_mtx[2, 1]) / s
-    else:
-        s = 2.0 * np.sqrt(1.0 + rot_mtx[2, 2] - rot_mtx[0, 0] - rot_mtx[1, 1])
-        q0 = (rot_mtx[1, 0] - rot_mtx[0, 1]) / s
-        q1 = (rot_mtx[0, 2] + rot_mtx[2, 0]) / s
-        q2 = (rot_mtx[1, 2] + rot_mtx[2, 1]) / s
-        q3 = 0.25 * s
+    # Vector b from rotation matrix diagonal + 1 (lines 72-75)
+    b = np.array([rot_mtx[0, 0], rot_mtx[1, 1], rot_mtx[2, 2], 1.0])
 
-    return np.array([q0, q1, q2, q3])
+    # Compute quaternion components (lines 76-85)
+    q = A @ b  # Matrix multiplication
+    q = np.maximum(q, 0.0)  # Clamp negative values to zero
+    q = np.sqrt(q)  # Take square root
+
+    # Determine signs based on off-diagonal elements (lines 87-95)
+    if rot_mtx[1, 2] < rot_mtx[2, 1]:
+        q[1] = -q[1]
+    if rot_mtx[2, 0] < rot_mtx[0, 2]:
+        q[2] = -q[2]
+    if rot_mtx[0, 1] < rot_mtx[1, 0]:
+        q[3] = -q[3]
+
+    return q
 
 
 def rotation_matrix_to_angles(rot_mtx: np.ndarray, prev_theta: float, prev_psi: float) -> Tuple[float, float, float, float, float]:

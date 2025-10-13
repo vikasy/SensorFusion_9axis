@@ -121,6 +121,12 @@ void run_testdata_test(const char *test_name,
     test_statistics_t stats = {0};
     int expected_idx = 0;
 
+    // Open CSV file for C outputs
+    FILE *csv_file = fopen("c_outputs_0922.csv", "w");
+    if (csv_file) {
+        fprintf(csv_file, "timestamp,q0,q1,q2,q3,roll,pitch,yaw\n");
+    }
+
     // Process all input samples
     for (int i = 0; i < input_count; i++) {
         sensor_data_t sensor_data;
@@ -157,9 +163,45 @@ void run_testdata_test(const char *test_name,
             sf_6xag_algo_run(algo_id, &output);
         }
 
-        // Check if we have expected output for this timestamp
+        // Write C output to CSV for this timestamp (if matches expected timestamp)
         if (expected_idx < expected_count &&
             expected_data[expected_idx].ts == input_data[i].ts) {
+
+            // DEBUG: Print detailed state for first output sample
+            if (expected_idx == 0) {
+                printf("\n================================================================================\n");
+                printf("C DETAILED DEBUG - SAMPLE 0 (First Output)\n");
+                printf("================================================================================\n");
+                printf("Input sample index: %d\n", i);
+                printf("Timestamp: %llu\n", input_data[i].ts);
+                printf("Sensor ID: %d (0=ACC, 1=GYRO, 2=MAG)\n", input_data[i].id);
+                printf("Sensor counts: [%d, %d, %d]\n", input_data[i].x, input_data[i].y, input_data[i].z);
+                printf("\nOutput Quaternion:\n");
+                printf("  q0 = %.10f\n", output.quat.q0);
+                printf("  q1 = %.10f\n", output.quat.q1);
+                printf("  q2 = %.10f\n", output.quat.q2);
+                printf("  q3 = %.10f\n", output.quat.q3);
+                printf("\nOutput Orientation (degrees):\n");
+                printf("  Roll  = %.6f\n", output.orientation[2]);
+                printf("  Pitch = %.6f\n", output.orientation[1]);
+                printf("  Yaw   = %.6f\n", output.orientation[0]);
+                printf("\nLinear Acceleration:\n");
+                printf("  ax = %.6f\n", output.linear_acc[0]);
+                printf("  ay = %.6f\n", output.linear_acc[1]);
+                printf("  az = %.6f\n", output.linear_acc[2]);
+                printf("\nGravity:\n");
+                printf("  gx = %.6f\n", output.gravity[0]);
+                printf("  gy = %.6f\n", output.gravity[1]);
+                printf("  gz = %.6f\n", output.gravity[2]);
+                printf("================================================================================\n\n");
+            }
+
+            if (csv_file) {
+                fprintf(csv_file, "%llu,%.8f,%.8f,%.8f,%.8f,%.3f,%.3f,%.3f\n",
+                    input_data[i].ts,
+                    output.quat.q0, output.quat.q1, output.quat.q2, output.quat.q3,
+                    output.orientation[2], output.orientation[1], output.orientation[0]);
+            }
 
             // Compare quaternions
             double est_quat[4] = {
@@ -239,6 +281,12 @@ void run_testdata_test(const char *test_name,
         printf("RESULT: ✗ FAIL (%.1f%% within tolerance, expected ≥90%%)\n", pass_rate);
     }
     printf("=======================================================================\n");
+
+    // Close CSV file
+    if (csv_file) {
+        fclose(csv_file);
+        printf("\n✓ C outputs written to c_outputs_0922.csv\n");
+    }
 
     // Cleanup
     if (use_9axis) {

@@ -78,7 +78,13 @@ function state_var = SF_Init_State( FusionCat )
         %   ErrCov          : Filter error covariance matrix
         state_var.ErrCov = QW_INIT_AGM;
         state_var.P_post = QW_INIT_AGM;
-    else      
+    elseif( strcmp(FusionCat, '6X_AG') )
+        % For 6-axis (orientation + bias), use 6x6 matrices
+        state_var.ProcNoiseVar = eye(6);
+        state_var.ErrCov = eye(6);
+        state_var.P_post = eye(6);
+        state_var.MeasNoiseVar = eye(3);
+    else
         state_var.ProcNoiseVar = eye(3);
         state_var.ErrCov = eye(3);
     end
