@@ -381,6 +381,20 @@ if(BUILD_TESTS)
         RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/bin
     )
 
+    # Tool: Generate C reference quaternions
+    add_executable(generate_c_reference
+        ../test/tests/e2e_tests/generate_c_reference.c
+        ${ALL_ALGO_SOURCES}
+    )
+    target_compile_definitions(generate_c_reference PRIVATE USE_6AXIS_FUSION USE_9AXIS_FUSION)
+    target_link_libraries(generate_c_reference m)
+    target_include_directories(generate_c_reference PRIVATE
+        ../test/data/testdata/fusion
+    )
+    set_target_properties(generate_c_reference PROPERTIES
+        RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/bin
+    )
+
     # # Test: Coordinate Frame Discovery
     # add_executable(test_coordinate_frame
     #     ../test/diagnostic/test_coordinate_frame.c
