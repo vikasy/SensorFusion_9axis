@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.10)
-project(SensorFusion VERSION 1.0.0 LANGUAGES C)
+project(SF_9axis VERSION 1.0.0 LANGUAGES C)
 
 # Set C standard
 set(CMAKE_C_STANDARD 99)
@@ -35,7 +35,7 @@ endif()
 include_directories(
     ../code/algo/inc
     ../code/app/inc
-    ../test/testdata/fusion  # Required for main.c test data
+    ../test/data/testdata/fusion  # Required for main.c test data
 )
 
 # Source directories
@@ -70,9 +70,9 @@ set(APP_SOURCES ${APP_SRC_DIR}/main.c)
 set(TEST_SOURCES "")
 
 # Target names
-set(MAIN_TARGET "SensorFusion")
-set(TEST_TARGET "SensorFusion_test")
-set(STATIC_LIB "libsensorfusion")
+set(MAIN_TARGET "sf_9axis")
+set(TEST_TARGET "sf_9axis_test")
+set(STATIC_LIB "libsf9axis")
 
 # Create static library for algorithms (algorithm only, no main)
 add_library(${STATIC_LIB} STATIC ${ALGO_SOURCES})
@@ -94,7 +94,7 @@ set_target_properties(${MAIN_TARGET} PROPERTIES
 
 set_target_properties(${STATIC_LIB} PROPERTIES
     ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/lib
-    OUTPUT_NAME "sensorfusion"
+    OUTPUT_NAME "sf9axis"
 )
 
 if(TEST_SOURCES)
@@ -115,7 +115,7 @@ install(TARGETS ${MAIN_TARGET} ${STATIC_LIB}
 )
 
 # Install headers (same as Makefile)
-install(DIRECTORY ../code/algo/inc/ DESTINATION include/sensorfusion
+install(DIRECTORY ../code/algo/inc/ DESTINATION include/sf9axis
     FILES_MATCHING PATTERN "*.h"
 )
 
