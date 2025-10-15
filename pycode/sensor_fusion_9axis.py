@@ -35,6 +35,37 @@ SF_MAG_MASK = 48  # bits 4-5
 SF_MAG_STALE = 16  # bit 4
 SF_MAG_MISSING = 32  # bit 5
 
+# Bias rate limiting (Iteration 1 + Phase 1 optimization)
+# Use motion-dependent rate limiting:
+# - During slow motion/static: Allow normal convergence (no limiting)
+# - During rapid rotation: Apply aggressive limiting (prevent tracking motion)
+#
+# Thresholds (optimized via grid search 2025-10-14):
+# - Slow motion: < 12 dps → no limit
+# - Moderate motion: 12-45 dps → moderate limit (0.07 dps/cycle = 7 dps/sec)
+# - Fast motion: > 45 dps → strong limit (0.015 dps/cycle = 1.5 dps/sec)
+SF_MOTION_THRESHOLD_SLOW = 12.0  # dps - below this, no bias limiting
+SF_MOTION_THRESHOLD_FAST = 45.0  # dps - above this, strong bias limiting
+SF_MAX_BIAS_RATE_MODERATE = 0.07  # dps per cycle during moderate motion
+SF_MAX_BIAS_RATE_FAST = 0.015  # dps per cycle during fast motion
+
+# Adaptive Process Noise Scaling (Iteration 2 improvement)
+# Increase orientation process noise during rapid rotation to:
+# - Tell filter to trust gyro integration more during motion
+# - Reduce accelerometer Kalman gain (accel less reliable during motion)
+# - Allow filter to track larger orientation changes without excessive correction
+#
+# Scale factors for Q[0][0] (orientation error covariance):
+# - Slow/Moderate motion (< 40 dps): 1.0× (normal process noise, trust accel)
+# - Fast motion (40-60 dps): 2.5× (modest increase, start reducing accel trust)
+# - Very fast motion (> 60 dps): 5.0× (significant increase, rely on gyro)
+#
+# Note: Uses different thresholds than bias limiting to avoid over-scaling
+SF_PROCESS_NOISE_THRESHOLD_FAST = 40.0  # dps - above this, start scaling
+SF_PROCESS_NOISE_THRESHOLD_VERY_FAST = 60.0  # dps - above this, strong scaling
+SF_PROCESS_NOISE_SCALE_FAST = 2.5  # Scale factor for fast motion
+SF_PROCESS_NOISE_SCALE_VERY_FAST = 5.0  # Scale factor for very fast motion
+
 
 class SensorFusion9Axis(SensorFusion6Axis):
     """
@@ -42,7 +73,15 @@ class SensorFusion9Axis(SensorFusion6Axis):
     Extends 6-axis fusion with magnetometer for absolute heading
     """
 
-    def __init__(self, acc_scale: float, gyro_scale: float, mag_scale: float):
+    def __init__(self, acc_scale: float, gyro_scale: float, mag_scale: float,
+                 motion_threshold_slow: float = SF_MOTION_THRESHOLD_SLOW,
+                 motion_threshold_fast: float = SF_MOTION_THRESHOLD_FAST,
+                 max_bias_rate_moderate: float = SF_MAX_BIAS_RATE_MODERATE,
+                 max_bias_rate_fast: float = SF_MAX_BIAS_RATE_FAST,
+                 process_noise_threshold_fast: float = SF_PROCESS_NOISE_THRESHOLD_FAST,
+                 process_noise_threshold_very_fast: float = SF_PROCESS_NOISE_THRESHOLD_VERY_FAST,
+                 process_noise_scale_fast: float = SF_PROCESS_NOISE_SCALE_FAST,
+                 process_noise_scale_very_fast: float = SF_PROCESS_NOISE_SCALE_VERY_FAST):
         """
         Initialize 9-axis sensor fusion
 
@@ -50,6 +89,14 @@ class SensorFusion9Axis(SensorFusion6Axis):
             acc_scale: Accelerometer scale factor (g/count)
             gyro_scale: Gyroscope scale factor (dps/count)
             mag_scale: Magnetometer scale factor (µT/count)
+            motion_threshold_slow: Slow motion threshold (dps) - default 12.0
+            motion_threshold_fast: Fast motion threshold (dps) - default 45.0
+            max_bias_rate_moderate: Max bias rate during moderate motion (dps/cycle) - default 0.07
+            max_bias_rate_fast: Max bias rate during fast motion (dps/cycle) - default 0.015
+            process_noise_threshold_fast: Threshold for fast motion process noise scaling - default 40.0
+            process_noise_threshold_very_fast: Threshold for very fast motion scaling - default 60.0
+            process_noise_scale_fast: Process noise scale for fast motion - default 2.5
+            process_noise_scale_very_fast: Process noise scale for very fast motion - default 5.0
         """
         # Initialize base 6-axis fusion
         super().__init__(acc_scale, gyro_scale)
@@ -59,6 +106,18 @@ class SensorFusion9Axis(SensorFusion6Axis):
 
         # Add magnetometer sensor
         self.mag_data = PhysSensor(sensor_id=SensorID.MAG, scale_factor=mag_scale)
+
+        # Store bias rate limiting parameters as instance variables (Iteration 1)
+        self.motion_threshold_slow = motion_threshold_slow
+        self.motion_threshold_fast = motion_threshold_fast
+        self.max_bias_rate_moderate = max_bias_rate_moderate
+        self.max_bias_rate_fast = max_bias_rate_fast
+
+        # Store adaptive process noise scaling parameters (Iteration 2)
+        self.process_noise_threshold_fast = process_noise_threshold_fast
+        self.process_noise_threshold_very_fast = process_noise_threshold_very_fast
+        self.process_noise_scale_fast = process_noise_scale_fast
+        self.process_noise_scale_very_fast = process_noise_scale_very_fast
 
         # Magnetometer-specific state variables
         self.mag_cal_offset = np.zeros(3)  # Hard iron offset
@@ -102,10 +161,26 @@ class SensorFusion9Axis(SensorFusion6Axis):
         self.mag_cal_valid = 0
         self.mag_meas_updt_ts = 0
 
-        # Initialize 4x4 covariance matrices
+        # Initialize 4x4 error covariance matrix P with non-zero values
         for i in range(4):
             for j in range(4):
-                self.err_cov_mtx_post[i, j] = np.zeros((3, 3))
+                if i == j:
+                    # Diagonal blocks - set initial uncertainty
+                    if i == 0:
+                        # P[0][0]: Initial orientation error covariance
+                        self.err_cov_mtx_post[i, j] = np.eye(3) * 0.1
+                    elif i == 1:
+                        # P[1][1]: Initial gyro bias error covariance
+                        self.err_cov_mtx_post[i, j] = np.eye(3) * (50.0 * DEG2RAD) ** 2
+                    elif i == 2:
+                        # P[2][2]: Initial linear acceleration error covariance
+                        self.err_cov_mtx_post[i, j] = np.eye(3) * 0.1
+                    else:
+                        # P[3][3]: Initial magnetic disturbance error covariance
+                        self.err_cov_mtx_post[i, j] = np.eye(3) * 0.01
+                else:
+                    # Off-diagonal blocks start at zero
+                    self.err_cov_mtx_post[i, j] = np.zeros((3, 3))
 
         # Zero out off-diagonal process noise blocks for mag
         self.proc_noise_var[0, 3] = np.zeros((3, 3))
@@ -191,24 +266,89 @@ class SensorFusion9Axis(SensorFusion6Axis):
             sensor_id: Sensor ID (ACC=0, GYRO=1, MAG=2)
             sensor_data: Sensor measurements [x, y, z] in raw counts
             timestamp: Timestamp in nanoseconds
-        """
-        # Call parent class for acc/gyro
-        super().preprocess_sensor_data(sensor_id, sensor_data, timestamp)
 
+        Returns:
+            Signal bits: 0x1=ACC_READY, 0x2=GYRO_READY, 0x4=MAG_READY
+        """
         # Handle magnetometer
         if sensor_id == SensorID.MAG:
             self.mag_data.count_buff[0] = sensor_data.astype(np.int16)
-            self.mag_data.count_avg = sensor_data.astype(np.int16)
+            # Scale to physical units (µT) like accel/gyro
+            self.mag_data.count_avg = sensor_data.astype(np.float64) * self.mag_data.scale_factor
             self.mag_data.timestamp = timestamp
             self.sens_flags |= 4
+            return self.signal_sf_run | 4
+
+        # Call parent class for acc/gyro
+        return super().preprocess_sensor_data(sensor_id, sensor_data, timestamp)
+
+    def _apply_bias_rate_limit(self, bias_correction: np.ndarray) -> np.ndarray:
+        """
+        Apply motion-adaptive bias rate limiting (Iteration 1 improvement)
+
+        Real gyro bias changes < 0.01 dps/sec due to thermal effects.
+        Faster changes indicate filter tracking motion instead of bias.
+
+        Rate limiting is adaptive based on current rotation magnitude:
+        - Slow motion (<threshold_slow): No limiting (allow convergence)
+        - Moderate motion (threshold_slow - threshold_fast): Moderate limiting
+        - Fast motion (>threshold_fast): Strong limiting
+
+        Args:
+            bias_correction: Proposed bias change (dps)
+
+        Returns:
+            Rate-limited bias change (dps)
+        """
+        # Detect current rotation magnitude
+        rotation_magnitude = np.linalg.norm(self.omega)
+
+        # Apply motion-dependent limiting using instance parameters
+        if rotation_magnitude < self.motion_threshold_slow:
+            # Slow motion or static - no limiting, allow convergence
+            return bias_correction
+        elif rotation_magnitude < self.motion_threshold_fast:
+            # Moderate motion - moderate limiting
+            return np.clip(bias_correction, -self.max_bias_rate_moderate, self.max_bias_rate_moderate)
+        else:
+            # Fast motion - strong limiting
+            return np.clip(bias_correction, -self.max_bias_rate_fast, self.max_bias_rate_fast)
+
+    def _compute_process_noise_scale(self) -> float:
+        """
+        Compute adaptive process noise scale factor based on motion magnitude (Iteration 2)
+
+        Uses higher thresholds than bias limiting to avoid over-scaling at moderate speeds.
+        Accelerometer corrections are still valuable at 15-40 dps for single-axis rotation.
+
+        Returns:
+            Scale factor for orientation process noise (1.0, 2.5, or 5.0)
+        """
+        rotation_magnitude = np.linalg.norm(self.omega)
+
+        if rotation_magnitude < self.process_noise_threshold_fast:
+            # Slow/moderate motion - normal process noise (trust accelerometer)
+            return 1.0
+        elif rotation_magnitude < self.process_noise_threshold_very_fast:
+            # Fast motion - modest increase (start reducing accel trust)
+            return self.process_noise_scale_fast
+        else:
+            # Very fast motion - significant increase (rely heavily on gyro)
+            return self.process_noise_scale_very_fast
 
     def _update_process_noise_9axis(self, delta_t: float):
         """Update process noise covariance matrix for 9-axis"""
         Cacc2 = self.lin_acc_tc * self.lin_acc_tc
 
+        # Compute adaptive scale factor for orientation process noise (Iteration 2)
+        # DISABLED: Causes regressions on rotation_y_15dps and rotation_z_30dps
+        # Root cause: Process noise scaling affects filter convergence globally,
+        # not just during measurement updates. Need different approach.
+        orient_noise_scale = 1.0  # self._compute_process_noise_scale()
+
         # Q[0][0]: Orientation error covariance
         self.proc_noise_var[0, 0] = (
-            np.eye(3) * self.proc_noise_var_orient +
+            np.eye(3) * self.proc_noise_var_orient * orient_noise_scale +
             self.err_cov_mtx_post[0, 0] +
             delta_t**2 * self.err_cov_mtx_post[1, 1]
         )
@@ -247,19 +387,29 @@ class SensorFusion9Axis(SensorFusion6Axis):
         if orient_err > SF_MAX_ORIENT_ERR:
             self.update_err_cov_mtx = 0
 
-    def time_update(self):
+    def time_update(self, debug=False):
         """
         Nominal time update for 9-axis (same as 6-axis but uses 4x4 covariance)
         """
         delta_t = SF_GYRO_SAMP_INTVL
+
+        if debug:
+            print(f"\n=== TIME UPDATE (ts={self.gyro_data.timestamp}) ===")
+            print(f"Quat BEFORE integration: [{self.quat_post.q0:.8f}, {self.quat_post.q1:.8f}, {self.quat_post.q2:.8f}, {self.quat_post.q3:.8f}]")
+            print(f"bias_post_s: [{self.bias_post_s[0]:.8f}, {self.bias_post_s[1]:.8f}, {self.bias_post_s[2]:.8f}] dps")
 
         # Process all gyro samples in buffer
         for k in range(SF_OVERSAMPLE_RATIO):
             # Compute angular velocity (bias-corrected)
             for i in range(3):
                 self.omega[i] = self.gyro_data.count_buff[k, i] * self.gyro_data.scale_factor
-                self.omega[i] -= self.bias_err_post_s[i]
+                self.omega[i] -= self.bias_post_s[i]  # Fixed: use BiasPostS (accumulated bias)
                 self.ang_rate_prev[i] = self.omega[i]
+
+            if debug:
+                print(f"  Buffer[{k}] gyro_raw: [{self.gyro_data.count_buff[k, 0]:.0f}, {self.gyro_data.count_buff[k, 1]:.0f}, {self.gyro_data.count_buff[k, 2]:.0f}]")
+                print(f"  Buffer[{k}] omega (bias-corrected): [{self.omega[0]:.8f}, {self.omega[1]:.8f}, {self.omega[2]:.8f}] dps")
+                print(f"  Quat before integrate[{k}]: [{self.quat_post.q0:.8f}, {self.quat_post.q1:.8f}, {self.quat_post.q2:.8f}, {self.quat_post.q3:.8f}]")
 
             # Integrate quaternion
             quat_int = quaternion_integrate(
@@ -269,18 +419,125 @@ class SensorFusion9Axis(SensorFusion6Axis):
             )
             self.quat_post.from_array(quat_int)
 
+            if debug:
+                print(f"  Quat after integrate[{k}]:  [{self.quat_post.q0:.8f}, {self.quat_post.q1:.8f}, {self.quat_post.q2:.8f}, {self.quat_post.q3:.8f}]")
+
         # Normalize quaternion
         quat_norm = quat_normalize(self.quat_post.to_array())
+        self.quat_post.from_array(quat_norm)
+
+        if debug:
+            print(f"Quat AFTER normalization: [{self.quat_post.q0:.8f}, {self.quat_post.q1:.8f}, {self.quat_post.q2:.8f}, {self.quat_post.q3:.8f}]")
+
+        # Update rotation matrix
+        self.rot_mtx_post = quat_to_rotation_matrix(self.quat_post.to_array())
+
+        # Update timestamp to sensor timestamp (not wall-clock!)
+        self.nom_updt_ts = self.gyro_data.timestamp
+
+        # Update error covariance matrix if enabled
+        if self.update_err_cov_mtx == 1:
+            self._update_process_noise_9axis(delta_t)
+
+    def measurement_update(self, debug=False):
+        """
+        Measurement update (correction step) using accelerometer - adapted for 9-axis (4x4 matrices)
+        """
+        if debug:
+            print(f"\n=== MEASUREMENT UPDATE (ts={self.acc_data.timestamp}) ===")
+
+        # Compute gravity error
+        for i in range(3):
+            self.grav_gyr_pri_s[i] = -self.rot_mtx_post[i, 2] * GTOMSEC2
+            self.grav_err_pri_s[i] = self.acc_data.count_buff[SF_OVERSAMPLE_RATIO - 1, i]
+            self.grav_err_pri_s[i] *= -1.0
+            self.grav_err_pri_s[i] *= self.acc_data.scale_factor * GTOMSEC2
+            self.grav_err_pri_s[i] += self.lin_acc_tc * self.acc_post_s[i]
+            self.grav_err_pri_s[i] -= self.grav_gyr_pri_s[i]
+
+        # Compute measurement matrix C (ONLY 3x3x3 for accel update - mag disturbance not affected!)
+        C = np.zeros((3, 3, 3))
+        cp_mat = cross_product_matrix(self.grav_gyr_pri_s)
+        C[0] = -DEG2RAD * cp_mat
+        C[1] = (DEG2RAD * SF_DELTA_T) * cp_mat
+        C[2] = np.eye(3)
+
+        # Compute Kalman gain: K = Qw*C'*inv(C*Qw*C' + Qv)
+        # F[3] = Qw[3][3]*C[3]'  (only 3 blocks, not 4!)
+        F = np.zeros((3, 3, 3))
+        for i in range(3):
+            F[i] = np.zeros((3, 3))
+            for j in range(3):
+                C_transp = C[j].T
+                term = self.proc_noise_var[i, j] @ C_transp
+                F[i] += term
+
+        # G = C*F + Qv
+        G = np.eye(3) * self.meas_noise_var_acc
+        for i in range(3):
+            G += C[i] @ F[i]
+
+        # Ginv = inv(G)
+        try:
+            G_inv = np.linalg.inv(G)
+            inv_exist = True
+        except np.linalg.LinAlgError:
+            inv_exist = False
+
+        # K = F*Ginv (only 3 blocks!)
+        if inv_exist:
+            for i in range(3):
+                self.kalman_gain[i] = F[i] @ G_inv
+            # Zero out K[3] - mag disturbance not updated by accelerometer!
+            self.kalman_gain[3] = np.zeros((3, 3))
+
+        # Measurement update: xe+ = xe- + K*ze (only 9 DOF, not 12!)
+        M_updt = np.zeros(9)
+        for k in range(3):
+            for j in range(3):
+                M_updt[3*k + j] = 0.0
+                for i in range(3):
+                    M_updt[3*k + j] += self.kalman_gain[k][j, i] * self.grav_err_pri_s[i]
+
+        # Update state error estimates
+        self.ornt_err_post_s = M_updt[0:3]
+        self.bias_err_post_s = M_updt[3:6]
+        self.acc_err_post_s = M_updt[6:9]
+        # Mag disturbance NOT updated by accelerometer!
+        self.mag_dist_err_post_s = np.zeros(3)
+
+        gyro_corr = -self.ornt_err_post_s / SF_DELTA_T
+
+        # Update quaternion with correction
+        quat_int = quaternion_integrate(
+            self.quat_post.to_array(),
+            gyro_corr,
+            SF_DELTA_T
+        )
+        quat_norm = quat_normalize(quat_int)
         self.quat_post.from_array(quat_norm)
 
         # Update rotation matrix
         self.rot_mtx_post = quat_to_rotation_matrix(self.quat_post.to_array())
 
-        self.nom_updt_ts = timestamp_ms()
+        # Update timestamp
+        self.meas_updt_ts = self.acc_data.timestamp
 
-        # Update error covariance matrix if enabled
-        if self.update_err_cov_mtx == 1:
-            self._update_process_noise_9axis(delta_t)
+        # Update aposteriori covariance matrix
+        self._update_error_covariance_9axis(C)
+
+        # Update gyro bias with rate limiting (Iteration 1 improvement)
+        bias_correction = self._apply_bias_rate_limit(self.bias_err_post_s)
+        self.bias_post_s -= bias_correction
+        self.bias_post_s = np.clip(self.bias_post_s, -200.0, 200.0)
+        self.acc_post_s = self.lin_acc_tc * self.acc_post_s - self.acc_err_post_s
+
+        # Transform acceleration to global frame
+        for j in range(3):
+            self.acc_post_g[j] = 0.0
+            for k in range(3):
+                self.acc_post_g[j] += self.rot_mtx_post[j, k] * self.acc_post_s[k]
+        self.acc_post_g[3] -= GTOMSEC2
 
     def measurement_update_mag(self):
         """
@@ -288,9 +545,10 @@ class SensorFusion9Axis(SensorFusion6Axis):
         Implements Kalman filter measurement update using magnetometer data
         """
         # Get measured magnetometer data (with calibration)
+        # count_avg is already in µT (scaled in preprocess_sensor_data)
         mag_measured = np.zeros(3)
         for i in range(3):
-            mag_measured[i] = self.mag_data.count_avg[i] * self.mag_data.scale_factor
+            mag_measured[i] = self.mag_data.count_avg[i]
             # Apply hard iron calibration
             mag_measured[i] -= self.mag_cal_offset[i]
 
@@ -383,20 +641,32 @@ class SensorFusion9Axis(SensorFusion6Axis):
         # Update aposteriori covariance matrix
         self._update_error_covariance_9axis(C)
 
-        # Update gyro bias
-        self.bias_post_s -= self.bias_err_post_s
+        # Update gyro bias with rate limiting (Iteration 1 improvement)
+        bias_correction = self._apply_bias_rate_limit(self.bias_err_post_s)
+        self.bias_post_s -= bias_correction
 
         # Store calibrated magnetometer data
         self.mag_post_s = mag_measured * mag_norm
         self.mag_post_g = self.rot_mtx_post.T @ self.mag_post_s
 
     def _update_error_covariance_9axis(self, C: np.ndarray):
-        """Update aposteriori error covariance matrix for 9-axis"""
+        """
+        Update aposteriori error covariance matrix for 9-axis
+
+        Args:
+            C: Measurement matrix - can be 3x3x3 (accel) or 4x3x3 (mag)
+        """
         # P_post = (I - K*C)*Qw
         # Compute A = (I - K*C)
-        A = np.zeros((4, 4, 3, 3))
-        for i in range(4):
-            for j in range(4):
+        # IMPORTANT: Only update the blocks that are affected by this measurement!
+        # For accel: update P[0:3][0:3] only (orientation, bias, lin_acc)
+        # For mag: update P[0:4][0:4] (all states including mag disturbance)
+
+        num_c_blocks = C.shape[0]  # 3 for accel, 4 for mag
+
+        A = np.zeros((num_c_blocks, num_c_blocks, 3, 3))
+        for i in range(num_c_blocks):
+            for j in range(num_c_blocks):
                 if i == j:
                     A[i, j] = np.eye(3)
                 else:
@@ -404,13 +674,15 @@ class SensorFusion9Axis(SensorFusion6Axis):
 
                 K_C = self.kalman_gain[i] @ C[j]
                 A[i, j] -= K_C
+
+                # Store in appropriate block of full P matrix
                 self.err_cov_mtx_post[i, j] = A[i, j]
 
-        # Compute P_post = A*Qw
-        for i in range(4):
-            for j in range(4):
+        # Compute P_post = A*Qw (only for affected blocks!)
+        for i in range(num_c_blocks):
+            for j in range(num_c_blocks):
                 temp = np.zeros((3, 3))
-                for k in range(4):
+                for k in range(num_c_blocks):
                     temp += self.err_cov_mtx_post[i, k] @ self.proc_noise_var[k, j]
 
                 # Ensure symmetry
@@ -484,8 +756,10 @@ class SensorFusion9Axis(SensorFusion6Axis):
         # Initialize orientation on first run
         if not self.orient_init:
             print("9-axis SF algo init orient")
-            accel_avg = self.acc_data.count_avg * self.acc_data.scale_factor * GTOMSEC2
-            mag_avg = self.mag_data.count_avg * self.mag_data.scale_factor
+            # count_avg is already scaled to physical units (g for accel, µT for mag)
+            # by the preprocessing (line 381 in sensor_fusion_6axis.py)
+            accel_avg = self.acc_data.count_avg * GTOMSEC2  # g * 9.81 = m/s²
+            mag_avg = self.mag_data.count_avg  # already in µT
             self._init_orient_mag(accel_avg, mag_avg)
 
         # Time update if new gyro data available
@@ -502,11 +776,27 @@ class SensorFusion9Axis(SensorFusion6Axis):
 
         # Magnetometer update if new mag data available
         if self.mag_meas_updt_ts < self.mag_data.timestamp:
-            # Detect magnetic disturbance
-            mag_measured = self.mag_data.count_avg * self.mag_data.scale_factor
-            disturbance = self.detect_mag_disturbance(mag_measured, self.mag_field_ref, 0.3)
+            # Get measured magnetometer data (already in µT from preprocessing)
+            mag_measured_raw = self.mag_data.count_avg
 
-            # Only apply mag update if no disturbance
+            # Check if mag reference is initialized
+            mag_ref_initialized = np.linalg.norm(self.mag_field_ref) > EPSILON
+
+            # Only check for disturbance if reference is initialized
+            if mag_ref_initialized:
+                # Normalize measured mag field for comparison with normalized reference
+                mag_norm = np.linalg.norm(mag_measured_raw)
+                if mag_norm > EPSILON:
+                    mag_measured_normalized = mag_measured_raw / mag_norm
+                    disturbance = self.detect_mag_disturbance(mag_measured_normalized, self.mag_field_ref, 0.3)
+                    # DEBUG
+                    # print(f"  [DEBUG] mag_norm={mag_norm:.3f}, mag_measured_normalized=[{mag_measured_normalized[0]:.6f}, {mag_measured_normalized[1]:.6f}, {mag_measured_normalized[2]:.6f}], disturbance={disturbance}")
+                else:
+                    disturbance = True  # Invalid magnitude
+            else:
+                disturbance = False  # Allow first measurement to initialize reference
+
+            # Apply mag update if no disturbance (or first measurement)
             if not disturbance:
                 self.measurement_update_mag()
 

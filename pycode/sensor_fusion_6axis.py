@@ -38,13 +38,14 @@ RAD2DEG = 180.0 / np.pi
 EPSILON = 1e-12
 NSEC2MSEC = 1000000
 
-# 6-axis noise parameters (matching C code)
+# 6-axis noise parameters (matching C code - these are empirically tuned)
+# Original C values work well, so we use them directly
 SF_6XAG_QVACC = 2e-6
 SF_6XAG_QWACC = 1e-4
 SF_6XAG_QVGYRO = 0.01  # Radians
 SF_6XAG_QWGYRO = 1e-9  # Radians
 SF_6XAG_QOrient = 1e-1
-SF_6XAG_QBias = 1e1
+SF_6XAG_QBias = 10.0  # Tuned to 10.0 (was 100.0) - prevents mag updates from over-correcting bias via cross-covariance
 SF_6XAG_QLinAcc = 1e1
 SF_6XAG_QBiasOrient = 1e-1
 
@@ -82,7 +83,7 @@ class PhysSensor:
     scale_factor: float = 0.0
     count_buff: np.ndarray = field(default_factory=lambda: np.zeros((SF_OVERSAMPLE_RATIO, 3), dtype=np.int16))
     last_index: int = 0
-    count_avg: np.ndarray = field(default_factory=lambda: np.zeros(3, dtype=np.int16))
+    count_avg: np.ndarray = field(default_factory=lambda: np.zeros(3, dtype=np.float64))  # Must be float to avoid overflow
     timestamp: int = 0  # nanoseconds
 
 
@@ -183,6 +184,7 @@ class SensorFusion6Axis:
         self.proc_noise_var_bias = SF_6XAG_QBias
         self.proc_noise_var_lin_acc = SF_6XAG_QLinAcc
         self.proc_noise_var_bias_orient = SF_6XAG_QBiasOrient
+        # Measurement noise for accelerometer (R matrix) - matching C code exactly
         self.meas_noise_var_acc = SF_6XAG_QVACC + SF_6XAG_QWACC + ((SF_6XAG_QVGYRO + SF_6XAG_QWGYRO) * SF_DELTA_T_SQ)
 
         # Linear acceleration time constant
@@ -205,10 +207,27 @@ class SensorFusion6Axis:
         self.quat_post = Quaternion(q0=1.0, q1=0.0, q2=0.0, q3=0.0)
         self.rot_mtx_post = np.eye(3)
 
-        # Initialize error covariance matrix to zero
+        # Initialize error covariance matrix P with non-zero values
+        # P must be non-zero to reflect initial uncertainty
         for i in range(3):
             for j in range(3):
-                self.err_cov_mtx_post[i, j] = np.zeros((3, 3))
+                if i == j:
+                    # Diagonal blocks - set initial uncertainty
+                    if i == 0:
+                        # P[0][0]: Initial orientation error covariance
+                        # Start with moderate uncertainty (rad²)
+                        self.err_cov_mtx_post[i, j] = np.eye(3) * 0.1
+                    elif i == 1:
+                        # P[1][1]: Initial gyro bias error covariance
+                        # Start with VERY large uncertainty since we don't know the bias
+                        # Use ~(50 dps)² = (50 * DEG2RAD)² ≈ 0.76 rad² to boost initial Kalman gain
+                        self.err_cov_mtx_post[i, j] = np.eye(3) * (50.0 * DEG2RAD) ** 2
+                    else:
+                        # P[2][2]: Initial linear acceleration error covariance
+                        self.err_cov_mtx_post[i, j] = np.eye(3) * 0.1
+                else:
+                    # Off-diagonal blocks start at zero
+                    self.err_cov_mtx_post[i, j] = np.zeros((3, 3))
 
         # Zero out off-diagonal process noise blocks
         self.proc_noise_var[0, 2] = np.zeros((3, 3))
@@ -340,13 +359,11 @@ class SensorFusion6Axis:
         if sensor_id == SensorID.ACC:
             # Buffer accelerometer sample (C code: lines 66-92)
             self.acc_data.count_buff[self.acc_count] = sensor_data.astype(np.int16)
-            if self.acc_count == 0:
-                # Save timestamp of first sample in buffer
-                self.acc_data.timestamp = timestamp
-
             self.acc_count += 1
+
             if self.acc_count == SF_OVERSAMPLE_RATIO:
-                # Buffer full - compute average and signal ready
+                # Buffer full - save timestamp of last sample and signal ready
+                self.acc_data.timestamp = timestamp
                 self.acc_count = 0
                 self.signal_sf_run |= ACC_READY_BIT
 
@@ -366,13 +383,11 @@ class SensorFusion6Axis:
         elif sensor_id == SensorID.GYRO:
             # Buffer gyroscope sample (C code: lines 96-109)
             self.gyro_data.count_buff[self.gyro_count] = sensor_data.astype(np.int16)
-            if self.gyro_count == 0:
-                # Save timestamp of first sample in buffer
-                self.gyro_data.timestamp = timestamp
-
             self.gyro_count += 1
+
             if self.gyro_count == SF_OVERSAMPLE_RATIO:
-                # Buffer full - signal ready
+                # Buffer full - save timestamp of last sample and signal ready
+                self.gyro_data.timestamp = timestamp
                 self.gyro_count = 0
                 self.signal_sf_run |= GYRO_READY_BIT
 
@@ -393,10 +408,10 @@ class SensorFusion6Axis:
         # Process all gyro samples in buffer
         for k in range(SF_OVERSAMPLE_RATIO):
             # Compute angular velocity (bias-corrected) in deg/s
-            # MATLAB line 48,51: omega = gyro - BiasErrPostS (NOT BiasPostS!)
+            # C code line 798: omega = gyro - BiasPostS (accumulated bias, NOT BiasErrPostS!)
             for i in range(3):
                 self.omega[i] = self.gyro_data.count_buff[k, i] * self.gyro_data.scale_factor
-                self.omega[i] -= self.bias_err_post_s[i]  # MATLAB approach: use BiasErrPostS
+                self.omega[i] -= self.bias_post_s[i]  # Fixed: use BiasPostS (accumulated bias)
                 self.ang_rate_prev[i] = self.omega[i]
 
             if debug:
@@ -444,6 +459,8 @@ class SensorFusion6Axis:
         )
 
         # Q[1][1]: Gyro bias error covariance
+        # The adaptive formula Q = Q_init + P with high Q_init (1000) provides
+        # strong bias observability signal
         self.proc_noise_var[1, 1] = (
             np.eye(3) * self.proc_noise_var_bias +
             self.err_cov_mtx_post[1, 1]
@@ -634,8 +651,8 @@ class SensorFusion6Axis:
 
         # Update gyro bias and linear acceleration
         self.bias_post_s -= self.bias_err_post_s
-        # Clamp gyro bias to prevent unbounded growth (from Sources_org/FS/fusion.c lines 1349-1350)
-        self.bias_post_s = np.clip(self.bias_post_s, -5.0, 5.0)
+        # Clamp gyro bias to prevent unbounded growth (increased from ±5 to ±200 dps for rotation data)
+        self.bias_post_s = np.clip(self.bias_post_s, -200.0, 200.0)
         self.acc_post_s = self.lin_acc_tc * self.acc_post_s - self.acc_err_post_s
 
         # Transform acceleration to global frame

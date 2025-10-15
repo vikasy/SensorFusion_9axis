@@ -1,0 +1,78 @@
+{
+  "date": "2025-10-14 09:47:52",
+  "description": "Part 1 baseline after QBias=10.0 fix",
+  "datasets": {
+    "static_60s": {
+      "quat_error_mean": 0.5766308449456393,
+      "quat_error_std": 0.0897505226867619,
+      "quat_error_max": 0.8834404527678188,
+      "bias_final": 0.4614175151097949,
+      "bias_max": 0.9607344876304352,
+      "excellent_pct": 0.0,
+      "good_pct": 21.260630315157577
+    },
+    "static_10s": {
+      "quat_error_mean": 2.716489918417789,
+      "quat_error_std": 1.661541241700669,
+      "quat_error_max": 5.032106418419748,
+      "bias_final": 0.8300425933016156,
+      "bias_max": 2.112146248038515,
+      "excellent_pct": 0.0,
+      "good_pct": 11.03309929789368
+    },
+    "static_high_bias_10s": {
+      "quat_error_mean": 2.6331621910152903,
+      "quat_error_std": 1.2179207503453813,
+      "quat_error_max": 4.602693057978678,
+      "bias_final": 1.0021771971921856,
+      "bias_max": 2.75861764325609,
+      "excellent_pct": 0.0,
+      "good_pct": 0.0
+    },
+    "static_high_noise_10s": {
+      "quat_error_mean": 5.240696428305942,
+      "quat_error_std": 2.9546249770351265,
+      "quat_error_max": 9.269484428713058,
+      "bias_final": 1.51931891209249,
+      "bias_max": 4.208579882219723,
+      "excellent_pct": 0.0,
+      "good_pct": 5.817452357071214
+    },
+    "rotation_y_15dps_10s": {
+      "quat_error_mean": 0.95478142651892,
+      "quat_error_std": 0.3662324439334518,
+      "quat_error_max": 1.661299424123141,
+      "bias_final": 0.8010304532825506,
+      "bias_max": 1.3165527565077786,
+      "excellent_pct": 0.0,
+      "good_pct": 9.42828485456369
+    },
+    "rotation_z_30dps_10s": {
+      "quat_error_mean": 1.538714465278089,
+      "quat_error_std": 0.5828661816816392,
+      "quat_error_max": 2.8738866572162465,
+      "bias_final": 0.6388132926724062,
+      "bias_max": 1.1216886468741445,
+      "excellent_pct": 0.0,
+      "good_pct": 0.0
+    },
+    "rotation_x_20dps_10s": {
+      "quat_error_mean": 2.728915575026821,
+      "quat_error_std": 1.3515549542966332,
+      "quat_error_max": 5.154249156681781,
+      "bias_final": 1.040356842779659,
+      "bias_max": 1.6093741297226496,
+      "excellent_pct": 0.0,
+      "good_pct": 0.9027081243731192
+    },
+    "vibration_5hz_10s": {
+      "quat_error_mean": 0.7867248925419363,
+      "quat_error_std": 0.3893404442983645,
+      "quat_error_max": 1.3998061313680188,
+      "bias_final": 0.6047021421329344,
+      "bias_max": 1.0352824059629246,
+      "excellent_pct": 0.0,
+      "good_pct": 35.00501504513541
+    }
+  }
+}
