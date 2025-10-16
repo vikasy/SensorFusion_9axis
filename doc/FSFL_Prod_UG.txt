@@ -1,0 +1,2076 @@
+© 2015 Freescale Semiconductor, Inc.   
+1 Introduction ................................ 
+1.1 Software Licensing ................................ 
+1.2 Software Features ................................ 
+1.3 Supporting Documentation ................................ 
+1.4 Requirements ................................ 
+1.4.1  Kinetis Platform ................................ 
+1.4.2  Freedom Sensor Development Platform 
+1.4.3  Peripherals Used by the Kit 
+1.4.4  CodeWarrior ................................ 
+1.4.5  Graphical User Interface ................................ 
+2 Quick Start Guides ................................ 
+2.1 Installing the Development Kit 
+2.2 Development with CodeWarrior 
+2.3 Development with Kinetis Design Studio 
+2.4 Limitations ................................ 
+2.5 Easy Entry Points for Your Code 
+2.6 Android Quick Start Guide ................................ 
+2.7 Windows Quick Start Guide 
+3 Project Details ................................ 
+3.1 Tasks Structure ................................ 
+3.1.1  RdSensData_task ................................ 
+3.1.2  Fusion_task calls ................................ 
+3.1.3  MagCal_task calls ................................ 
+3.2 Global Data Structures ................................ 
+3.2.1  Writing Sensor Values into Global Structures 
+3.3 Reading Sensor Values ................................ 
+3.3.1  Accelerometer ................................ 
+3.4.1  Gyroscope ................................ 
+3.3.2  Magnetometer ................................ 
+3.4 Reading Fusion Results ................................ 
+4 Software Tasks ................................ 
+4.1 Task Scheduling ................................ Freescale Semiconductor  
+USER GUIDE  
+Freescale Sensor Fusion for Kinetis 
+Product Development Kit User Guide 
+ 
+ 
+Contents 
+................................ ................................................... ............. ................................ 
+................................ ................................ ................................ 
+................................ ................................ ................................ 
+................................ ................................ ................................ 
+................................ ................................ ................................ 
+................................ ................................................... ............. ................................ 
+Freedom Sensor Development Platform  ................................ ................................ 
+Peripherals Used by the Kit  .................................................. .............. ................................ 
+................................ ................................................... ............. ................................ 
+................................ ................................ ................................ 
+................................ ................................ ................................ 
+Installing the Development Kit  .................................................. .............. ................................ 
+Development with CodeWarrior  .................................................. .............. .............................. 
+Development with Kinetis Design Studio  ................................ ................................ 
+................................ ................................................... ............. .............................. 
+Easy Entry Points for Your Code  .................................................. .............. ............................ 
+................................ ................................ ................................ 
+Windows Quick Start Guide  .................................................. .............. ................................ 
+................................ ................................................... ............. .............................. 
+................................ ................................ ................................ 
+................................ ................................ ................................ 
+................................ ................................ ................................ 
+................................ ................................ ................................ 
+................................ ................................ ................................ 
+Writing Sensor Values into Global Structures  ................................ ................................ 
+................................ ................................ ................................ 
+................................ ................................................... ............. ................................ 
+................................ ................................................... ............. ................................ 
+................................ ................................................... ............. ................................ 
+................................ ................................ ................................ 
+................................ ................................................... ............. ............................. 
+................................ ................................ ................................ Document Number: 
+Freescale Sensor Fusion for Kinetis 
+Product Development Kit User Guide 
+................................ .... 3 
+................................ ................... 3 
+................................ .................... 4 
+................................ ....... 5 
+................................ ........................... 6 
+................................ ....6 
+................................ .............................8  
+................................ .............. 10  
+................................ ...... 11  
+................................ ................... 11  
+................................ ....................... 12  
+................................ . 12 
+..............................  14 
+................................ ................. 19 
+..............................  19 
+............................  20 
+................................ ...... 20 
+................................ .... 22 
+..............................  23  
+................................ ....................... 23 
+................................ ............................. 24  
+................................ .............................. 25  
+................................ ............................. 26  
+................................ ............ 26 
+................................ .................. 27  
+................................ .......... 27 
+................................ ... 28  
+................................ ......... 28  
+................................ ... 28  
+................................ .......... 28 
+.............................  31  
+................................ ..................... 32 Document Number: FSFL_Prod_UG 
+Rev. 1.3, 9/2015
+Freescale Sensor Fusion for Kinetis 
+Product Development Kit User Guide  
+Introduction 
+ 
+2   Freescale  Sensor Fusion for Kinetis Product Development Kit User Guide,  Rev. 1.3, 9/2015 
+  Freescale Semiconductor, Inc. 
+ 4.2 Timing Diagram ................................ ................................................... ................................... 33 
+4.3 user_tasks.c .................................. ................................................... ...................................... 34 
+4.4 UART Communications ........................... ................................................... ............................ 36 
+5 Adding Support for a New PCB ...................... ................................................... .......................... 37  
+5.1 File-by-File Changes .......................... ................................................... .................................. 38 
+5.1.1  Events.c .......................................... ................................................... ............................................... 38  
+5.1.2  drivers.c ......................................... ................................................... ................................................ 38  
+5.1.3  mqx_tasks.c ....................................... ................................................... ............................................ 39  
+5.1.4  user_tasks.c ...................................... ................................................... ............................................. 39  
+5.1.5  build.h (Build Parameters) ........................ ................................................... ..................................... 39  
+5.1.6  main.c ............................................ ................................................... ................................................ 40  
+6 Bluetooth Packet Structure ........................ ................................................... .............................. 41  
+6.1 Development board to Fusion Toolbox ........... ................................................... ..................... 41 
+6.1.1  Packet Type 1 ..................................... ................................................... ........................................... 41  
+6.1.2  Packet Type 2: Debug .............................. ................................................... ..................................... 43  
+6.1.3  Packet Type 3: Angular Rate ....................... ................................................... .................................. 43  
+6.1.4  Packet Type 4: Euler Angles ....................... ................................................... .................................. 43  
+6.1.5  Packet Type 5: Altitude and Temperature ........... ................................................... .......................... 44  
+6.2 Toolbox to Freedom Development Platform ....... ................................................... .................. 44 
+7 Odds and Ends ..................................... ................................................... ..................................... 45  
+7.1 ANSI C ........................................ ................................................... ........................................ 45 
+7.2 Floating Point Libraries ...................... ................................................... .................................. 45 
+7.3 Error Handling ................................ ................................................... ..................................... 46 
+7.4 Numerical Accuracy ............................ ................................................... ................................. 46 
+8 Revision History .................................. ................................................... ...................................... 46  
+A-1 Creating a Run Configuration for OpenSDA 1.0 boards ................................................... ......... 48  
+A-2 Creating Run Configuration for Segger OpenSDA ..... ................................................... ............ 55  
+ 
+ 
+ 
+  
+ 
+Freescale Sensor Fusion for Kinetis Product Develop ment Kit User Guide, Rev. 1.3, 9/2015  
+Freescale Semiconductor, Inc. 1 Introduction 
+Sensor fusion is a process by which data from sever al different sensors are fused  to compute 
+something more than could be determined by any one sensor alone. An example is computing the 
+orientation of a device in three dimensional space.  That data is then used to alter the perspective 
+presented by a 3D GUI or game. 
+The Freescale Sensor Fusion Library for Kinetis MCU s (also referred to as Fusion Library or 
+development kit ) provides advanced functions for computation of de vice orientation, linear acceleration, 
+gyro offset and magnetic interference based on the outputs of Freescale inertial and magnetic sensors.  
+Version 5.x of the development kit now includes: 
+• Full source code for the sensor fusion libraries 
+• New & improved 6 and 9-axis Kalman filters with vi sibly better convergence properties 
+• Prepackaged implementations targeted at specific F reedom development platforms 
+• Support for CodeWarrior and Kinetis Design Studio 
+• Full documentation including user manual and fusio n data sheet 
+The fusion library is supplied under a liberal BSD open source license, which allows the user to emplo y 
+this software with Freescale MCUs and sensors, or those of our competitors . Support for issues relating 
+to the default distribution running on Freescale re ference hardware is available via standard Freescal e 
+support channels. Support for non-standard platform s and applications is available at 
+https://community.freescale.com/community/sensors/s ensorfusion . 
+This document is part of the documentation for Free scale Sensor Fusion Library for Kinetis MCUs 
+(compatible with Freedom Development Platform, FRDM -KL25Z, FRDM-KL26Z, FRDM-K20D50M, 
+FRDM-K46Z and FRDM-K64F) software. Its use and dist ribution are controlled by the license 
+agreement in the Software Licensing  section. 
+1.1 Software Licensing 
+Copyright © 2014, Freescale Semiconductor, Inc. All  rights reserved 
+Redistribution and use in source and binary forms, with or without modification, are permitted provide d 
+that the following conditions are met: 
+• Redistributions of source code must retain the abo ve copyright notice, this list of conditions and th e 
+following disclaimer. 
+• Redistributions in binary form must reproduce the above copyright notice, this list of conditions and  
+the following disclaimer in the documentation and/o r other materials provided with the distribution. 
+• Neither the name of Freescale Semiconductor, Inc. nor the names of its contributors may be used 
+to endorse or promote products derived from this so ftware without specific prior written permission. 
+ 
+Introduction 
+ 
+4   Freescale  Sensor Fusion for Kinetis Product Development Kit User Guide,  Rev. 1.3, 9/2015 
+  Freescale Semiconductor, Inc. 
+ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" 
+AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, B UT NOT LIMITED TO, THE 
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS F OR A PARTICULAR PURPOSE 
+ARE DISCLAIMED. IN NO EVENT SHALL FREESCALE SEMICON DUCTOR, INC. BE LIABLE FOR 
+ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLAR Y, OR CONSEQUENTIAL DAMAGES 
+(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBS TITUTE GOODS OR SERVICES; 
+LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUP TION) HOWEVER CAUSED AND 
+ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, ST RICT LIABILITY, OR TORT 
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS 
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUC H DAMAGE. 
+1.2 Software Features 
+The development kit is shipped in the form of a zip  file.  Simply unzip to the directory of your choic e on 
+your development PC.  The kit includes a number of CodeWarrior and Kinetis Design Studio canned 
+sensor fusion projects.  Collectively, these cover Kinetis ARM Cortex M0+, M4 and M4F 
+implementations.  They are intended as reference pr ojects for you to refer to when porting to other 
+MCUs and boards. 
+Freescale Freedom platforms supported “out-of-the-b ox” include: 
+• FRDM-KL25Z 
+• FRDM-KL26Z 
+• FRDM-K20D50M 
+• FRDM-KL46Z and 
+• FRDM-K64F 
+The boards above can be mixed and matched with the following Freescale sensor “shields”: 
+• FRDM-FXS-MULTI (deprecated) 
+• FRDM-FXS-MULTI-B (deprecated) 
+• FRDM-FXS-9AXIS (deprecated) 
+• FRDM-FXS-MULT2-B 
+• FRDM-STBC-AGM01 
+ 
+This product provides access to source code for all  functions. The software features include: 
+• Fusion and magnetic calibration algorithms 
+• Programmable sensor sample rate (Default= 200 Hz) 
+• Programmable sensor fusion rate (Default = 25 Hz) 
+• Supported frames of reference include NED, Android  and Windows 8. 
+• No procedural interface to learn. 
+o Write sensor readings into one set of global struc tures 
+o Read fusion results from a different set of global  structures 
+• Ability to compile and link any combination of sta ndard algorithms 
+o Accelerometer only (tilt) 
+o Magnetometer only eCompass (vehicle) 
+o Gyro only orientation (relative rotation) 
+  
+ 
+Freescale Sensor Fusion for Kinetis Product Develop ment Kit User Guide, Rev. 1.3, 9/2015  
+Freescale Semiconductor, Inc. o Accelerometer plus magnetometer 6-axis eCompass 
+o Accelerometer plus gyroscope orientation (gaming) 
+o Accelerometer plus magnetometer and gyroscope (ful l 9-axis) 
+• Freescale’s award-winning magnetic compensation so ftware, which provides geomagnetic field 
+strength, hard and soft iron corrections and qualit y-of-fit indication 
+• Supported by Freescale Code Warrior, Kinetis Desig n Studio and Processor Expert tools 
+• Directly compatible with the Freescale Sensor Fusi on Toolbox for Android and Windows (Fusion 
+Toolbox). Board-specific template programs include predefined Bluetooth/UART interfaces 
+compatible with the Fusion Toolbox. 
+1.3 Supporting Documentation 
+• Freescale Sensor Fusion Library for Kinetis Data S heet 
+• www.freescale.com/sensorfusion  
+• MCU on Eclipse (blog)  
+• Orientation Representations: Part 1  
+• Orientation Representations: Part 2  
+• Hard and soft iron magnetic compensation explained   
+• CodeWarrior Integrated Development Environment Sof tware at www.freescale.com/codewarrior   
+• Kinetis Design Studio software at www.freescale.com/kds   
+• Euler Angles at en.wikipedia.org/wiki/Euler_Angles   
+• Introduction to Random Signals and Applied Kalman Filtering, 3rd edition, by Robert Grover 
+Brown and Patrick Y.C. Hwang, John Wiley & Sons, 19 97 
+• Quaternions and Rotation Sequences, Jack B. Kuiper s, Princeton University Press, 1999 
+• Freescale Freedom development platform home page a t Freescale Freedom Development 
+Platform  
+• OpenSDA User’s Guide , Freescale Semiconductor, Rev 0.93, 2012-09-18 
+• PE micro Open SDA Support page at www.pemicro.com/opensda   
+• Freescale Application Note AN5018, Rev. 1.0:, Basi c Kalman Filter Theory 
+• Freescale Application Note AN5019, Rev. 1.0:: Magn etic Calibration Algorithms 
+• Freescale Application Note AN5020, Rev. 1.0: Deter mining Matrix Eigenvalues and 
+Eigenvectors by Jacobi Algorithm 
+• Freescale Application Note AN5021, Rev. 1.0: Calcu lation of Orientation Matrices from Sensor 
+Data 
+• Freescale Application Note AN5022, Rev. 1.0: Quate rnion Algebra and Rotations 
+• Freescale Application Note AN5023, Rev. 1.0: Senso r Fusion Kalman Filters 
+Introduction 
+ 
+6   Freescale  Sensor Fusion for Kinetis Product Development Kit User Guide,  Rev. 1.3, 9/2015 
+  Freescale Semiconductor, Inc. 
+ 1.4 Requirements 
+1.4.1 Kinetis Platform 
+The Sensor Fusion Library currently runs on the fol lowing hardware platforms: 
+• KL25Z Freedom Development Platform, Figure 1, based on the Kinetis KL2 family 
+MKL25Z128VLK4 MCU 
+— 48 MHz ARM M0+ core 
+— 128 KB of flash memory 
+— 16 KB of RAM 
+ 
+Figure 1. KL25Z Freedom Development Platform (FRDM- KL25Z) 
+ 
+• KL26Z Freedom Development Platform, Figure 2 , based on the Kinetis KL2 family 
+MKL26Z128VLH4 MCU 
+— 48 MHz ARM M0+ core 
+— a full-speed USB controller 
+— 128 KB of flash memory 
+— 16 KB of RAM 
+ 
+Figure 2. KL26Z Freedom Development Platform (FRDM- KL26Z) 
+
+  
+ 
+Freescale Sensor Fusion for Kinetis Product Develop ment Kit User Guide, Rev. 1.3, 9/2015  
+Freescale Semiconductor, Inc. • KL46Z Freedom Development Platform, Figure 3 , based on the Kinetis KL2 family 
+MKL26Z128VLH4 MCU 
+— 48 MHz ARM M0+ core 
+— a full-speed USB controller 
+— 128 KB of flash memory 
+— 16 KB of RAM 
+ 
+Figure 3. KL46Z Freedom Development Platform (FRDM- KL46Z) 
+ 
+• K20D50M Freedom Development Platform, Figure 4 , based on the Kinetis K20 family 
+MK20DX128VLH5 MCU 
+— 50 MHz ARM M4 core 
+— 128 KB of flash memory 
+— 32 KB of FlexNVM 
+— 16 KB of RAM 
+ 
+Figure 4. K20D50M Freedom Development Platform (FRD M-K20D50M) 
+ 
+
+Introduction 
+ 
+8   Freescale  Sensor Fusion for Kinetis Product Development Kit U ser Guide 
+  
+ • K64F Freedom Development Platform, 
+MK64FN1M0VLL12 MCU 
+— 120 MHz ARM M4 core with FPU 
+— 1 MB of flash memory 
+— 256 KB of RAM 
+Figure 5 . K64F Freedom Development Platform (FRDM 
+Any of these platforms can be programmed via the Op enSDA serial port on the board. A USB mini 
+connector cable is required to program the board. 
+1.4.2 Freedom Sensor Development Platform 
+Freescale has released a number of 
+Freedom Development Kinetis Platforms discussed in 
+• FRDM-FXS-9-AXIS (deprecated) 
+accelerometer/magnetometer combination sensor and a n FXAS21000 gyroscope 
+• FRDM-FXS-MULTI (deprecated) 
+additional sensors 
+• FRDM-FXS-MULTI-B (deprecated) 
+Bluetooth Module and battery 
+• FRDM-STBC- AGM01, which replaces the FRDM 
+accelerometer/magnetometer combination sensor and a n FXAS21002 gyroscope 
+• The FRDM-FXS-MULT2- B replaces the FRDM 
+newer FXAS21002 gyroscope, but otherwise has the sa me sensor 
+The first three boards were built from the same PCB design and differ only in t he number of parts on 
+the platform. Those first three boards are no longer in productio n, but t 
+of the above boards.  The FRDM- FXS 
+supports Bluetooth communications to the Freescale Sensor Fusion Toolbox for Android. 
+Key components of the FRDM-FXS -
+two boards have essentially the same layout.  The m ajor difference being the new and improved 
+FXAS21002 on the FRDM-FXS- MULT2 
+Sensor Fusion for Kinetis Product Development Kit U ser Guide 
+Freescale K64F Freedom Development Platform, Figure 5 , based on the Kinetis K60 family 
+20 MHz ARM M4 core with FPU  
+ 
+. K64F Freedom Development Platform (FRDM -K64F) 
+Any of these platforms can be programmed via the Op enSDA serial port on the board. A USB mini 
+is required to program the board.  
+Freedom Sensor Development Platform  
+a number of  Freedom Sensor Development platforms compatible wit h the 
+Freedom Development Kinetis Platforms discussed in  Kinetis Platform . These are:  
+(deprecated) , which contains an FXOS8700CQ 6-axis 
+accelerometer/magnetometer combination sensor and a n FXAS21000 gyroscope 
+(deprecated) , which contains all features of the FRDM- FXS 
+(deprecated) , which contains all features of the FRDM- FXS 
+AGM01, which replaces the FRDM -FXS-9-AXIS.  It contains FXOS8700CQ 6 
+accelerometer/magnetometer combination sensor and a n FXAS21002 gyroscope 
+B replaces the FRDM -FXS-MULTI and FRDM-FXS- MULTI 
+newer FXAS21002 gyroscope, but otherwise has the sa me sensor content. 
+built from the same PCB design and differ only in t he number of parts on 
+Those first three boards are no longer in productio n, but t he Fusion Library works with any 
+FXS -MULTI-B & FRDM-FXS-MULT2-B boards are 
+supports Bluetooth communications to the Freescale Sensor Fusion Toolbox for Android. 
+-MULTI-B and FRDM-FXS-MULT2-B are identified in 
+two boards have essentially the same layout.  The m ajor difference being the new and improved 
+MULT2 -B. 
+Sensor Fusion for Kinetis Product Development Kit U ser Guide , Rev. 1.3, 9/2015 
+Freescale  Semiconductor, Inc. , based on the Kinetis K60 family 
+Any of these platforms can be programmed via the Op enSDA serial port on the board. A USB mini 
+Freedom Sensor Development platforms compatible wit h the 
+ 
+accelerometer/magnetometer combination sensor and a n FXAS21000 gyroscope  
+FXS -9-AXIS plus 
+FXS -MULTI plus 
+FXOS8700CQ 6 -axis 
+accelerometer/magnetometer combination sensor and a n FXAS21002 gyroscope  
+MULTI -B.  It uses the 
+built from the same PCB design and differ only in t he number of parts on 
+he Fusion Library works with any 
+boards are  the only ones that 
+supports Bluetooth communications to the Freescale Sensor Fusion Toolbox for Android.  
+are identified in Figure 6 .  The 
+two boards have essentially the same layout.  The m ajor difference being the new and improved 
+  
+ 
+Freescale Sensor Fusion for Kinetis Product Develop ment Kit User Guide, Rev. 1.3, 9/2015  
+Freescale Semiconductor, Inc.  
+Figure 6. Freedom Development Platform Mult2-B with  key components 
+NOTE: The user must remove the BT Power Jumper when using  OpenSDA Communications Device 
+Class [CDC] (UART/USB) to communicate with a PC whe n using a base board which uses one UART 
+for both OpenSDA and to drive the Bluetooth interfa ce.  See Table 1 for details. 
+Figure 7  shows the FRDM-FXS-MULTI-B Sensor Development Plat form plugging in to the FRDM-
+KL25Z Freedom Development Platform. 
+ 
+Figure 7. Freedom Development Platforms, FRDM-FXS-M ULTI-B mated to FRDM-KL25Z 
+
+Introduction 
+ 
+10   Freescale  Sensor Fusion for Kinetis Product Development Kit U ser Guide 
+  
+ NOTE:  When mating the two boards, check to ensure that se nsor board, when configured with a 
+battery mounted on the back, is free of any obstacl es presented by the base, Freescale Freedom 
+Development board. 
+The FRDM-STBC-AGM01 i s shown in Figure 8. 
+but still has all the components necessary to imple ment full 9 
+all the base boards listed above. 
+Figure 8. FRDM 
+1.4.3 Peripherals Used by the Kit 
+Version 5.x of the product development software uses the virtual perip herals in 
+initialized via Processor Expert.   
+Changes from previous versions of the development kit: 
+• Prior versions reserved pins for blue LED and two test pins.  
+release. 
+• Some Freedom boards use the same UART for the OpenS DA CDC 
+and communicating with UART on the sensor shield.  Others (FRDM 
+K64F in the list below) utilized separate UARTS for  those two functions. 
+sensor fusion library required the user to reprogra m the 
+boards, depending upon whether or not a wired or wi reless link was desired.  Version 5.0 of the 
+kit includes two UARTS for all platforms.   Either can be used to communicate with the 
+reference applications.  For FRDM 
+dummy.  But it’s inclusion allows use of exactly th e same code for all platforms, while enabling 
+one binary per platform to support both wired and w ireless communications on those boards 
+with separate UARTs. 
+                                                
+1 CDC = Communications Device Class 
+Sensor Fusion for Kinetis Product Development Kit U ser Guide 
+Freescale When mating the two boards, check to ensure that se nsor board, when configured with a 
+battery mounted on the back, is free of any obstacl es presented by the base, Freescale Freedom 
+s shown in Figure 8.   It is a much simpler board than those shown above, 
+but still has all the components necessary to imple ment full 9 -axis sensor fusion.  It is compatible with 
+ 
+Figure 8. FRDM -STBC-AGM01 Freedom Development Platform  
+Used by the Kit  
+product development software uses the virtual perip herals in  Table 
+of the development kit:  
+reserved pins for blue LED and two test pins.  These have been freed up 
+Some Freedom boards use the same UART for the OpenS DA CDC 1 se rial port communications 
+and communicating with UART on the sensor shield.  Others (FRDM -K20D50M and FRDM 
+K64F in the list below) utilized separate UARTS for  those two functions.   Version 4.22 of the 
+sensor fusion library required the user to reprogra m the  UART in Processor Expert for those two 
+boards, depending upon whether or not a wired or wi reless link was desired.  Version 5.0 of the 
+kit includes two UARTS for all platforms.   Either can be used to communicate with the 
+reference applications.  For FRDM -KL25Z/KL26Z/KL46Z, the second UART is essentially a  
+dummy.  But it’s inclusion allows use of exactly th e same code for all platforms, while enabling 
+one binary per platform to support both wired and w ireless communications on those boards 
+CDC = Communications Device Class  
+Sensor Fusion for Kinetis Product Development Kit U ser Guide , Rev. 1.3, 9/2015 
+Freescale  Semiconductor, Inc. When mating the two boards, check to ensure that se nsor board, when configured with a 
+battery mounted on the back, is free of any obstacl es presented by the base, Freescale Freedom 
+It is a much simpler board than those shown above, 
+axis sensor fusion.  It is compatible with 
+ 
+Table 1. These are 
+hese have been freed up  in this 
+rial port communications 
+K20D50M and FRDM -
+Version 4.22 of the 
+UART in Processor Expert for those two 
+boards, depending upon whether or not a wired or wi reless link was desired.  Version 5.0 of the 
+kit includes two UARTS for all platforms.   Either can be used to communicate with the 
+KL25Z/KL26Z/KL46Z, the second UART is essentially a  
+dummy.  But it’s inclusion allows use of exactly th e same code for all platforms, while enabling 
+one binary per platform to support both wired and w ireless communications on those boards 
+  
+ 
+Freescale Sensor Fusion for Kinetis Product Develop ment Kit User Guide, Rev. 1.3, 9/2015  
+Freescale Semiconductor, Inc. Table 1. Virtual peripherals mapping to MCU resourc es per board combination 
+Virtual 
+Peripheral Processor 
+Expert 
+Function FRDM- 
+KL25Z FRDM-
+KL26Z FRDM-KL46Z FRDM- 
+K20D50M FRDM-K64F Description 
+N/A CPU MKL25Z12 
+8VLK4 
+Cortex M0 
++ MCU MKL26Z12 
+8VLH4 
+Cortex M0 
++ MCU MKL46Z256VM  
+C4 Cortex M0 + 
+MCU MK20DX128VL 
+H5 Cortex M4 MK64FN1M0VL  
+L12 Cortex M4 
+with FPU Microcontroller 
+LED_RED BitIO_LDD PTB18 PTE29 PTC3 PTB22 Red LED 
+illuminated only 
+during the 
+period when a 
+magnetic 
+calibration is in 
+progress. 
+LED_GREEN BitIO_LDD PTB19 PTE31 PTD5 PTD4 PTE26 Gre en LED 
+flickers when 
+the sensor 
+fusion 
+algorithms are 
+executing. 
+FTM TimerUnit_ 
+LDD LPTMR0 Timer to drive 
+the sensor read 
+process at a 
+typical rate of 
+200Hz. 
+UART_A Serial_LDD UART0 on PTA2:1 connects to both 
+Bluetooth module and OpenSDA CDC UART1 on 
+PTE1:0 (BT) UART3 on 
+PTC17:16 (BT) Serial port 
+communications  
+UART_B UART1 on PTE1:0 – “dummy” UART for 
+code compatibility UART0 on PTB17:16 used for 
+CDC UART/USB communication 
+I2C I2C_LDD I2C1 on PTC2:1 I2C0 on PTB1:0  I2C1 on 
+PTC11:10 The I2C master 
+bus 
+communicating 
+with the 
+sensors. 
+ 
+1.4.4 CodeWarrior 
+CodeWarrior 10.6 or Kinetis Design Studio 3.0 (or a bove) must be used to build these applications. 
+CodeWarrior can be downloaded from Freescale at htt p://www.freescale.com/codewarrior.  Kinetis 
+Design Studio can be downloaded from http://www.fre escale.com/kds . 
+ 
+1.4.5 Graphical User Interface 
+A device running either Android 3.0 or Windows 7.0 or higher is required to run the Freescale Sensor 
+Fusion Toolbox. Details are available at www.freescale.com/sensorfusion . 
+Quick Start Guides 
+ 
+12   Freescale  Sensor Fusion for Kinetis Product Development Kit U ser Guide 
+  
+ 2 Quick Start Guides 
+2.1 Installing the Development Kit 
+This procedure explains how to obtain 
+1. Download the zipfile containing the kit 
+using any standard expansion tool into the 
+directory structure shown in Figures 9 and 10.  Thi s version of the development kit has some 
+bonus material  in the form o f bare board projects for tiltm 
+mean “without RTOS”. 
+The reference projects for sensor fusion will be un der the 
+the subject of this user guide. 
+Figure 9. Kit structure with CodeWarrior subtree ex panded 
+ 
+Sensor Fusion for Kinetis Product Development Kit U ser Guide 
+Freescale Quick Start Guides  
+the Development Kit  
+This procedure explains how to obtain  and install the Sensor Fusion Library Development K it. 
+zipfile containing the kit  from www.freescale.com/sensorfusion . Expand the zip file 
+using any standard expansion tool into the root directory of your choice.  You will then see the 
+directory structure shown in Figures 9 and 10.  Thi s version of the development kit has some 
+f bare board projects for tiltm eter and eCompass.  By 
+The reference projects for sensor fusion will be un der the <toolname> FSFK  directories, and are 
+Figure 9. Kit structure with CodeWarrior subtree ex panded  
+Sensor Fusion for Kinetis Product Development Kit U ser Guide , Rev. 1.3, 9/2015 
+Freescale  Semiconductor, Inc. and install the Sensor Fusion Library Development K it.  
+Expand the zip file 
+You will then see the 
+directory structure shown in Figures 9 and 10.  Thi s version of the development kit has some 
+By “bare board”, we 
+directories, and are 
+ 
+  
+ 
+Freescale Sensor Fusion for Kinetis Product Develop ment Kit User Guide 
+Freescale Semiconductor, Inc. Figure 10. Kit structure with KDS subtree expanded 
+ 
+2. If not already done, Freescale recommends updating the OpenSDA 
+Development Platform to the most recent release for  that board. There are 
+OpenSDA boot loaders in existence 
+you want to use the Freescale Sensor Fusion Toolbox  for Windows GUI via a USB connection, you 
+must select a variant that supports “virtual serial  port” over USB.  Alternately, if you wish to 
+communicate via Bluetooth, then you must hav 
+installed on your PC.  In both cases, your board is  then enumerated as a serial COM port by the 
+toolkit. 
+The OpenSDA2 ARM CMSIS- DAP 
+reliable serial communications to Windows PCs then the 1 
+CodeWa rrior does not offer support fo 
+improved download speeds. 
+ 
+At the time of writing, mbed implementations are av ailable for FRDM 
+K64F.   The FRDM- KL26Z does not have an mbed implementation availabl e for download at this 
+time.  Check  www.freescale.com/opensda 
+                                                
+2 AKA “mbed” 
+Freescale Sensor Fusion for Kinetis Product Develop ment Kit User Guide , Rev. 1.3, 9/2015  Figure 10. Kit structure with KDS subtree expanded  
+If not already done, Freescale recommends updating the OpenSDA bootloader 
+Development Platform to the most recent release for  that board. There are two generations of 
+loaders in existence , with multiple vendor options supported for OpenSDA2.x.  If 
+you want to use the Freescale Sensor Fusion Toolbox  for Windows GUI via a USB connection, you 
+must select a variant that supports “virtual serial  port” over USB.  Alternately, if you wish to 
+communicate via Bluetooth, then you must hav e the proper drivers for your Bluetooth module 
+installed on your PC.  In both cases, your board is  then enumerated as a serial COM port by the 
+DAP 2 CDC drivers have been shown on other projects 
+communications to Windows PCs then the 1 st  generation OpenSDA. 
+rrior does not offer support fo r CMSIS-DAP , and other implementations may offer 
+At the time of writing, mbed implementations are av ailable for FRDM -KL2 5Z/KL46Z/K20D50M and 
+KL26Z does not have an mbed implementation availabl e for download at this 
+www.freescale.com/opensda  to see if this has changed. 
+ 
+bootloader  for your Freedom 
+two generations of 
+for OpenSDA2.x.  If 
+you want to use the Freescale Sensor Fusion Toolbox  for Windows GUI via a USB connection, you 
+must select a variant that supports “virtual serial  port” over USB.  Alternately, if you wish to 
+e the proper drivers for your Bluetooth module 
+installed on your PC.  In both cases, your board is  then enumerated as a serial COM port by the 
+been shown on other projects  to offer more 
+generation OpenSDA.   However 
+, and other implementations may offer 
+5Z/KL46Z/K20D50M and 
+KL26Z does not have an mbed implementation availabl e for download at this 
+Quick Start Guides 
+ 
+14   Freescale  Sensor Fusion for Kinetis Product Development Kit User Guide,  Rev. 1.3, 9/2015 
+  Freescale Semiconductor, Inc. 
+  
+Figure 11. Freedom Development Platform KL-25Z 
+Procedure 
+The following procedure outlines the process for up dating your board’s OpenSDA. Refer to Figure  
+as you perform step (c).  The process is the same, regardless of which OpenSDA software you 
+install. 
+a. Visit freescale.com/opensda , select your hardware platform via the pulldown me nu located 
+under the OpenSDA block diagram. 
+b. Download the most recent OpenSDA alternative of choice for your board. 
+c. Hold down the Reset button (located in box #2 ab ove) and then power the board by connecting 
+a powered USB cord to the USB port (located in box #1 above). The LED will blink (located in 
+box #3 above), indicating that the board is now in bootloader mode. Release the Reset button at 
+this point. 
+d. Open Windows Explorer and locate the BOOTLOADER drive. 
+e. Drag the file you downloaded (either a .bin or . srec file) onto the BOOTLOADER. 
+f.   Unplug the USB cable from the board then plug it back in. The Freedom Development Platform 
+is now updated to the latest firmware or applicatio n. 
+3. Inspect the contents of the docs  directory.  There you will find this document, a d atasheet for the 
+fusion library, and numerous other references. 
+2.2 Development with CodeWarrior 
+1. If not already accomplished, install and test Co deWarrior 10.6 on your computer. Download the 
+tool by following the link provided in CodeWarrior . 
+2. After successfully installing zipfile contents f or the kit, the file structure in the workspace sho uld 
+match Figure 9. Reference projects for sensor fusio n are found under the Codewarrior FSFK  
+directory.  Each of these will contain a sources di rectory, where you should see: 
+approximations.c  
+approximations.h  
+build.h  
+drivers.c  
+drivers.h  
+Events.c 
+Events.h  
+fusion.c  
+
+  
+ 
+Freescale Sensor Fusion for Kinetis Product Develop ment Kit User Guide, Rev. 1.3, 9/2015  
+Freescale Semiconductor, Inc. fusion.h  
+magnetic.c  
+magnetic.h  
+main.c  
+matrix.c  
+matrix.h  
+mqx_tasks.c  
+mqx_tasks.h  
+orientation.c  
+orientation.h  
+types.h 
+user_tasks.c  
+user_tasks.h 
+NOTE: The contents of the Sources directory is identical regardless of which board is targeted. 
+Hardware specific customizations are done in Processor Expert . That code will go into the 
+Generated_Code and MQX™ LITE directories.  The sour ces in the bare board bonus directories 
+are also consistent within each of those two sets. 
+3. Open CodeWarrior and in the Workspace Launcher dialog, see Figure , choose the workspace 
+where the product development project is located.  For this example, we have located the kit at 
+C:\FSFK. 
+ 
+Figure 12. Workspace launcher select window 
+4. Import the project using File-> Import option, see Figure 8  select General ->Existing Projects into 
+Workspace  
+
+Quick Start Guides 
+ 
+16   Freescale  Sensor Fusion for Kinetis Product Development Kit User Guide,  Rev. 1.3, 9/2015 
+  Freescale Semiconductor, Inc. 
+  
+Figure 8. Import dialog window 
+5. Click Next . In the Import Window that appears, navigate to th e folder containing the CodeWarrior 
+FSFK directory, and select it. See Figure 9 .  Click “Finish”. 
+
+  
+ 
+Freescale Sensor Fusion for Kinetis Product Develop ment Kit User Guide, Rev. 1.3, 9/2015  
+Freescale Semiconductor, Inc.  
+ 
+Figure 9. Import Projects window 
+6. In the project browser, double click on file nam e “ProcessorExpert.pe”.  This will open the 
+Processor Expert Components panel as shown in Figur e 15. 
+
+Quick Start Guides 
+ 
+18   Freescale  Sensor Fusion for Kinetis Product Development Kit User Guide,  Rev. 1.3, 9/2015 
+  Freescale Semiconductor, Inc. 
+  
+Figure 10. Imported Project with Components Window Expanded on Left 
+ 
+7. In the Components panel, click on the Generate Processor Expert Code icon. Make sure the 
+appropriate project name in the CodeWarrior Project s View is selected and then select from the 
+menu Project->Build Project to build the project. 
+8. Select Run ->Run Configurations to bring up the Run Configurations dialog, shown in  Figure 11 . 
+
+  
+ 
+Freescale Sensor Fusion for Kinetis Product Develop ment Kit User Guide, Rev. 1.3, 9/2015  
+Freescale Semiconductor, Inc.  
+Figure 11. Run Configurations window 
+9. Click the Run button. If the user wishes to use a different confi guration, follow instructions in 
+Creating a Run Configuration for OpenSDA 1.0 boards . 
+10. Proceed to Easy Entry Points for  Your Code 
+The development kit contains predefined CodeWarrior  project(s) for use with supported Freescale 
+Freedom Development Platforms. Kit functionality in cludes sensor drivers generated via Processor 
+Expert, magnetic calibration, sensor fusion and dat a streaming interface. User code can be easily 
+added to user_tasks.c within any of the following predefined functions: 
+• void UserStartup(void); 
+• void UserHighFrequencyTaskInit(void); //runs once, the first time through 
+the 200 Hz task 
+• void UserHighFrequencyTaskRun(void); //runs each ti me the 200 Hz task 
+runs 
+• void UserMediumFrequencyTaskInit(void); //runs once , the first time 
+through the 25 Hz task 
+• void UserMediumFrequencyTaskRun(void); // runs each  time the 25 Hz task 
+runs 
+Sensor and fusion results are simply read from pred efined structures. 
+The development kit provides access to drivers, har dware abstraction layers, communications 
+interfaces, and more. Although this guide provides a convenient place to start, the user is not limite d to 
+
+Quick Start Guides 
+ 
+20   Freescale  Sensor Fusion for Kinetis Product Development Kit User Guide,  Rev. 1.3, 9/2015 
+  Freescale Semiconductor, Inc. 
+ only the configurability that is described. Details  of complete configurability can be found in later 
+sections of this guide. 
+11. Android Quick Start Guide. 
+2.3 Development with Kinetis Design Studio 
+The Freescale Sensor Fusion Library also supports t he use of the Kinetis Design Studio. Information on  
+KDS can be found at www.freescale.com/kds . 
+The installation and Getting Started with KDS proce ss is nearly identical to that for CodeWarrior exce pt 
+that some of the screens shown in Development with CodeWarrior will have the Kinetis Design Studio 
+title displayed instead of CodeWarrior as was previ ously shown. 
+2.4 Limitations 
+Sensors supported using the development kit out-of- the box include FXOS8700CQ 6-axis 
+accelerometer/magnetometer combination sensor and t he FXAS21002 gyroscope. Kalman filters are 
+tuned for specific sensors. Alternate sensor combin ations are available, and more can easily be added 
+by making the appropriate additions to drivers.c/.h  and build.h. 
+2.5 Easy Entry Points for Your Code 
+The development kit contains predefined CodeWarrior  project(s) for use with supported Freescale 
+Freedom Development Platforms. Kit functionality in cludes sensor drivers generated via Processor 
+Expert, magnetic calibration, sensor fusion and dat a streaming interface. User code can be easily 
+added to user_tasks.c within any of the following predefined functions: 
+• void UserStartup(void); 
+• void UserHighFrequencyTaskInit(void); //runs once, the first time through 
+the 200 Hz task 
+• void UserHighFrequencyTaskRun(void); //runs each ti me the 200 Hz task 
+runs 
+• void UserMediumFrequencyTaskInit(void); //runs once , the first time 
+through the 25 Hz task 
+• void UserMediumFrequencyTaskRun(void); // runs each  time the 25 Hz task 
+runs 
+Sensor and fusion results are simply read from pred efined structures. 
+The development kit provides access to drivers, har dware abstraction layers, communications 
+interfaces, and more. Although this guide provides a convenient place to start, the user is not limite d to 
+only the configurability that is described. Details  of complete configurability can be found in later 
+sections of this guide. 
+2.6 Android Quick Start Guide 
+1. Once running, the Tri-Color LED on the Freedom D evelopment Platform flashes green at a rapid 
+rate. Every once in a while, a red flash will appea r when the magnetic calibration routines are 
+running. 
+  
+ 
+Freescale Sensor Fusion for Kinetis Product Develop ment Kit User Guide, Rev. 1.3, 9/2015  
+Freescale Semiconductor, Inc. Freedom/sensor shield configurations also include a  blue LED next to the BlueRadios module on 
+the shield board. See Table 1 . For production boards, this LED is OFF when the b oard is NOT 
+connected to a Bluetooth link. It is ON when it IS connected via Bluetooth to another device. 
+2. If not already done, download the Sensor Fusion Toolbox onto an Android 4.0 or higher device 
+(tablets are desired). This app can be found by sea rching Google Play, at http://play.google.com 
+for the term sensor fusion . Start the app on the Android device once it has b een installed. Once the 
+Sensor Fusion Toolbox is open, the software will di splay as shown in this example, see Figure 12 . 
+ 
+Figure 12. Sensor Fusion Toolbox 
+3. Open the Preferences Screen , see Figure 13  and check the Automatically enable Bluetooth 
+on entry checkbox. Click Save and Exit option and then exit the application. 
+
+Quick Start Guides 
+ 
+22   Freescale  Sensor Fusion for Kinetis Product Development Kit User Guide,  Rev. 1.3, 9/2015 
+  Freescale Semiconductor, Inc. 
+  
+Figure 13. Sensor Fusion preferences window 
+4. If not already done, pair the development board Bluetooth interface with the Android device. The 
+exact process is different for each model of Androi d device, but usually this is done in the 
+Settings ->Bluetooth screen. Search for active devices and look for one that starts with 
+BlueRadios, followed by a 6-digit hex code Pair to that device. It is recommended that you pair to a 
+single sensor fusion Freedom Development Platform a t any given time. 
+5. Restart the Android app. 
+6. In the app menu, select Remote 9-axis  for the Source/Algorithm. 
+7. Rotate the development board and observe the eff ects in the Android app display. 
+2.7 Windows Quick Start Guide 
+The Sensor Fusion Toolbox supports the Windows oper ating system, as well as Android OS. The 
+procedure below describes getting started with Wind ows. 
+1. This tool requires an OpenSDA CDC Serial Port de vice driver for proper operation. Consult the 
+OpenSDA documentation from a debug vendor such as ( P&E Micro , Segger  or MBED ) for details. 
+2. Run the Windows installer (Refer to www.freescal e.com/sensorfusion). 
+a. Welcome Screen, click Next . 
+b. Choose installation folder, click Next . 
+c. Confirm Installation, click Next . 
+
+  
+ 
+Freescale Sensor Fusion for Kinetis Product Develop ment Kit User Guide 
+Freescale Semiconductor, Inc. d. Installation is complete, click 
+3. Start the Fusion Toolbox 
+4. Attach Freedom/Sensor board stack 
+5. File->Flash-><base board>->< shield board 
+6. Select your Freedom board in the resulting Save As dialog box, click 
+7. Reset your Freedom Development Platform by unpluggi ng and re 
+OK . 
+8. Click the Auto Detect  button. 
+9. Start using the software. 
+3 Project Details 
+This section discusses implementation details for t he template programs for Freescale Kinetis 
+microcontrollers. These leverage the MQX 
+Processor Expert code generation tool. 
+3.1 Tasks Structure 
+Version 5.x of the fusion library has simplified th e project structure.  There are three main tasks 
+managed by the RTOS.  Th ese are shown in 
+mqx_tasks.c. 
+Table 
+Sensor Fusion Routines 
+RdSensData_task() 
+Fusion_task() 
+MagCal_task() 
+Freescale Sensor Fusion for Kinetis Product Develop ment Kit User Guide , Rev. 1.3, 9/2015  Installation is complete, click Close . 
+Attach Freedom/Sensor board stack -up via USB  
+shield board >-><sensor combination> 
+Select your Freedom board in the resulting Save As dialog box, click Save . 
+Reset your Freedom Development Platform by unpluggi ng and re -plugging from/to your PC, click 
+This section discusses implementation details for t he template programs for Freescale Kinetis 
+microcontrollers. These leverage the MQX ™ LITE RTOS and device drivers generated via the 
+code generation tool.   The high level architecture is shown in Figure 19 b elow. 
+Figure 14. Function Hierarchy 
+Version 5.x of the fusion library has simplified th e project structure.  There are three main tasks 
+ese are shown in  Table 2, which  lists the top level routines found in 
+Table 2. Top Level Sensor Fusion Routines 
+Description 
+Performs sensor initialization and sampling (high frequency task) 
+Performs sensor fusion initialization and on- going fusion 
+frequency task) 
+Performances magnetic calibration in the background 
+plugging from/to your PC, click 
+This section discusses implementation details for t he template programs for Freescale Kinetis 
+LITE RTOS and device drivers generated via the 
+The high level architecture is shown in Figure 19 b elow.  
+ 
+Version 5.x of the fusion library has simplified th e project structure.  There are three main tasks 
+routines found in 
+(high frequency task)  
+going fusion (medium 
+the background  
+Project Details 
+ 
+24   Freescale  Sensor Fusion for Kinetis Product Development Kit User Guide,  Rev. 1.3, 9/2015 
+  Freescale Semiconductor, Inc. 
+  
+For users who are planning to employ a different RT OS, the functions in this table make good interface  
+points for that RTOS.  90% of the code in these fun ctions is RTOS independent.  The remainder, which 
+does some event management, is easily identified an d replaced.  Look for the string “_lwevent”. 
+The next few sub-sections provide additional detail  for each of the three functions listed above. 
+3.1.1 RdSensData_task 
+The RdSensData_tasks is responsible for sensor init ialization and sampling.  It is the highest frequen cy 
+task within the sensor fusion library. 
+3.1.1.1 RTOS and Timer Calls 
+By their nature, these functions are not portable t o non-Kinetis architectures.  The _lwevent and _tas k 
+functions allow the fusion routines to coordinate t asks with the MQXLite RTOS.   The 
+FTM_SetPeriodTicks function is used to control the sensor sampling frequency.  All of these functions 
+were created via Processor Expert. 
+• _task_create_at 
+• _lwevent_create  
+• _lwevent_wait_for 
+• _lwevent_set 
+• FTM_SetPeriodTicks 
+3.1.1.2 GUI 
+LED_RED_ClrVal, LED_RED_SetVal, LED_GREEN_SetVal ar e generated by Processor Expert, and 
+provide low level GPIO functions to control LED col ors on the development hardware. 
+The LED is RED during sensor initialization. 
+LED operation is strictly for user feedback, and th ey can be eliminated with no effect on fusion 
+operation. 
+3.1.1.3 Sensor Drivers 
+Each sensor type has an initialization and at least  one ReadData function.  These are all defined in 
+drivers.c.   These functions are hardware specific,  and will need to be replaced if different hardware  is 
+used. 
+• MPL3115_Init / MPL3115_ReadData 
+• FXOS8700_Init / FXOS8700_ReadAccData / FXOS8700_Re adMagData 
+• FXAS2100X_Init / FXAS2100X_ReadData 
+• MMA8652_Init / MMA8652_ReadData 
+• FXLS8952_Init /  FXLS8952_ReadData 
+• MAG3110_Init / MAG3110_ReadData 
+The drivers above are build on top of: 
+  
+ 
+Freescale Sensor Fusion for Kinetis Product Develop ment Kit User Guide, Rev. 1.3, 9/2015  
+Freescale Semiconductor, Inc. • WriteI2CByte 
+• ReadI2CBytes 
+Both of which are also defined in drivers.c. 
+3.1.1.4 User Tasks 
+user_tasks.c provides convenient entry points for d evelopers to add their own code without having to 
+modify the more involved mqx_tasks functions.  This  makes it easier to integrate future library upgrad es 
+from Freescale.   
+• UserStartup 
+• UserHighFrequencyTaskInit 
+• UserHighFrequencyTaskRun 
+UARTs are initialized via the UserStartup function.   Most of the UART operation is encapsulated within  
+the user functions, as it is viewed as being applic ation specific.  Events.c contains UART callbacks a nd 
+command interpreter. 
+3.1.1.5 Magnetics 
+Both of the functions below are defined in magnetic .c. 
+• iUpdateMagnetometerBuffer updates the magnetic mea surement buffer with most recent magnetic 
+data (typically 200Hz).   
+• fInvertMagCal maps uncalibrated magnetometer data onto calibrated averaged data  
+3.1.2 Fusion_task calls 
+3.1.2.1 RTOS Calls 
+The _lwevent functions allow the fusion routines to  coordinate tasks with the MQXLite RTOS.    
+• _lwevent_wait_for 
+• _lwevent_set 
+3.1.2.2 User Tasks 
+Both of these functions are defined in user_tasks.c . 
+• UserMediumFrequencyTaskInit 
+• UserMediumFrequencyTaskRun calls CreateAndSendPack etsViaUART (defined in drivers.c), 
+which sends data from development board to Windows or Android via UART. 
+3.1.2.3 GUI 
+The Green LED is flashed to indicate that the fusio n routines are running. 
+• LED_GREEN_NegVal 
+LED operation is strictly for user feedback, and th ey can be eliminated with no effect on fusion 
+operation. 
+Project Details 
+ 
+26   Freescale  Sensor Fusion for Kinetis Product Development Kit User Guide,  Rev. 1.3, 9/2015 
+  Freescale Semiconductor, Inc. 
+ 3.1.2.4 Fusion Functions 
+The standard sensor fusion application can run any combination of 6 algorithms plus pressure 
+measurement based upon compile time constants set i n build.h.   
+There’s a standard bit of code wrapped around each of the fusion calls that is used to measure 
+execution time using the systick counter in the ARM  core.  systick counts are automatically sent to th e 
+Sensor Fusion Toolbox (both Windows and Android), e nabling an easy evaluation of algorithm 
+computation costs. 
+• fInitFusion – forces a reset of all algorithms the  next time they run 
+• fRun_1DOF_P_BASIC – 1-axis pressure measurement (l ow pass filtered) 
+• fRun_3DOF_G_BASIC – 3-axis accelerometer-based til t computation 
+• fRun_3DOF_B_BASIC – 2-axis vehicle compass algorit hm 
+• fRun_3DOF_Y_BASIC – 3-axis gyro integration algori thm 
+• fRun_6DOF_GB_BASIC – 6-axis tilt-compensated eComp ass algorithm 
+• fRun_6DOF_GY_KALMAN – 6-axis accel/gyro Kalman fil ter for gaming 
+• fRun_9DOF_GBY_KALMAN – 9-axis Kalman filter 
+All of the functions listed above are defined in fi le fusion.c. 
+3.1.3 MagCal_task calls 
+3.1.3.1 RTOS Calls 
+The _lwevent functions allow the fusion routines to  coordinate tasks with the MQXLite RTOS.   In this 
+case, to wait for a magnetic calibration event befo re running calibration. 
+• _lwevent_wait_for 
+• LED_RED_SetVal / LED_RED_ClrVal - The LED is flash ed red during magnetic calibration.  Again, 
+LED calls can be removed without affecting fusion r esults. 
+• fInitMagCalibration - initialize magnetic calibrat ion and magnetometer data buffer 
+• fRunMagCalibration – run magnetic calibration 
+3.2 Global Data Structures 
+Fusion inputs and outputs are stored in global data  structures, which are only allocated if the select ed 
+build requires them. Build options used to control the allocation of the global data structures are th e 
+following and are contained in build.h : 
+#define COMPUTE_1DOF_P_BASIC  // 1DOF pressure and temperature 
+#define COMPUTE_3DOF_G_BASIC     // 3-axis accel ti lt 
+#define COMPUTE_3DOF_B_BASIC  // 3DOF mag  eCompass (vehicle): (mag ) 
+#define COMPUTE_3DOF_Y_BASIC  // 3DOF gyro  integration: (gyro ) 
+#define COMPUTE_6DOF_GB_BASIC    // 6-axis accel + mag eCompass 
+#define COMPUTE_6DOF_GY_KALMAN   // 6axis accel + g yro Kalman algorithm 
+#define COMPUTE_9DOF_GBY_KALMAN  // 9-axis Kalman a lgorithm 
+  
+ 
+Freescale Sensor Fusion for Kinetis Product Develop ment Kit User Guide, Rev. 1.3, 9/2015  
+Freescale Semiconductor, Inc. The default build has all options above enabled. Th is allows ready comparison of the different options  
+in real time. Disabling an option is as easy as com menting out the appropriate #define in build.h . 
+Global data structures are allocated as follows in source file tasks.c in response to the build options 
+above. Key structure pointers are shown in Table 3.  
+Table 3 Global Structures 
+Pointer Function Structure Pointer 
+(mqx_tasks.c) Structure Type 
+(types.h) 
+Altitude / Temperature thisPressure PressureSensor 
+Accelerometer thisAccel AccelSensor 
+Magnetometer thisMag MagSensor 
+Gyroscope thisGyro GyroSensor 
+Altitude / Temperature thisSV_1DOF_P_BASIC  SV_1DOF_P_BASIC 
+2-axis automotive compass thisSV_3DOF_B_BASIC  SV_3DOF_B_BASIC 
+3-axis gyro integration thisSV_3DOF_Y_BASIC  SV_3DOF_Y_BASIC 
+3-axis tilt results thisSV_3DOF_G_BASIC SV_3DOF_G_BASIC 
+eCompass results thisSV_6DOF_GB_BASI 
+C SB_6DOF_GB_BASIC 
+accel+gyro results thisSV_6DOF_GY_KALM 
+AN  SV_6DOF_GY_KALMAN 
+9-axis results thisSV_9DOF_GBY_KAL 
+MAN  SV_9DOF_GBY_KALMAN 
+ 
+3.2.1 Writing Sensor Values into Global Structures 
+Sensor drivers are designed to take two parameters:  
+• a pointer to the Processor Expert Logical Device D river (LDD) structure associated with the serial 
+port to which the sensor is attached.  For the curr ent library, this is I2C_DeviceData. 
+• a pointer to a generic structure for that class of  sensor. For the current implementation, this is on e 
+of: 
+• thisPressure 
+• thisAccel 
+• thisMag 
+• thisGyro 
+Each driver is responsible for transforming (if nec essary) sensor data into the THISCOORDSYSTEM frame 
+of reference defined in build.h.  drivers.c contain s utility functions to assist in this effort.  Driv ers are 
+also responsible for filling the fields of the gene ric sensor structure.  The sensor fusion and magnet ic 
+calibration functions will read the data directly f rom these structures. 
+3.3 Reading Sensor Values 
+NOTE:  CHX, CHY and CHZ are conveniently defined as 0, 1 and 2 for readability in the library. Sensor 
+data types are defined in types.h. 
+Project Details 
+ 
+28   Freescale  Sensor Fusion for Kinetis Product Development Kit User Guide,  Rev. 1.3, 9/2015 
+  Freescale Semiconductor, Inc. 
+ 3.3.1 Accelerometer 
+Accelerometer values are stored as int16 . Multiply by thisAccel->fgPerCount  to convert to 
+gravities. 
+float fAcc[3]; // accel sensor output x, y, z 
+fAcc[X] = (float) thisAccel.iGs[CHX]*thisAccel.fgPe rCount;  
+fAcc[Y] = (float) thisAccel.iGs[CHY]*thisAccel.fgPe rCount;  
+fAcc[Z] = (float) thisAccel.iGs[CHZ]*thisAccel.fgPe rCount; 
+Alternately, simply read the averaged measurements,  which are already stored as floats: 
+fAcc[X] = thisAccel.fGsAvg[CHX];  
+fAcc[Y] = thisAccel.fGsAvg[CHY];  
+fAcc[Z] = thisAccel.fGsAvg[CHZ]; 
+3.4.1 Gyroscope  
+Gyroscope values are stored as int16 . Multiply by thisGyro->fDegPerSecPerCount  to convert to 
+degrees/second. 
+float fAngularRate[3]; // gyro sensor output  
+fAngularRate[X] = (float) thisGyro.iYs[CHX]*thisGyr o.fDegPerSecPerCount;  
+fAngularRate[Y] = (float) thisGyro.iYs[CHY]*thisGyr o.fDegPerSecPerCount;  
+fAngularRate[Z] = (float) thisGyro.iYs[CHZ]*thisGyr o.fDegPerSecPerCount; 
+3.3.2 Magnetometer 
+Magnetometer values are stored as int16 . Multiply by thisMag->fCountsPeruT  to convert to µTs. 
+Both raw and calibrated magnetometer outputs are av ailable. Scaling is the same for both. 
+float fBr[3]; // mag - raw average over OVERSAMPLE_ RATIO measurements  
+float fBc[3]; // mag - iBp after calibration 
+fBr[X] = (float) thisMag.iBsAvg[X]*thisMag.fCountsP eruT;  
+fBr[Y] = (float) thisMag.iBsAvg[Y]*thisMag.fCountsP eruT;  
+fBr[Z] = (float) thisMag.iBsAvg[Z]*thisMag.fCountsP eruT;  
+fBc[X] = (float) thisMag.iBcAvg[X]*thisMag.fCountsP eruT;  
+fBc[Y] = (float) thisMag.iBcAvg[Y]*thisMag.fCountsP eruT;  
+fBc[Z] = (float) thisMag.iBcAvg[Z]*thisMag.fCountsP eruT; 
+Alternately, you can read values directly in floati ng point: 
+fBr[X] = thisMag.fBsAvg[X];  
+fBr[Y] = thisMag.fBsAvg[Y];  
+fBr[Z] = thisMag.fBsAvg[Z];  
+fBc[X] = thisMag.fBcAvg[X];  
+fBc[Y] = thisMag.fBcAvg[Y];  
+fBc[Z] = thisMag.fBcAvg[Z]; 
+3.4 Reading Fusion Results 
+Global Data Structure variables 
+  
+ 
+Freescale Sensor Fusion for Kinetis Product Develop ment Kit User Guide, Rev. 1.3, 9/2015  
+Freescale Semiconductor, Inc. Each of the various fusion options have similar out put structures. Index directly to the data you need  
+using the pointer names in Table 3. 
+Table 4  Fusion Algorithm Options correspond to the followin g: 
+• G = SV_3DOF_G_BASIC (accel only) 
+• B = SV_3DOF_B_BASIC (2-axis auto compass) 
+• Y = SV_3DOF_B_BASIC (gyro integration) 
+• GB = SV_6DOF_GB_BASIC (accel + mag eCompass) 
+• GY = accel + gyro Kalman 
+• GBY = 9-axis Kalman 
+Table 4  variable names follow a strict naming convention. 
+• Core variable names 
+— m = magnetic 
+— b = gyro offset 
+— a = acceleration 
+— q = quaternion 
+• angle names= Phi, The, Psi, Rho and Chi  
+• f prefix = floating point variable 
+• LP = low pass filtered 
+• Pl suffix = post apriori estimate from Kalman filt er 
+• Gl suffix = global frame 
+• R = rotation / orientation 
+• Se = sensor frame 
+© 2015 Freescale Semiconductor, Inc.   
+Table 4 . Location of individual 
+Description data type 
+(accel) 
+roll in degrees 
+float fLPPhi 
+pitch in degrees 
+float fLPThe 
+yaw in degrees 
+float fLPPsi 
+compass heading in degrees 
+float fLPRho 
+tilt angle in degrees 
+float fLPChi 
+magnetic inclination angle in degrees 
+float N/A 
+gyro offset in degrees/sec 
+float N/A 
+linear acceleration in the global frame in gravities 
+float N/A 
+quaternion (unitless) 
+fquaternion  fLPq, fq 
+angular velocity in dps 
+float fOmega[3] 
+orientation matrix (unitless) 
+float fR[3][3] 
+fLPR[3][3] 
+rotation vector 
+float fLPRVec[3] 
+time interval in seconds 
+float fdeltat 
+1. Yaw is not supported for 3-axis accelerometer.  Only yaw is supported for the 2D automotive compass . 
+2. Physical gyro angular rate corrected to subtract computed offset. 
+. Location of individual variables within the global structures 
+  Fusion Algorithm Options 
+G 
+(accel)  B 
+(auto 
+compass) Y 
+(gyro) GB 
+(eCompass)  GY 
+(accel + gyro) 
+fLPPhi  fLPPhi fPhi fLPPhi fPhiPl 
+fLPThe  fLPThe fThe fLPThe fThePl 
+fLPPsi  fLPPsi fPsi fLPPsi fPsiPl 
+fLPRho  fLPRho fRho fLPRho fRhoPl 
+fLPChi  fLPChi fChi fLPChi fChiPl 
+N/A  N/A N/A fDelta, 
+fLPDelta N/A  
+N/A  N/A N/A N/A fbPL[3] 
+N/A  N/A N/A N/A fAccGl[3] 
+LPq, fq  fLPq, fq fq fLPq, fq fqPl  
+fOmega[3] 1 fOmega[3] 1 fOmega[3]  fOmega[3]  fOmega[3] 
+fR[3][3]  
+fLPR[3][3]  fR[3][3] 
+fLPR[3][3]  fR[3][3] fR[3][3] 
+fLPR[3][3]  fRPl[3][3] 
+fLPRVec[3]  fLPRVec[3]  fRVec fLPRVec[3]  fRVecPl [3] 
+eltat  fdeltat fdeltat fDeltat fKalmandeltat 
+Only yaw is supported for the 2D automotive compass .  
+. Physical gyro angular rate corrected to subtract computed offset. 
+Fusion Algorithm Options  
+(accel + gyro)  GBY 
+(9-axis) 
+fPhiPl  fPhiPl 
+fThePl  fThePl 
+fPsiPl  fPsiPl 
+fRhoPl  fRhoPl 
+fChiPl  fChiPl 
+ fDeltaPl 
+fbPL[3]  fbPL[3] 
+fAccGl[3]  fAccGl[3]  
+ fqPl 
+fOmega[3] 2 fOmega[3] 2 
+fRPl[3][3]  fRPl[3][3] 
+[3]  fRVecPl[3] 
+fKalmandeltat  fKalmandeltat  
+© 2015 Freescale Semiconductor, Inc.   
+Example: 3.5.1 Reading Quaternion Values 
+The Freescale library uses the convention that 
+are stored as float, and can be used directly. 
+struct fquaternion fq;              
+float q0, q1, q2, q3; 
+ 
+// fq = thisSV_3DOF_G_BASIC.fLPq; 
+//fq = thisSV_3DOF_B_BASIC .fLPq 
+//fq = thisSV_3DOF_Y_BASIC .fq 
+//fq = thisSV_6DOF_GB _BASIC.fLPq;  // OR 
+//fq = thisSV_6DOF_GY_KALMAN.fqPl; // OR 
+fq = thisSV_9DOF_GBY_KALMAN.fqPl; 
+ 
+q0 = fq.q0;  
+q1 = fq.q1;  
+q2 = fq.q2;  
+q3 = fq.q3; 
+Example: 3.5.2  Reading Euler Angles 
+Euler angles are stored as float with units of degr ees. 
+Using 3-axis accel only model: 
+float roll  = thisSV_3DOF_G_BASIC.fLPPhi; 
+float pitch = thisSV_3DOF_G_BASIC.fLPThe; 
+float yaw   = thisSV_3DOF_G_BASIC.fLPPsi; 
+Using 6- axis accel + mag (eCompass) model: 
+float roll  = thisSV_6DOF_GB_BASIC.fLPPhi; 
+float pitch = thisSV_6DOF_GB_BASIC.fLPThe; 
+float yaw   = thisSV_6DOF_GB_BASIC.fLPPsi; 
+Using 6- axis accel + gyro Kalman filter model: 
+float roll  = thisSV_6DOF_GY_KALMAN.fPhiPl; 
+float pitch = thisSV_6DOF_GY_KALMAN.fThePl; 
+float yaw   = thisSV_6DOF_GY_KALMAN.f 
+Using 9-axis Kalman filter model: 
+float roll  = thisSV_9DOF_GBY_KALMAN.fPhiPl; 
+float pitch = thisSV_9DOF_GBY_KALMAN.fThePl; 
+float yaw   = thisSV_9DOF_GBY_KALMAN.fPsiPl; 
+4 Software Tasks 
+Kinetis template programs for Sensor Fusion Library  are partiti 
+Example: 3.5.1 Reading Quaternion Values  
+The Freescale library uses the convention that  /uni0071/uni0030/g3404/uni0063/uni006F/uni0073/uni0009/g4666/uni03B1 /uni0032/uni2044 /g4667 and /g4670/uni0071/uni0031/uni002C/uni0071/uni0032/uni002C/uni0071/uni0033/g4671/g2904/g3404/uni0075
+can be used directly.  
+             // quaternion   
+fq = thisSV_3DOF_G_BASIC.fLPq;  // OR 
+.fLPq   // OR 
+.fq   // OR 
+_BASIC.fLPq;  // OR  
+//fq = thisSV_6DOF_GY_KALMAN.fqPl; // OR  
+fq = thisSV_9DOF_GBY_KALMAN.fqPl;  
+Euler Angles  
+Euler angles are stored as float with units of degr ees.  
+= thisSV_3DOF_G_BASIC.fLPPhi;  
+thisSV_3DOF_G_BASIC.fLPThe;  
+= thisSV_3DOF_G_BASIC.fLPPsi;  
+axis accel + mag (eCompass) model:  
+= thisSV_6DOF_GB_BASIC.fLPPhi;  
+pitch = thisSV_6DOF_GB_BASIC.fLPThe;  
+= thisSV_6DOF_GB_BASIC.fLPPsi;  
+axis accel + gyro Kalman filter model:  
+= thisSV_6DOF_GY_KALMAN.fPhiPl;  
+float pitch = thisSV_6DOF_GY_KALMAN.fThePl;  
+= thisSV_6DOF_GY_KALMAN.f PsiPl; 
+= thisSV_9DOF_GBY_KALMAN.fPhiPl;  
+float pitch = thisSV_9DOF_GBY_KALMAN.fThePl;  
+= thisSV_9DOF_GBY_KALMAN.fPsiPl;  
+Kinetis template programs for Sensor Fusion Library  are partiti oned into three software tasks. 
+/g3400/uni0073/uni0069/uni006E /g4666/uni03B1 /uni0032/uni2044 /g4667. Values 
+oned into three software tasks.  
+Software Tasks 
+ 
+32   Freescale  Sensor Fusion for Kinetis Product Development Kit User Guide,  Rev. 1.3, 9/2015 
+  Freescale Semiconductor, Inc. 
+ Table 5. Software task frequencies and priorities 
+Task Frequency Priority 
+Sensor sampling, integration and 
+decimation task Typically runs at 200 Hz and 
+typically decimates the sensor data 
+to lower frequency for the sensor 
+fusion.  This task has the highest priority. 
+sensor fusion task Typically executes at 25 Hz 
+(assuming 200 Hz sensor sampling 
+and 8x OVERSAMPLING) This task has middle priority. 
+Magnetic calibration task 1 Typically executes once per 
+minute.  This task has the lowest priority. 
+1. The10-element version of the Freescale magnetic calibration library is utilized. 
+4.1 Task Scheduling 
+The Sampling task is scheduled by the RTOS timer (typically at 2 00 Hz). The execution of the Fusion 
+task is locked to the Sampling task by being released to execute after a pre-deter mined number of 
+iterations of the Sampling task. The execution of the Calibration task is controlled by the Fusion task 
+and is released to execute after a pre-determined n umber of iterations of the Fusion task. 
+The accelerometer, magnetometer, and gyro sensors o perate asynchronously to the RTOS. Typically, 
+the sensors are configured to run freely at a nomin al output data rate of 200 Hz and are polled by the  
+Sampling task at 200 Hz. 
+Figure 15  illustrates the basic structure of the three real- time tasks used by the fusion library and the 
+hierarchical scheduling of the software tasks. 
+  
+ 
+Freescale Sensor Fusion for Kinetis Product Develop ment Kit User Guide 
+Freescale Semiconductor, Inc. Figure 
+The five software function names [UserStartup(), UserHighFrequencyTas kInit(), 
+UserHighFrequencyTaskRun(), UserMediumFrequencyTask Init() and 
+UserMediumFrequencyTaskRun()] are shown 
+to create additional functionality as described in 
+4.2 Timing Diagram 
+Figure 16 shows the relative timing and priorities of the sen sors and the three software tasks. 
+  5 ms       
+          
+FXOS8700 Output (200 Hz)           
+FXAS21000 Output (200 Hz)          
+Sensor Sampling Task (200 Hz)           
+Sensor Fusion Task (200 Hz)          
+Magnetic Calibration Task          
+Figure 
+Freescale Sensor Fusion for Kinetis Product Develop ment Kit User Guide , Rev. 1.3, 9/2015  Figure 15. Software Task Scheduling Diagram 
+function names [UserStartup(), UserHighFrequencyTas kInit(), 
+UserHighFrequencyTaskRun(), UserMediumFrequencyTask Init() and 
+UserMediumFrequencyTaskRun()] are shown above . These functions may be altered by the developer 
+described in  user_tasks.c . 
+shows the relative timing and priorities of the sen sors and the three software tasks. 
+                                
+          40 ms                     
+                                
+                                
+                                
+                                
+                                
+Figure 16. Software Task Timing Diagram 
+ 
+. These functions may be altered by the developer 
+shows the relative timing and priorities of the sen sors and the three software tasks.  
+              
+              
+              
+              
+              
+              
+              
+Software Tasks 
+ 
+34   Freescale  Sensor Fusion for Kinetis Product Development Kit User Guide,  Rev. 1.3, 9/2015 
+  Freescale Semiconductor, Inc. 
+ The first two rows show the internal timing of the FXOS8700 and FXAS21000 sensors sampling and 
+latching data at a typical rate of 200 Hz. These tw o sensors operate asynchronously to each other and 
+asynchronously to the three software tasks executin g on the uC. There are, therefore, offsets between 
+the latching of the FXOS8700 output data, the latch ing of the FXAS21000 output data and their reading 
+by the Sensor Sampling Task. These offsets will slo wly drift, resulting in a variable timing error of up to 
+2.5 ms (at 200 Hz) between the FXOS8700 and FXAS210 00 sensor data and a variable latency of up 
+to 2.5 ms before this data is read by the uC sensor  Sampling Task. 
+The third row shows the I 2C reads of the 200 Hz sensor Sampling task with groups of eight 
+measurements coded in the same color on the assumpt ion that the OVERSAMPLE_RATIO = 8. 
+The fourth row shows the 25 Hz sensor Fusion task processing the groups of eight measurements 
+from the 200 Hz sensor Sampling Task. The sensor Fusion task starts when the eighth measurement 
+is available from the Sensor Sampling Task and continues,with interruptions by the higher  priority 
+Sensor Sampling Task,until complete. 
+The magnetic Calibration Task has lower priority and executes only when neit her the sensor 
+Sampling Task nor the sensor Fusion Task are executing. In the event that all tasks are  complete for 
+a given 200 Hz interval, the software may drop into  an idle task, which may, in turn, place the MCU in to 
+a temporary STOP mode to save power. 
+Not shown in Figure 16  are serial communications from the embedded MCU an d an external controller 
+and/or GUI. In the case of the supplied project tem plates, this is comprised of UART communications to  
+an external Bluetooth module or Windows client via virtual serial port. Entry into STOP mode must be 
+deferred until any UART communications are complete  (the UART requires that clocks be active for 
+transmission). 
+Instead, the device will enter WAIT mode until tran smission is complete. 
+4.3 user_tasks.c 
+The CodeWarrior and KDS template projects successfu lly build in their as-shipped configurations. 
+However, additional functionality may be supplement ed by adding code in the file user_tasks.c (see 
+code listing below) wherever // PUT YOUR CODE HERE  appears. After adding the code, the updated 
+application can be built and downloaded to the deve lopment board. 
+// Copyright (c) 2014, 2015, Freescale Semiconducto r, Inc. 
+// All rights reserved. 
+//  
+// Redistribution and use in source and binary form s, with or without 
+// modification, are permitted provided that the fo llowing conditions are met: 
+//     * Redistributions of source code must retain  the above copyright 
+//       notice, this list of conditions and the fo llowing disclaimer. 
+//     * Redistributions in binary form must reprod uce the above copyright 
+//       notice, this list of conditions and the fo llowing disclaimer in the 
+//       documentation and/or other materials provi ded with the distribution. 
+//     * Neither the name of Freescale Semiconducto r, Inc. nor the 
+//       names of its contributors may be used to e ndorse or promote products 
+//       derived from this software without specifi c prior written permission. 
+//  
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDE RS AND CONTRIBUTORS "AS IS" AND 
+// ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BU T NOT LIMITED TO, THE IMPLIED 
+// WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE 
+// DISCLAIMED. IN NO EVENT SHALL FREESCALE SEMICOND UCTOR, INC. BE LIABLE FOR ANY 
+// DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY , OR CONSEQUENTIAL DAMAGES 
+// (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF S UBSTITUTE GOODS OR SERVICES; 
+// LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTER RUPTION) HOWEVER CAUSED AND 
+// ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,  STRICT LIABILITY, OR TORT 
+  
+ 
+Freescale Sensor Fusion for Kinetis Product Develop ment Kit User Guide, Rev. 1.3, 9/2015  
+Freescale Semiconductor, Inc. // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN A NY WAY OUT OF THE USE OF THIS 
+// SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
+// 
+// If you want to take a simplistic approach of usi ng the existing templates 
+// as your starting point, simply adding your code for startup, sampling task (eg. 200Hz) 
+// and fusion tasks (eg. 25Hz), then this is the fi le for you.  Just put your code 
+// where ever you see "PUT YOUR CODE HERE" 
+// 
+#include "Cpu.h" 
+#include "UART_A.h" 
+#include "UART_B.h" 
+ 
+#include "mqx_tasks.h" 
+#include "Events.h" 
+#include "drivers.h" 
+#include "UART_A.h" 
+ 
+// global structures 
+uint8 sUARTOutputBuffer[256];  // larger than the n ominal 124 byte size for outgoing packets 
+uint8 sUART_A_InputBuffer[32]; // larger than nomin al 1 byte command in case of buffering 
+uint8 sUART_B_InputBuffer[32]; // larger than nomin al 1 byte command in case of buffering 
+ 
+void UserStartup(void) 
+{ 
+ // initialize the BlueRadios Bluetooth module 
+ BlueRadios_Init(UART_A_DeviceData); 
+ 
+ // trigger a callback when any single character is  received into  
+ // the UART_A or UART_B buffers. 
+ UART_A_ReceiveBlock(UART_A_DeviceData, sUART_A_Inp utBuffer, 1); // Bluetooth on shield 
+ UART_B_ReceiveBlock(UART_B_DeviceData, sUART_B_Inp utBuffer, 1); // OpenSDA and USB 
+  
+ // UART callbacks and command interpreter are loca ted in Events.c 
+ 
+ // put code here to be executed at the end of the RTOS startup sequence. 
+ // 
+ // PUT YOUR CODE HERE  
+ // 
+ 
+ return; 
+} 
+ 
+void UserHighFrequencyTaskInit(void) 
+{ 
+ // User code to be executed ONE TIME the first tim e the high  
+ // frequency task is run. 
+ // 
+ // PUT YOUR CODE HERE 
+ // 
+ return; 
+} 
+ 
+void UserMediumFrequencyTaskInit(void) 
+{ 
+ // User code to be executed ONE TIME the first tim e the medium  
+ // frequency task is run 
+ // 
+ // PUT YOUR CODE HERE 
+ // 
+ return; 
+} 
+ 
+ 
+Software Tasks 
+ 
+36   Freescale  Sensor Fusion for Kinetis Product Development Kit User Guide,  Rev. 1.3, 9/2015 
+  Freescale Semiconductor, Inc. 
+ void UserHighFrequencyTaskRun(void) 
+{ 
+ // The default frequency at which this code runs i s 200Hz. 
+ // This code runs after sensors are sampled. 
+ // In general, try to keep "high intensity" code o ut of  
+ // UserHighFrequencyTaskRun. 
+ // The high frequency task also has highest priori ty. 
+ // 
+ // PUT YOUR CODE HERE 
+ // 
+ return; 
+} 
+ 
+void UserMediumFrequencyTaskRun(void) 
+{ 
+ static int32 iThrottle = 0; 
+ 
+ // This function is called after the Kalman filter  loop at a rate of  
+ // SENSORFS / OVERSAMPLE_RATIO Hz. With the defaul t settings this is  
+ // 200Hz/8=25Hz giving a smooth video quality disp lay on the PC and  
+ // Android user interfaces. The UART (serial over USB and over Bluetooth)  
+ // is limited to 115kbps which is more than adequa te for the 31kbps  
+ // needed at the default 25Hz output rate but insu fficient for 100Hz or  
+ // 200Hz output rates.  There is little point is p roviding output data  
+ // faster than 25Hz video rates but since the UART s can 
+ // support a higher rate, the limit is set to MAXP ACKETRATEHZ=40Hz. 
+ 
+ // check for any need to throttle the output rate 
+#define MAXPACKETRATEHZ 40 
+#define RATERESOLUTION 1000 
+ if (((int32)MAXPACKETRATEHZ * (int32)OVERSAMPLE_RA TIO) >= (int32)SENSORFS) 
+ { 
+  // no UART bandwidth problem: transmit the packet s over UART (USB and Bluetooth) 
+  CreateAndSendPacketsViaUART(UART_A_DeviceData, UA RT_B_DeviceData); 
+ } 
+ else 
+ { 
+  // throttle back by fractional multiplier  
+  //    (OVERSAMPLE_RATIO * MAXPACKETRATEHZ) / SENS ORFS 
+  // the increment applied to iThrottle is in the r ange 0 to (RATERESOLUTION - 1) 
+  iThrottle += ((int32)OVERSAMPLE_RATIO * (int32) M AXPACKETRATEHZ *  
+    (int32)RATERESOLUTION) / SENSORFS; 
+  if (iThrottle >= RATERESOLUTION) 
+  {    
+   // update the throttle counter and transmit the packets over  
+   // UART (USB and Bluetooth) 
+   iThrottle -= RATERESOLUTION; 
+   CreateAndSendPacketsViaUART(UART_A_DeviceData, U ART_B_DeviceData); 
+  } 
+ } 
+ 
+ // 
+ // PUT YOUR CODE HERE 
+ // 
+  
+ return; 
+} 
+4.4 UART Communications 
+CreateAndSendPacketsViaUART is responsible for sending Bluetooth packets to the  Fusion Toolbox. 
+Variable array sUARTOutputBuffer[]  contains information to be transmitted to the tool box. The 
+  
+ 
+Freescale Sensor Fusion for Kinetis Product Develop ment Kit User Guide, Rev. 1.3, 9/2015  
+Freescale Semiconductor, Inc. code snippet below, which may be found in drivers.c , illustrates how a DEBUG packet (packet type 
+0x02) can easily be constructed. 
+if  (globals.DebugPacketOn) 
+ { 
+  // [0]: packet start byte 
+  sUARTOutputBuffer[iIndex++] = 0x7E; 
+ 
+  // [1]: packet type 2 byte 
+  tmpuint8 = 0x02; 
+  sBufAppendItem(sUARTOutputBuffer, &iIndex, &tmpui nt8, 1); 
+ 
+  // [2]: packet number byte 
+  sBufAppendItem(sUARTOutputBuffer, &iIndex, &iPack etNumber, 1); 
+  iPacketNumber++; 
+ 
+  // [4-3] software version number 
+  tmpint16 = THISBUILD; 
+  sBufAppendItem(sUARTOutputBuffer, &iIndex, (uint8 *)&tmpint16, 2); 
+ 
+  // [6-5] systick  count / 20 
+  sBufAppendItem(sUARTOutputBuffer, &iIndex, (uint8 *)&isystick, 2); 
+ 
+  // [7 in practice but can be variable]: add the t ail byte for the debug packet type 2 
+  sUARTOutputBuffer[iIndex++] = 0x7E; 
+ } 
+NOTE: UART/Bluetooth communications are included for ease  of use, but they are NOT considered 
+part of the Fusion Library. This portion of the lib rary should be treated as example code which may be  
+changed in future versions of the library. In this section it is presumed that the user is adapting on e of 
+the Freescale Fusion Library template projects to a  similar Kinetis-based board, also using 
+MQX™ LITE. Ports to other (possibly non- Freescale)  MCUs will require the user to write their own 
+sensor drivers and supply their own RTOS layers. Re gardless of the MCU/RTOS used, Freescale 
+recommends the user adopt the task structure and ou tlined in Tasks Structure . The functions discussed 
+in that section provide the cleanest point at which  to interface to different hardware/RTOS architectu res. 
+5 Adding Support for a New PCB 
+The simplifying assumption in this section is that you are adapting one of the template projects to a 
+similar Kinetis-based board, also using MQXLITE. Po rts to other, possibly non-Freescale, MCUs will 
+require you to write your own sensor drivers and su pply your own RTOS layers. Regardless of the 
+MCU/RTOS used, Freescale recommends the user adopt the task structure and outlined in Section 4.1.  
+The functions discussed in that section provide the  cleanest point at which to interface to different 
+hardware/RTOS architectures. This section provides a brief explanation of how to add support in the 
+software for a new PCB. 
+The fusion library has been implemented on top of b asic functions created via Processor Expert.  
+Choice of peripherals and peripheral pins determine  if your PCB design affects any software 
+assumptions. If so, it is best to make those adjust ments directly within Processor Expert and then 
+regenerate support functions using Processor Expert . 
+Table 6  lists files not generated by Processor Expert, tha t may need to be modified to implement the 
+sensor fusion algorithms on different hardware, wit h a different RTOS or with different sensors. 
+Adding Support for a New PCB 
+ 
+38   Freescale  Sensor Fusion for Kinetis Product Development Kit User Guide,  Rev. 1.3, 9/2015 
+  Freescale Semiconductor, Inc. 
+ Table 6. Source files which may need to be modified  
+Files Description 
+Events.c 
+Events.h  Callback functions for hardware events.  Also inclu des the UART command 
+interpreter. 
+drivers.c 
+drivers.h  Initialization of hardware timers and I2C drivers f or sensors.  Also includes UART 
+output routines (which are called by user_tasks.c) 
+mqx_tasks.c  
+mqx_tasks.h  Creates and runs the Sampling, Fusion and Calibrati on tasks which call functions 
+in tasks.c. 
+user_tasks.c  
+user_tasks.h  Application specific entry points.  They also encap sulate much of the UART 
+communication. 
+build.h  Build options consolidated into a single file. 
+main.c  Initializes and executes MQX. 
+ 
+5.1 File-by-File Changes 
+5.1.1 Events.c 
+This file contains event handlers for: 
+• non-maskable interrupt (currently empty) 
+• 200 Hz timer 
+• UART communications 
+UART communications include functions UART_A_OnBlockReceived() and 
+UART_B_OnBlockReceived() .  These implement decoding of incoming Bluetooth p ackets sent by 
+the Freescale Sensor Fusion Toolbox. The user can r eplace that code with whatever communications 
+is appropriate for their application. 
+5.1.2 drivers.c 
+This file is highly hardware-dependent. It contains : 
+1. Timer utility functions 
+2. Sensor initialization  and sampling functions 
+3. Hardware Abstraction Layer (HAL) mapping functio ns 
+4. UART utility functions 
+5. CreateAndSendPacketsViaUART() , which is responsible for creating output packets for 
+transmission via Bluetooth. 
+If the user’s project utilizes the same default per ipherals and sensors defined in earlier sections, and 
+they are oriented the same way as the reference PCB s , they will probably not need to make any 
+changes to items 1–4 above. If you use a different communications mechanism or packet structure, 
+item 5 above will need to be replaced.] 
+If your PCB does have a different layout of the acc elerometer, magnetometer and gyro sensors, you 
+may need to modify the HAL ( Hardware Abstraction L ayer) functions in drivers.c.  These are: 
+• ApplyAccelHAL() 
+• ApplyMagHAL()  
+  
+ 
+Freescale Sensor Fusion for Kinetis Product Develop ment Kit User Guide, Rev. 1.3, 9/2015  
+Freescale Semiconductor, Inc. • ApplyGyroHAL()   
+The purpose of these functions is to transform sens or readings from sensor frame, to 
+THISCOORDSYSTEM  (as defined in build.h).  If your physical sensor package orientations differ from 
+those shown in Figure 6, then you will need to acco unt for the change in the HAL functions. 
+5.1.3 mqx_tasks.c 
+This file contains: 
+• RdSensData_task() : High frequency sensor sampling 
+• Fusion_task() : Top level control loop for sensor fusion 
+• MagCal_task() : Low frequency task for magnetic calibration 
+If the user’s project needs additional MQX-Lite tas ks for their project, they should be added here.  
+matching Processor Expert tasks should be created u nder the MQX1 object in the Processor Expert 
+Components pane. 
+Several GPIOs have been pre-allocated for LED contr ol within mqx_tasks.c . The user will need to 
+remove or modify those references if those resource s are not available in the project. 
+5.1.4 user_tasks.c 
+This file has been defined as an easy place for you  to PUT YOUR CODE HERE . It also contains 
+initialization for UART communications and calls to  stream data to the Sensor Fusion Toolbox via those  
+UARTS.  If you don’t need those UART communications , be sure to delete the code here, as well as 
+additional functions in Events.c. 
+5.1.5 build.h (Build Parameters) 
+The file build.h contains build options and defines data structures applicable to all source files. 
+Adding a new PCB 
+The identifier for the new PCB should be added at t he end of the list of sensor PCBs currently 
+supported with a new unique identifier. The constan t THIS_KINETIS should then be set to the identifier  
+of the new sensor PCB. The board IDs defined here a re used by the Freescale Sensor Fusion Toolbox, 
+both Windows and Android, to identify the board ima ges used in the rotating device view. 
+// Kinetis  processor base boards:  
+// 5 bit code 0 to 31 inclusive transmitted in bits  4-0 
+#define  RESERVED0       0 
+#define  FRDM_KL25Z       1 
+#define  FRDM_K20D50M     2 
+#define  SPARE0        3 
+#define  FRDM_KL26Z      4 
+#define  FRDM_K64F      5 
+#define  SPARE1       6 
+#define  FRDM_KL46Z     7 
+#define  SPARE2     8 
+#define  FRDM_K22F    9 
+#define  SPARE3     10 
+#define  FRDM_KL05Z       11 
+#define  SPARE4     12 
+#define  FRDM_KL02Z       13 
+Adding Support for a New PCB 
+ 
+40   Freescale  Sensor Fusion for Kinetis Product Development Kit User Guide,  Rev. 1.3, 9/2015 
+  Freescale Semiconductor, Inc. 
+ #define  FRDM_KE02Z       14 
+#define  FRDM_KE06Z       15 
+Assuming your MCU and sensors are on the same board , you will also want to include the following: 
+#define THIS_SHIELD SHIELD_NONE 
+Coordinate System 
+The coordinate system to be used is set by THISCOOR DSYSTEM with valid values being NED, 
+ANDROID and WIN8.  
+// coordinate system for the build (3 permutations)  
+#define NED 0                     // identifier for  NED angle output 
+#define ANDROID 1                 // identifier for  Android angle output 
+#define WIN8 2                    // identifier for  Windows 8 angle output 
+#define THISCOORDSYSTEM ANDROID   // the coordinate  system to be used 
+Fusion Models 
+The software is capable of running any or all of th e available fusion functions in parallel. The defau lt 
+setting computes all variants. 
+#define COMPUTE_1DOF_P_BASIC    // 1DOF pressure (a ltitude) and temperature 
+#define COMPUTE_3DOF_G_BASIC    // 3DOF acceleromet er tilt (basic algorithm) 
+#define COMPUTE_3DOF_B_BASIC    // 3DOF magnetomete r  compass (basic vehicle algorithm) 
+#define COMPUTE_3DOF_Y_BASIC    // 3DOF gyro  integration (basic algorithm) 
+#define COMPUTE_6DOF_GB_BASIC   // 6DOF acceleromet er and magnetometer  eCompass (basic 
+algorithm) 
+#define COMPUTE_6DOF_GY_KALMAN  // 6DOF acceleromet er and gyro  (Kalman  algorithm) 
+#define COMPUTE_9DOF_GBY_KALMAN // 9DOF acceleromet er, magnetometer and gyro (Kalman  
+algorithm) 
+Simply comment any algorithms which you do not need . 
+Timing and Filters 
+SENSORFS defines the execution rate of the sensor s ampling task in Hz. The sensor readings are 
+averaged and decimated to a rate OVERSAMPLE_RATIO l ower before passing to the Kalman filter. 
+The default values of 200 and 8 respectively result  in the sensors being sampled at 200 Hz and the 
+Kalman filter executing at 25 Hz. 
+// sampling rate and kalman filter timing 
+#define SENSORFS 200         // integer frequency ( Hz) of sensor sampling process 
+#define OVERSAMPLE_RATIO 8   // integer 3-axis, 6-a xis, 9-axis run at 
+                                  // SENSORFS / OVE RSAMPLE_RATIO Hz 
+5.1.6 main.c 
+This file contains the application’s main()  function which performs microcontroller initializa tion and 
+starts the MQX Lite operating system. This function  should be replaced with equivalent processor 
+initialization and operating startup code if either  is changed. 
+  
+ 
+Freescale Sensor Fusion for Kinetis Product Develop ment Kit User Guide, Rev. 1.3, 9/2015  
+Freescale Semiconductor, Inc. 6 Bluetooth Packet Structure 
+The tables presented in this section are the same a s those included with the Freescale Sensor Fusion 
+Toolbox for Android in-app help. 
+Prior to version 2013.07.18 of the Freescale Sensor  Fusion Toolbox for Android application, 
+communication between the Android device and extern al board was strictly one way, from board to 
+Android device. Version 2013.07.18 and above add th e ability for the application to send commands to 
+the development board. This is done at application start-up for flags to enable the following: 
+• debug mode 
+• roll/pitch/compass display on the Device view 
+• virtual compass display on the Device view 
+The debug mode is now required to be always on, sin ce this packet transmits the firmware version 
+number that is displayed by the Toolbox. Additional ly, a packet may be sent to change quaternion type 
+whenever the Source/Algorithm selector in the Senso r Fusion Toolbox is changed. 
+6.1 Development board to Fusion Toolbox 
+The development board to Android protocol is a stre aming data protocol (using RFCOMM). Packets are 
+delimited by inserting a special byte (0x7E) betwee n packets. This means that we must provide a 
+means for transmitting 0x7E within the packet paylo ad. This is done on the transmission side by making  
+the following substitutions: 
+• Replace 0x7E by 0x7D5E (1 byte payload becomes 2 t ransmitted) 
+• Replace 0x7D by 0x7D5D (1 byte payload becomes 2 t ransmitted) 
+The Fusion Toolbox does the inverse mapping as the data stream is received. Partial packets are 
+discarded. The options menu has a Toggle Hex Displa y option available for developers coding their 
+own board interface. 
+On the embedded app side, the 0x7E and 0x7D encodin g is performed automatically by function 
+sBufAppendItem() , which is used to create outgoing packet structure s. The developer only needs to 
+explicitly add starting and ending 0x7E delimiters.  
+6.1.1 Packet Type 1 
+This is the primary data packet format utilized by the Fusion Toolbox. 
+Table 7. Current version of packet type 1 
+Byte # Function Units 
+0 Packet Start = 0x7E None 
+1 Packet Type = 01 None 
+2 Packet # This number increments by 1 for each sam ple. Rolls over at 0xFF to 0x00. 
+6:3 Timestamp 1 LSB = 1.00 microseconds (Previously  1.33. Updated 2013.07.18) 
+8:7 ACC X 1 LSB = 122.07 µg 
+10:9 ACC Y 1 LSB = 122.07 µg 
+12:11 ACC Z 1 LSB = 122.07 µg 
+14:13 MAGX 1 LSB = 0.1 µT 
+Bluetooth Packet Structure 
+ 
+42   Freescale  Sensor Fusion for Kinetis Product Development Kit User Guide,  Rev. 1.3, 9/2015 
+  Freescale Semiconductor, Inc. 
+ Byte # Function Units 
+16:15 MAGY 1 LSB = 0.1 µT 
+18:17 MAGZ 1 LSB = 0.1 µT 
+20:19 GYRO X 1 LSB = 872.66 µrad/s (0.05 dps) 
+22:21 GYRO Y 1 LSB = 872.66 µrad/s (0.05 dps) 
+24:23 GYRO Z 1 LSB = 872.66 µrad/s (0.05 dps) 
+26:25 quaternion q0 1 LSB = 1/30,000 (unitless) 
+28:27 quaternion q1 1 LSB = 1/30,000 (unitless) 
+30:29 quaternion q2 1 LSB = 1/30,000 (unitless) 
+32:31 quaternion q3 1 LSB = 1/30,000 (unitless) 
+33 Flags Bit field with the following bit definitio ns: 
+Bit 0 = valid gyro data  
+Bit 1 = gyro is virtual 
+Bit 2 = 6-axis quaternion is valid  
+Bit 3 = 9-axis quaternion is valid 
+Bits 5:4 = 00 = Data is NED Frame of Reference  
+Bits 5:4 = 01 = Data is Android Frame of Reference 
+Bits 5:4 = 10 = Data is Windows Frame of Reference  
+Bits 5:4 = 11 = RESERVED 
+Bits 7:6 = RESERVED 
+34 Board ID Two numeric fields with the following p ossible values: 
+Base Board = Bits 4:0: 
+0. = RESERVED  
+1. = FRDM-KL25Z  
+2. = FRDM-K20D50M  
+3. = RESERVED 
+4. = FRDM-KL26Z  
+5. = FRDM-K64F 
+6. = RESERVED 
+7. = FRDM-KL46Z 
+8. = RESERVED 
+9. = FRDM-K22F 
+10. = RESERVED 
+11. = FRDM-KL05Z 
+12. = RESERVED 
+13. = FRDM-KL02Z 
+14. = FRDM-KE02Z 
+15. = FRDM-KE06Z 
+  Sensor Shield Board = Bits 7:5 
+0. = FRDM-FXS-MULTI-B 
+1. = None 
+2. = FRDM-STBC-AGM01 
+3. = FRDM-STBC-AGM02 
+All others are reserved.  Contact sfusion@freescale.com if the user is 
+interested in having another board added to this li st. 
+35 Packet END = 0x7E None 
+  
+ 
+Freescale Sensor Fusion for Kinetis Product Develop ment Kit User Guide, Rev. 1.3, 9/2015  
+Freescale Semiconductor, Inc.  
+Table 7  represents the packet format adopted by the Fusion  Toolbox on 1 August 2013. The 
+assumption inherent in this format is that the appl ication will instruct the development board with re gard 
+to desired algorithm. 
+6.1.2 Packet Type 2: Debug 
+The development board may send 1 to n 16-bit words to the app for display on the Device view. This 
+view is enabled via a checkbox in the Preferences s creen. 
+Table 8. Debug Packet Format 
+Byte # Function Units 
+0 Packet Start = 0x7E None 
+1 Packet Type = 0x02  
+2 Packet Number None 
+4:3 Software Version Number None 
+6:5 Systick count / 20 Bytes 6:5 now carry the sysT ick count/20 
+… Variable Payload  
+2n + 1:2n Debug Wordn Last of n debug words to tran smit 
+2n + 2 Packet END = 0x7E None 
+ 
+6.1.3 Packet Type 3: Angular Rate 
+This packet type is used to send angular rate value s to the Android app. This view is enabled via a 
+checkbox in the Preferences screen. 
+Table 9. Packet Type 3: Angular Rate 
+Byte # Function Units 
+0 Packet Start = 0x7E None 
+1 Packet Type = 0x03 None 
+2 Packet # This number increments by 1 for each sam ple. Rolls over at 0xFF to 
+0x00.  6:3 Timestamp 1 LSB = 1.00 microseconds (Previously  1.33. Updated 2013.07.18) 
+8:7 X 1 LSB = 872.66 micro-radians/sec (0.05 dps) 
+10:9 Y 1 LSB = 872.66 micro-radians/sec (0.05 dps) 
+12:11 Z 1 LSB = 872.66 micro-radians/sec (0.05 dps)  
+13 Packet END = 0x7E None 
+ 
+6.1.4 Packet Type 4: Euler Angles 
+This packet type is used to send roll/pitch/compass  heading information to the Android app. This view is 
+enabled via a checkbox in the Preferences screen. 
+Bluetooth Packet Structure 
+ 
+44   Freescale  Sensor Fusion for Kinetis Product Development Kit User Guide,  Rev. 1.3, 9/2015 
+  Freescale Semiconductor, Inc. 
+ Table 10. Packet type 4 - Roll/Pitch/Compass 
+Byte # Function Units 
+0 Packet Start = 0x7E None 
+1 Packet Type = 0x04 None 
+2 Packet # This number increments by 1 for each sam ple. Rolls over at 0xFF to 0x00. 
+6:3 Timestamp 1 LSB = 1.00 microseconds (Previously  1.33. Updated 2013.07.18) 
+8:7 Phi (Roll) 1 LSB = 0.1degree 
+10:9 Theta (Pitch) 1 LSB = 0.1degree 
+12:11 Rho (Compass) 1 LSB = 0.1degree 
+13 Packet END = 0x7E None 
+ 
+6.1.5 Packet Type 5: Altitude and Temperature 
+This packet type is used to send altitude and tempe rature information to the Android app. This view is  
+enabled via a checkbox in the Preferences screen. 
+Table 11. Packet type 5 - Altitude and Temperature 
+Byte # Function Units 
+0 Packet Start = 0x7E None 
+1 Packet Type = 0x05 None 
+2 Packet # This number increments by 1 for each sam ple. Rolls over at 0xFF to 
+0x00. 
+6:3 Timestamp 1 LSB = 1.00 microseconds 
+10:7 Altitude 1 LSB = 0.001 meters 
+12:11 Temperature 1 LSB = 0.01 degree 
+13 Packet END = 0x7E Packet type 6 is reserved for transmitting magnetic buffer information. 
+This is used by the Windows version of the Toolbox,  but not by the 
+Android version. This is so application specific th at Freescale is not 
+publishing it. 
+Packet type 7 is reserved for transmitting kalman f ilter information. 
+Use the same notations. 
+ 
+6.2 Toolbox to Freedom Development Platform 
+Up until version 2013.07.18 of the Fusion Toolbox, communication was strictly one way: from 
+development platform to Android device. Versions re leased after that date include limited ability to 
+configure the embedded board from Android. The comm and protocol is subject to change. 
+  
+ 
+Freescale Sensor Fusion for Kinetis Product Develop ment Kit User Guide, Rev. 1.3, 9/2015  
+Freescale Semiconductor, Inc. Possible 4-byte commands are shown below. Substitut e a space for each “#” to enforce the 4-byte 
+width. 
+• ALT+ = Altitude/Temperature packet on 
+• ALT- = Altitude/Temperature packet off (default) 3  
+• DB+# = debug packet on (default) (transmitted via “Options Menu->Enable debug”) 
+• DB-# = debug packet off (transmitted via “Options Menu->Disable debug”) 
+• Q3## = transmit 3-axis accelerometer quaternion (t ilt) in standard packet 
+• Q3M# = transmit magnetometer quaternion (auto comp ass) in standard packet 
+• Q3G# = transmit gyro-based quaternion in standard packet 
+• Q6MA = transmit 6-axis mag/accel quaternion in sta ndard packet (transmitted when “Remote 
+mag/accel” is selected on the Source/Algorithms spi nner) 
+• Q6AG = transmit 6-axis accel/gyro quaternion in st andard packet (transmitted when “Remote 
+accel/gyro” is selected on the Source/Algorithms sp inner) 
+• Q9## = transmit 9-axis quaternion in standard pack et (default) (transmitted when “Remote 9axis” is 
+selected on the Source/Algorithms spinner) 
+• RPC+ = Roll/Pitch/Compass packet on 
+• RPC- = Roll/Pitch/Compass packet off (default) 
+• RST# = Sensor Fusion soft reset (resets all sensor  fusion data structures) 
+• VG+# = Virtual gyro packet on 
+• VG-# = Virtual gyro packet off (default) 
+Note that the commands above can request that the e mbedded board perform computations in a 
+specific way. Confirm that the proper operation has  taken place by checking the Flags field in Packet 
+type 1. See the flags row of Table 7 . 
+7 Odds and Ends 
+7.1 ANSI C 
+The Sensor Fusion Library software is written accor ding to the ANSI C90 standard and does not use 
+any of the ANSI C99 or C11 extensions. 
+Integers are a mixture of standard C long (four byt e) integers with typedef as int32 and C short (2 by te) 
+integers with typedef as int16. Floating point vari ables are all single precision of size four bytes. 
+7.2 Floating Point Libraries 
+The Sensor Fusion Library software uses single prec ision floating point arithmetic. C functions, like 
+sqrt() , which return a double are immediately cast back i nto single precision. 
+Floating point arithmetic is performed using softwa re emulation on the processors with integer cores o r 
+directly on the FPU by processors with an internal FPU. 
+                                                
+3.  The debug packet must be enabled for firmware v ersion number and sysTick counts to be properly dis played 
+by the Toolbox. 
+Revision History 
+ 
+46   Freescale  Sensor Fusion for Kinetis Product Development Kit User Guide,  Rev. 1.3, 9/2015 
+  Freescale Semiconductor, Inc. 
+ 7.3 Error Handling 
+The Sensor Fusion Library software is believed inca pable of triggering exceptions. All conditions that  
+could lead to exceptions are detected before the re levant function call is made. Conditions tested to 
+prevent runtime exceptions are: 
+• division by zero, whether floating point or intege r 
+• inverse sine or cosine of an argument outside the range –1 to +1 
+• tangent of –90 degrees or 90 degrees angles 
+• square root of a negative number. 
+7.4 Numerical Accuracy 
+The Sensor Fusion Library software is numerically a ccurate to the limits of single precision floating 
+point arithmetic. 
+Small angle approximations are only used when the r elevant angle is, in fact, small so no accuracy is 
+lost compared to using the standard libraries. For example, sines and cosines of small angles are 
+computed with a MacLaurin series to give similar ac curacy to the standard sine and cosine libraries bu t 
+at lower computational expense. 
+Conditions that lead to inaccurate results are dete cted and the results computed using an alternative 
+algorithm suitable for those cases where the primar y algorithm fails. An example is the calculation of  
+the orientation quaternion from a rotation matrix w here the primary algorithm differencing elements 
+across the diagonal approaches a 0/0 calculation. T he alternative algorithm used near 180 degree 
+rotations operates on the matrix diagonal elements instead. 
+The sensor fusion algorithms have been tested to be  stable for tens of millions of 200 Hz iterations. 
+Accumulation of rounding errors in the rotation qua ternions or matrices is prevented by regular 
+renormalization. 
+8 Revision History 
+Table 12. Revision history 
+Rev. No. Date Description 
+0 02/2014  Initial version  
+  
+ 
+Freescale Sensor Fusion for Kinetis Product Develop ment Kit User Guide, Rev. 1.3, 9/2015  
+Freescale Semiconductor, Inc. Rev. No. Date Description 
+1.0 04/2014  Updated license scheme documentation. Demo and (new  board-specific) Production 
+licenses explained. 
+Quick start instructions for software installation via the installer added. 
+The software revision includes many enhancements - the major ones are as follows: 
+1. Added MPL3115 I2C driver. I2C driver for MPL3115  now detects whether MPL3115 
+is present so as to support the 9 axis board 
+2. Debug packet (Type 2) transmits firmware build i n place of padding byte 
+3. Added Altitude / Temperature packet 
+4. Added Kalman packet 
+5. Added Magnetics packet 
+6. Added FXAS21002 driver and sensor option 
+7. Support for Sequential/Parallel algorithm 
+8. RST command implemented 
+9. Code and comments cleaned up and made clearer th roughout 
+10. ALT+/ALT- commands added to support Altitude pa cket 
+11. Global variable definitions are now consolidate d into two structs named globals and 
+mqxglobals . 
+1.1  05/2014  Updated documentation for additional board support of FRDM-K64F. 
+Added instructions for UART selection based on the MULTI board being used.  
+1.2 11/2014 Sensor Fusion Release 4.22 
+1.3 9/2015 Library Version 5.00.  This version of the sensor f usion library  
+• has completely rewritten Kalman filters 
+• additional auto compass and gyro-based quaternion computation option 
+• no longer uses an installer.  The library is shipp ed as a zip file. 
+• has a flattened software hierarchy over Release 4. 22 
+The manual has been completely reviewed and updated  for consistency with V5.00. 
+ 
+Revision History 
+ 
+48   Freescale  Sensor Fusion for Kinetis Product Development Kit User Guide,  Rev. 1.3, 9/2015 
+  Freescale Semiconductor, Inc. 
+ Appendix A – CodeWarrior Run Configurations 
+A-1 Creating a Run Configuration for OpenSDA 1.0 bo ards 
+The user must have a valid run configuration create d within CodeWarrior in order to download code to 
+the Freedom Development Platform. The following seq uence shows how to create one if you do not 
+already have it. See Figure A-1 . 
+1. Select Run ->Run Configurations . The user should see a window similar to the scree nshot below: 
+ 
+Figure A-1. CodeWarrior Run Configuration window 
+2. Select CodeWarrior Download and then click the New Launch Configuration icon on the left. 
+See Figure A-2 . 
+
+  
+ 
+Freescale Sensor Fusion for Kinetis Product Develop ment Kit User Guide, Rev. 1.3, 9/2015  
+Freescale Semiconductor, Inc.  
+Figure A-2. CodeWarrior creating new launch configu ration 
+3. Click the New… button to the right of the Connection field. See Figure A-2 . 
+4. Select Hardware or Simulator Connection, and Cli ck Next . See Figure  A-3 . 
+
+Revision History 
+ 
+50   Freescale  Sensor Fusion for Kinetis Product Development Kit User Guide,  Rev. 1.3, 9/2015 
+  Freescale Semiconductor, Inc. 
+  
+Figure  A-3. Setting CodeWarrior Remote System Type  
+5. Enter a valid connection name in the name field,  see Figure A-4.  
+
+  
+ 
+Freescale Sensor Fusion for Kinetis Product Develop ment Kit User Guide, Rev. 1.3, 9/2015  
+Freescale Semiconductor, Inc.  
+Figure A-4. Naming new CodeWarrior connection 
+6. In the Target type field click New... . See Figure A-4 . 
+7. Click the Edit button on the Target type field. See Figure A-5 . 
+
+Revision History 
+ 
+52   Freescale  Sensor Fusion for Kinetis Product Development Kit User Guide,  Rev. 1.3, 9/2015 
+  Freescale Semiconductor, Inc. 
+  
+Figure A-5. Selecting CodeWarrior Target type 
+If you have a KL25Z board, scroll down to KL25Z, ex pand the sub-list and select KL25Z128M4. If 
+you have a K20D50M board, scroll down to K20D, expa nd the sub-list and select K20DX128. 
+8. Check the “ Execute reset ” check box, (see Figure A-5 ) then enter a value in the name field and 
+click Finish . 
+NOTE:  If issues are encountered with a connection create d in this way and a new connection 
+needs to be recreated, using the recommended settin gs shown in  Figure A-6 .  
+
+  
+ 
+Freescale Sensor Fusion for Kinetis Product Develop ment Kit User Guide 
+Freescale Semiconductor, Inc. Figure A- 6
+9. Configure the New Connection 
+change KL25Z to K50D50M) and then click the 
+Configuration dialog. 
+Freescale Sensor Fusion for Kinetis Product Develop ment Kit User Guide , Rev. 1.3, 9/2015  6. CodeWarrior new connect example setup 
+New Connection dialog as shown in Figure A-7 . (I f you have a K20D50M board, 
+change KL25Z to K50D50M) and then click the Finish button. The focus will return to the  
+f you have a K20D50M board, 
+button. The focus will return to the Run 
+Revision History 
+ 
+54   Freescale  Sensor Fusion for Kinetis Product Development Kit User Guide,  Rev. 1.3, 9/2015 
+  Freescale Semiconductor, Inc. 
+  
+Figure A-7. CodeWarrior run configuration dialog 
+10. Click Finish  
+
+  
+ 
+Freescale Sensor Fusion for Kinetis Product Develop ment Kit User Guide, Rev. 1.3, 9/2015  
+Freescale Semiconductor, Inc. 11. Modify the Application field on the dialog (shown in Figure A-8 ) to include the elf file (produced 
+during the Build step) to download. 
+ 
+Figure A-8. Setting the elf file in CodeWarrior 
+12. Click Apply and Run to download code to the board. 
+A-2 Creating Run Configuration for Segger OpenSDA 
+The user must have a valid run configuration create d within CodeWarrior in order to download code to 
+their development board. The following sequence sho ws how to create one if you do not already have 
+one for the Segger OpenSDA version 2.0 used with th e Freedom Development Platform K64F. Begin 
+by accepting the software terms of use statement. S ee Figure A-9 . 
+
+Revision History 
+ 
+56   Freescale  Sensor Fusion for Kinetis Product Development Kit User Guide,  Rev. 1.3, 9/2015 
+  Freescale Semiconductor, Inc. 
+  
+Figure A-9. Freescale Software Terms of Use 
+Set the Segger OpenSDA Debug configuration as in Figure A-10 . 
+
+  
+ 
+Freescale Sensor Fusion for Kinetis Product Develop ment Kit User Guide, Rev. 1.3, 9/2015  
+Freescale Semiconductor, Inc.  
+Figure A-10. Segger OpenSDA Debug Configuration 
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+ Document Number: FSFL_Prod_UG  
+Revision Rev. 1.3, 9/2015 
+   
+How to Reach Us: 
+Home Page: 
+freescale.com 
+Web Support: 
+freescale.com/support Information in this document is provided solely to enable system and 
+software implementers to use Freescale products. Th ere are no express 
+or implied copyright licenses granted hereunder to design or fabricate any 
+integrated circuits based on the information in thi s document. Freescale 
+reserves the right to make changes without further notice to any products 
+herein. 
+Freescale makes no warranty, representation, or gua rantee regarding the 
+suitability of its products for any particular purp ose, nor does Freescale 
+assume any liability arising out of the application  or use of any product or 
+circuit, and specifically disclaims any and all lia bility, including without 
+limitation consequential or incidental damages. “Ty pical” parameters that 
+may be provided in Freescale data sheets and/or spe cifications can and 
+do vary in different applications, and actual perfo rmance may vary over 
+time. All operating parameters, including “typicals ,” must be validated for 
+each customer application by customer’s technical e xperts. Freescale 
+does not convey any license under its patent rights  nor the rights of 
+others. Freescale sells products pursuant to standa rd terms and 
+conditions of sale, which can be found at the follo wing address: 
+freescale.com/SalesTermsandConditions. 
+Freescale and the Freescale logo are trademarks of Freescale 
+Semiconductor, Inc., Reg. U.S. Pat. & Tm. Off. All other product or service 
+names are the property of their respective owners. 
+© 2015 Freescale Semiconductor, Inc. 
+ 

@@ -96,3 +96,9 @@ build/test_artifacts/
 build/CTestTestfile.cmake
 build/Testing/
 reference/
+
+# Documentation - do not commit
+pycode/docs/donotcheckin/
+
+# Analysis archive - do not commit
+pycode/analysis_archive/

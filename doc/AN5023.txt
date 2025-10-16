@@ -1,0 +1,1893 @@
+ 
+© Freescale Semiconductor, Inc. 
+ Contents 
+1 Introduction ...................................... ................................................... ............................................ 3  
+1.1 Summary ....................................... ................................................... .......................................... 3 
+1.2 Terminology ................................... ................................................... ......................................... 4 
+1.3 Software Functions ............................ ................................................... ..................................... 7 
+2 Estimating Acceleration and Magnetic Disturbance .. ................................................... ................ 8  
+2.1 Introduction .................................. ................................................... ........................................... 8 
+2.2 Accelerometer Sensor Model and Noise Covariance ................................................... ............. 10 
+Magnetometer Sensor Model and Noise Covariance .... ................................................... ................ 11 
+2.3 Compile Time Constants ........................ ................................................... ............................... 12 
+3 Least Squares Accelerometer and Magnetometer Orient ation Matrix ...................................... . 12  
+3.1 Introduction .................................. ................................................... ......................................... 12 
+3.2 Matrix Trace Lemma ............................ ................................................... ................................. 13 
+3.3 Definition of the Error Function .............. ................................................... ................................ 13 
+3.4 Solution by Eigen-Decomposition ............... ................................................... ........................... 15 
+3.5 /g2244 Matrix For Gravity and Geomagnetic Vectors ....... ................................................... .............. 17 
+3.5.1  Aerospace Coordinate System (NED) ................. ................................................... ............................... 18  
+3.5.2  Android Coordinate System (ENU) ................... ................................................... .................................. 19  
+3.5.3  Windows 8 Coordinate System (ENU) ................. ................................................... .............................. 20  
+3.6 Relative Weightings............................ ................................................... ................................... 20 
+4 Gravity and Geomagnetic Tilt Error Quaternions..... ................................................... ................ 22  
+4.1 Introduction .................................. ................................................... ......................................... 22 
+4.2 Rotation Quaternion Between Two Vectors ....... ................................................... .................... 22 
+4.3 Gravity Tilt Error Quaternion Measurement ..... ................................................... ...................... 24 
+4.4 Geomagnetic Tilt Error Quaternion Measurement . ................................................... ................ 25 
+5 Gyroscope Sensor Model ............................ ................................................... .............................. 26  
+5.1 Zero Rate Offset Model ........................ ................................................... ................................. 26 
+5.2 Angular Velocity Model ........................ ................................................... .................................. 28 
+6 Magnetic Inclination Model ........................ ................................................... ................................ 28  
+6.1 Definition of the Inclination Angle ........... ................................................... ............................... 28 
+6.2 Inclination Angle Model ....................... ................................................... .................................. 29 
+6.3 Inclination Angle Error Measurement ........... ................................................... ......................... 29 
+7 Accelerometer, Magnetometer and Gyroscope Sensor Fu sion Kalman Filter .......................... 31  
+7.1 Introduction .................................. ................................................... ......................................... 31 
+7.2 Kalman Filter Process Model ................... ................................................... .............................. 31 
+7.3 Kalman Filter Error Process Model ............. ................................................... ........................... 31 
+7.4 A Priori Estimate of the State Vector ......... ................................................... ............................ 32 
+7.5 A Posteriori Error Corrections ................ ................................................... ................................ 32 
+7.6 Kalman Filter Measurement Error Model ......... ................................................... ...................... 34 
+7.7 Process Error Covariance Matrix ............... ................................................... ............................ 35 
+7.8 Measurement Error Covariance Matrix ........... ................................................... ....................... 38 
+7.9 A Priori Covariance Matrix Update ............. ................................................... ........................... 39 
+7.10 A Posteriori Covariance Matrix Update ........ ................................................... .......................... 39 Freescale Semiconductor  Document Number: AN5023 
+APPLICATION NOTE  Rev. 1, 9/201 5
+ 
+Sensor Fusion Kalman Filters 
+Mark Pedley and Michael Stanley  
+ 
+ 
+ 
+Introduction 
+2   Sensor Fusion Kalman Filters 
+Mark  Pedley and Michael Stanley, 1, 9/2015 
+ 
+  © Freescale Semiconductor, Inc. 7.11 Kalman Filter Gain Matrix Update ............. ................................................... ............................. 40 
+7.12 Compile Time Constants ....................... ................................................... ................................ 40 
+8 Accelerometer and Gyroscope Sensor Fusion Kalman Fi lter .............................................. ...... 41  
+8.1 Introduction .................................. ................................................... ......................................... 41 
+8.2 Kalman Filter Process Model ................... ................................................... .............................. 41 
+8.3 Kalman Filter Error Process Model ............. ................................................... ........................... 41 
+8.4 A Priori Estimate of the State Vector ......... ................................................... ............................ 41 
+8.5 A Posteriori Error Corrections ................ ................................................... ................................ 42 
+8.6 Kalman Filter Measurement Error Model ......... ................................................... ...................... 42 
+8.7 Process Error Covariance Matrix ............... ................................................... ............................ 43 
+8.8 Measurement Error Covariance Matrix ........... ................................................... ....................... 43 
+8.9 A Priori Covariance Matrix Update ............. ................................................... ........................... 43 
+8.10 A Posteriori Covariance Matrix Update ........ ................................................... .......................... 44 
+8.11 Kalman Filter Gain Matrix Update ............. ................................................... ............................. 44 
+8.12 Compile Time Constants ....................... ................................................... ................................ 44 
+9 References ........................................ ................................................... .......................................... 44  
+10  Revision History .................................. ................................................... ....................................... 44  
+ 
+  
+  
+Sensor Fusion Kalman Filters 
+Mark Pedley and Michael Stanley, 1, 9/2015  
+ 
+© Freescale Semiconductor, Inc.  1 Introduction 
+1.1 Summary 
+This application note documents the mathematics use d by the two Kalman filters which implement the 
+fusion of i) accelerometer, magnetometer and gyrosc ope data and ii) accelerometer and gyroscope 
+data. These two algorithms are labeled "Gaming Hand set" and "Gyro Stabilized Compass" in the 
+Freescale Sensor Fusion Toolbox. 
+The Freescale Application Note (AN5018)  Basic Kalman Filter Theory " provides an introduction to the 
+mathematics of standard Kalman filters. The sensor fusion Kalman filters are a variant termed i) 
+'complementary', in that orientation estimates are provided independently by the gyroscope and by the 
+accelerometer and magnetometer and ii) 'indirect' i n that the Kalman filter tracks error signals rathe r 
+than the underlying process. 
+The sensor fusion Kalman filters have been designed  to be operate reliably with low power in an 
+environment where interference from acceleration ma y vary by 60dB (from a few mg at rest to several 
+thousand mg during aggressive handset motion) and w here interference from stray magnetic 
+disturbance fields may also vary by 60dB (from a fe w µT in normal conditions to 1000 µT or more when 
+a magnet is brought close). The quality of the esti mated gravity and geomagnetic vectors estimated by 
+the accelerometer and magnetometer sensors used to stabilize the gyroscope sensor therefore varies 
+dramatically. This document is therefore organized around solving this problem and using the available  
+sensor data in an optimal manner. 
+Section 2 describes a simple method for estimating the noise components affecting i) the 
+accelerometer estimate of the gravity vector and ii ) the magnetometer estimate of the geomagnetic 
+vector in terms of deviations from the 1g sphere an d geomagnetic sphere respectively 1. Acceleration is 
+modeled as noise on the accelerometer estimate of t he gravity vector and magnetic disturbance is 
+modeled as noise on the magnetometer estimate of th e geomagnetic vector. 
+Given these noise estimates, section 3 derives the least squares orientation solution which optimally 
+weights the orientation fit to the estimated gravit y and geomagnetic vectors. This ensures that the 
+orientation is i) still stabilized relative to the geomagnetic vector using the magnetometer when the 
+accelerometer data is meaningless as a result of ag gressive motion and ii) still stabilized in tilt re lative 
+to the gravity vector using the accelerometer when the magnetometer data is meaningless as a result 
+of a magnet introducing a strong magnetic disturban ce. 
+Section 4 derives simple (and therefore low computa tional power) quaternion expressions for the 
+quaternion errors i) between the gyroscope and acce lerometer estimates of the gravity vector and ii) 
+between the gyroscope and magnetometer estimates of  the geomagnetic vector. 
+Sections 5 documents the model of the gyroscope sen sor and its zero rate offset error and drift. The 
+zero rate offset is the primary source of errors in  the gyroscope sensor estimate of orientation. Unli ke 
+the accelerometer, the gyroscope is highly insensit ive to acceleration and, unlike the magnetometer, i s 
+completely insensitive to magnetic fields. 
+Section 6 discusses the estimation of the geomagnet ic inclination angle. This angle is a required inpu t 
+to the least squares weighted orientation fit algor ithm of section 3. 
+                                                
+1 Here we refer to the fact that if you rotate an ac celerometer or magnetometer in space, and then plot  the 
+readings taken during those rotations, you should i deally obtain a sphere.  This results from the fact  that 
+regardless of orientation, you are always measuring  the same vector.  From the sensor’s perspective, t he 
+readings map onto a sphere of radius equal to the m agnitude of the vector in question. 
+Introduction 
+4   Sensor Fusion Kalman Filters 
+Mark  Pedley and Michael Stanley, 1, 9/2015 
+ 
+  © Freescale Semiconductor, Inc. Section 7 derives the Kalman filter which stabilize s the two error quaternions derived in section 4 
+according to the relative confidence in the gyrosco pe, accelerometer and magnetometer orientation 
+estimates. 
+Section 8 derives a simplified variant of the Kalma n of section 7 designed for use in systems with 
+accelerometer and gyroscope sensors only. Here only  the gravity error quaternion is updated according 
+to the relative confidence in the accelerometer and  gyroscope estimates of the gravity vector.  
+1.2 Terminology 
+Symbol Definition 
+Superscript -  Denotes an a priori  estimate made without use of the current 
+measurement. 
+Superscript +  Denotes an a posteriori  estimate made with use of the current 
+measurement. 
+Subscript /g2013  Denotes an error component. 
+Subscript /g1863  Refers to iteration /g1863. 
+Subscript /g1833  Denotes an accelerometer measurement or estimate. 
+Subscript /g1839  Denotes a magnetometer measurement or estimate. 
+Subscript /g1851  Denotes a gyroscope measurement or estimate. 
+Superscript /g1833  Denotes that the measurement or estimate is in the global (earth) frame. 
+Superscript /g1845  Denotes that the measurement or estimate is in the sensor frame. 
+/g2183/g3038/…ni0009/g3008,/g2183/g3038/…ni0009/g3020 Acceleration in the global and sensor frames (units  g) at iteration /g1863 
+/g2157/g3038 Linear prediction or state matrix for the error pro cess /g2206/g3084,/g3038 at iteration /g1863 
+/g2184/g3038 Gyroscope zero rate offset vector (units deg/s) at iteration /g1863 
+/g2184/g3084,/g3038 Gyroscope zero rate offset error vector (units deg/ s) at iteration /g1863 
+/g1828 The local geomagnetic field strength (units µT) 
+/g2158/g3030,/g3038/…ni0009/g3020 Calibrated magnetometer measurement in the sensor f rame (units µT 2) at 
+iteration /g1863 
+/g2159/g3038 The measurement matrix relating the measured proces s /g2208/g3084,/g3038/…ni0009 to the 
+underlying error process /g2206/g3084,/g3038 at iteration /g1863 
+/g2208/g3084,/g3038/…ni0009=/g2159/g3038/g2206/g3084,/g3038+/g2204/g3038 
+/g2186/g3038/…ni0009/g3008,/g2186/g3038/…ni0009/g3020 The magnetic disturbance in global and sensor frame s (units µT) at 
+iteration /g1863 
+/g1831[] Expectation operator. 
+/g1831(/g2174), /g1831(/g1869) Orientation fit error as a function of rotation mat rix /g2174 and quaternion /g1869 
+/g1859 Magnitude of the gravity vector equal to 1g in all measurement frames 
+/g2189/g3038/…ni0009
+/…ni0009/g3008,/g2189/g3038/…ni0009/g3020 The gravity vector in the global and sensor frames (units g) at iteration /g1863 
+/g2163/g3038/…ni0009/g3020 Accelerometer measurement in the sensor frame ( g) at iteration /g1863 
+  
+Sensor Fusion Kalman Filters 
+Mark Pedley and Michael Stanley, 1, 9/2015  
+ 
+© Freescale Semiconductor, Inc.  Symbol Definition 
+/g2165/g3041/…ni0009 /g1866 by /g1866 identity matrix 
+/g2167/g3038 The Kalman filter gain matrix at iteration /g1863 
+/g2195/g3038/…ni0009
+/…ni0009/g3008,/g2195/g3038/…ni0009
+/…ni0009/g3020 The geomagnetic vector in the global and sensor fra mes (units µT) at 
+iteration /g1863 
+/g2196/g3549 Normalized rotation axis 
+/g2171/g3041/…ni0009 /g1866 by /g1866 zero matrix 
+/g2172/g3038/g2879 A priori  covariance matrix. 
+/g2172/g3038/g2878 A posteriori  covariance matrix 
+/g1869=/g4668/g1869/g2868,/g1869/g2869,/g1869/g2870,/g1869/g2871/g4669 Orientation quaternion transforming from global to sensor frame as a 
+result of coordinate system rotation 
+/g1869/g3038 Orientation quaternion transforming from global to sensor frame at 
+iteration /g1863 
+/g1869/g3548/g3038/g2879 A priori  estimate of the orientation quaternion /g1869/g3038 
+/g1869/g3548/g3038/g2878 A posteriori  estimate of the orientation quaternion /g1869/g3038 
+/g1869/g3053/g3034/g3084 ,/g3038,/g2199/g3053/g3034/g3084 ,/g3038 Measured rotation quaternion between the accelerome ter and 
+magnetometer (6DOF) estimate and a priori  gravity vector estimate from 
+the gyroscope. /g1869/g3053/g3034/g3084 ,/g3038 is the full quaternion and /g2199/g3053/g3034/g3084 ,/g3038 is the vector 
+component. 
+/g1869/g3053/g3040/g3084 ,/g3038,/g2199/g3053/g3040/g3084 ,/g3038 Measured rotation quaternion between the accelerome ter and 
+magnetometer (6DOF) estimate and a priori  geomagnetic vector estimate 
+from the gyroscope. /g1869/g3053/g3040/g3084 ,/g3038 is the full quaternion and /g2199/g3053/g3040/g3084 ,/g3038 is the vector 
+component. 
+/g1869/g3034/g3084 ,/g3038,/g2199/g3034/g3084 ,/g3038 The orientation tilt error quaternion relative to t he true gravity vector 
+modeled in the Kalman filter. /g1869/g3034/g3084 ,/g3038 is the full quaternion and /g2199/g3034/g3084 ,/g3038 is the 
+vector component.  
+/g1869/g3040/g3084 ,/g3038,/g2199/g3040/g3084 ,/g3038 The orientation tilt error quaternion relative to t he true geomagnetic vector 
+modeled in the Kalman filter. /g1869/g3040/g3084 ,/g3038 is the full quaternion and /g2199/g3040/g3084 ,/g3038 is the 
+vector component. 
+/g1843/g3028,/g3038 Acceleration covariance (units g2) at iteration /g1863 
+/g1843/g3028,/g3038=/g1831[/…ni007C/g2183/g3038/…ni0009/g3020/…ni007C/g2870] 
+/g1843/g3031,/g3038 Magnetic disturbance covariance (units µT 2) at iteration /g1863 
+/g1843/g3031,/g3038=/g1831[/…ni007C/g2186/g3038/…ni0009/g3020/…ni007C/g2870] 
+/g1843/g3049/g3003 ,/g3038 Magnetometer sensor noise covariance (units µT 2) at iteration /g1863 
+/g1843/g3049/g3003 ,/g3038=/g1831/g4674/g3627/g2204/g3003,/g3038/g3627/g2870/g4675 
+/g1843/g3049/g3008 ,/g3038 Accelerometer sensor noise covariance (units g2) at iteration /g1863 
+/g1843/g3049/g3008 ,/g3038=/g1831/g4674/g3627/g2204/g3008,/g3038/g3627/g2870/g4675 
+Introduction 
+6   Sensor Fusion Kalman Filters 
+Mark  Pedley and Michael Stanley, 1, 9/2015 
+ 
+  © Freescale Semiconductor, Inc. Symbol Definition 
+/g1843/g3050/g3029 ,/g3038 Covariance of gyroscope zero rate offset random wal k (units deg 2/sec 2) at 
+iteration /g1863 
+/g1843/g3050/g3083 ,/g3038=/g1831/g3427/g1875/g3029,/g3038/g2870/g3431 
+/g1843/g3050/g3083 ,/g3038 Covariance of geomagnetic inclination angle random walk (units deg 2) at 
+iteration /g1863 
+/g1843/g3050/g3083 ,/g3038=/g1831/g3427/g1875/g3083,/g3038/g2870/g3431 
+/g2173/g3050,/g3038 Covariance matrix of noise process  /g2205/g3038 in the underlying process /g2206/g3084,/g3038 
+/g2173/g3050,/g3038=/g1855/g1867/g1874 /g4668/g2205/g3038,/g2205/g3038/g4669=/g1831[/g2205/g3038/g2205/g3038/g3021] 
+/g2173/g3049,/g3038 Covariance matrix of measurement noise process  /g2204/g3038 in the measured 
+process /g2208 
+/g2173/g3049,/g3038=/g1855/g1867/g1874 /g4668/g2204/g3038,/g2204/g3038/g4669=/g1831[/g2204/g3038/g2204/g3038/g3021] 
+/g2200/g3038 k-th  fixed reference vector in the global frame 
+/g2174 Rotation (aka orientation) matrix 
+/g2174/g3038 Orientation matrix transforming from global to sens or frame at iteration /g1863 
+/g2174/g3553/g3038/g2879 A priori  estimate of the orientation matrix /g2174/g3038 at iteration /g1863 
+/g2174/g3553/g3038/g2878 A posteriori  estimate of the orientation matrix /g2174/g3038 at iteration /g1863 
+/g2201/g3038 k-th  measured vector in the sensor frame 
+/g1872/g1870 (/g2157) Trace of matrix /g2157 
+/g2203,/g2204 Arbitrary vectors. 
+/g2204/g3038 Additive noise in the Kalman filter measured error process /g2208/g3084,/g3038: 
+/g2208/g3084,/g3038/…ni0009=/g2159/g3038/g2206/g3084,/g3038+/g2204/g3038 
+/g2204/g3003,/g3038 Magnetometer sensor additive noise (units µT) at it eration /g1863 
+/g2204/g3008,/g3038 Accelerometer sensor additive noise (units g) at iteration /g1863 
+/g2204/g3026,/g3038 Gyroscope sensor additive noise (units deg/s) at it eration /g1863 
+/g2205/g3038 Additive noise in error of underlying Kalman filter  process /g2206/g3084,/g3038: 
+/g2206/g3084,/g3038=/g2157/g3038/g2206/g3084,/g3038/g2879/g2869+/g2205/g3038 
+/g2205/g3029,/g3038 Driving noise for gyroscope offset random walk (uni ts deg/s) at iteration /g1863 
+/g1875/g3083,/g3038 Driving noise for geomagnetic inclination angle ran dom walk (units deg) at 
+iteration /g1863 
+/g2206/g3084,/g3038 The underlying Kalman filter error process at itera tion /g1863 
+/g2206/g3549/g3084,/g3038/g2879 The a priori  estimate of the Kalman filter error process /g2206/g3084,/g3038 
+/g2206/g3549/g3084,/g3038/g2878 The a posteriori  estimate of the Kalman filter error process /g2206/g3084,/g3038 
+/g2181/g3038/…ni0009/g3020 Gyroscope measurement (units deg/s) at iteration /g1863 
+/g2208/g3084,/g3038/…ni0009 The measurement error vector 
+  
+Sensor Fusion Kalman Filters 
+Mark Pedley and Michael Stanley, 1, 9/2015  
+ 
+© Freescale Semiconductor, Inc.  Symbol Definition 
+/g2009 Used as scaling constant in covariance matrices con verting units of deg/s 
+to radians 
+/g2009=/g3436/g2024/g2012/g1872 
+180 /g3440 
+/g2009/g3038 Weighting applied to measurement of the k-th  reference vector in 
+orientation fit. 
+/g2009/g3034 Weighting applied to gravity reference vector 
+/g2009/g3040 Weighting applied to geomagnetic reference vector 
+/g2012 Geomagnetic inclination angle (deg) 
+/g2012/g3038 Geomagnetic inclination angle (deg) at iteration /g1863 
+/g2012/g3084,/g3038 Geomagnetic inclination angle error (deg) at iterat ion /g1863 
+/g2012/g3053/g3084 ,/g3038 Error between the Kalman filter estimate of inclina tion angle /g2012 and the 
+accelerometer plus magnetometer estimate. 
+/g2012/g1872  Sampling interval of the Kalman filter (units s) 
+/g2015 Rotation angle (degrees or radians) 
+/g2244 4x4 symmetric matrix whose eigenvectors give the op timum orientation 
+quaternion. 
+/g2019 Eigenvalue and Lagrange Multiplier 
+/g2259/g3038 True angular velocity (deg/s) 
+/g2259/g3038/g2879 The a priori  estimate of the angular velocity /g2259/g3038 (deg/s) 
+ 
+1.3 Software Functions 
+Table 1. Sensor Fusion Library software functions 
+Kalman Filter Initialization Functions (fusion.c) Section 
+void fInit_6DOF_GY_KALMAN 
+(struct SV_6DOF_GY_KALMAN *pthisSV, struct AccelSen sor *pthisAccel); 
+ 
+void fInit_9DOF_GBY_KALMAN 
+(struct SV_9DOF_GBY_KALMAN *pthisSV, struct AccelSe nsor *pthisAccel, 
+struct MagSensor *pthisMag, struct MagCalibration * pthisMagCal); 7, 8 
+Kalman Filter Execution Functions (fusion.c) Section 
+void fRun_6DOF_GY_KALMAN 
+(struct SV_6DOF_GY_KALMAN *pthisSV, struct AccelSen sor *pthisAccel, 
+struct GyroSensor *pthisGyro); 
+ 
+void fRun_9DOF_GBY_KALMAN 
+(struct SV_9DOF_GBY_KALMAN *pthisSV, struct AccelSe nsor *pthisAccel, 7, 8 
+Estimating Acceleration and Magnetic Disturbance 
+8   Sensor Fusion Kalman Filters 
+Mark  Pedley and Michael Stanley, 1, 9/2015 
+ 
+  © Freescale Semiconductor, Inc. Kalman Filter Initialization Functions (fusion.c) Section 
+struct MagSensor *pthisMag, struct GyroSensor *pthi sGyro, struct 
+MagCalibration *pthisMagCal);  
+Least Squares Accelerometer and Magnetometer Orient ation (orientation.c) Section 
+void fLeastSquareseCompassNED 
+(struct fquaternion *pfq, float fB, float fDelta, f loat fsinDelta, 
+float fcosDelta, float *pfDelta6DOF, float fBc[], f loat fGs[], float 
+*pfQvBQd, float *pfQvGQa) 
+ 
+void fLeastSquareseCompassAndroid(struct fquaternio n *pfq, float fB, 
+float fDelta, float fsinDelta, float fcosDelta, flo at *pfDelta6DOF, 
+float fBc[], float fGs[], float *pfQvBQd, float *pf QvGQa) 
+ 
+void fLeastSquareseCompassWin8 
+(struct fquaternion *pfq, float fB, float fDelta, f loat fsinDelta, 
+float fcosDelta, float *pfDelta6DOF, float fBc[], f loat fGs[], float 
+*pfQvBQd, float *pfQvGQa) 3 
+Quaternion Algebra (orientation.c) Section 
+void fveqconjgquq 
+(struct fquaternion *pfq, float fu[], float fv[]) 4 
+Compile Time Constants (fusion.h) Section 
+FQVBQD_MIN_9DOF_GBY_KALMAN 2 
+FQVY_9DOF_GBY_KALMAN  
+FQVY_6DOF_GY_KALMAN 5 
+FQWB_9DOF_GBY_KALMAN 
+FQWB_6DOF_GY_KALMAN 5 
+FQWDLT_9DOF_GBY_KALMAN 5 
+FGYRO_OFFSET_MIN_9DOF_GBY_KALMAN 
+FGYRO_OFFSET_MIN_9DOF_GBY_KALMAN 7 
+FDELTA_MIN_9DOF_GBY_KALMAN 
+FDELTA_MAX_9DOF_GBY_KALMAN 7 
+2 Estimating Acceleration and Magnetic Disturbance 
+Compared to versions 4.22 and earlier versions of t he library, version 5.00 has somewhat simplified th e 
+Kalman filters by treating linear acceleration and magnetic interference as “noise”, rather than track ing 
+them as explicit variables in the filter.  Somewhat  counter intuitively, this appears to improve dynam ic 
+response of the filters. 
+2.1 Introduction 
+This section describes a simple technique for estim ating the interfering “noise” affecting the 
+accelerometer estimate of the gravity vector and th e magnetometer estimate of the geomagnetic 
+vector. 
+  
+Sensor Fusion Kalman Filters 
+Mark Pedley and Michael Stanley, 1, 9/2015  
+ 
+© Freescale Semiconductor, Inc.  The accelerometer sensor at rest has high frequency  measurement noise of approximately 3mg and an 
+orientation dependent error of order 30mg or so res ulting from various sources including i) non-linear ity 
+in its signal chain response ii) imperfectly calibr ated offset iii) imperfectly calibrated gain and iv ) 
+uncorrected cross-axis interference. In addition, t he accelerometer will also experience physical 
+acceleration up to 8000mg in gaming applications wi th orientation changes at 2000dps meaning that 
+the acceleration can change by 16000mg in 0.1s. The  accuracy of the accelerometer estimate of the 
+gravity vector therefore varies dramatically depend ing on the dynamics by a factor of 60dB. 
+The magnetometer sensor at rest has high frequency measurement noise of one or two uT and an 
+orientation dependent error of comparable size resu lting from an imperfect estimate of the hard and so ft 
+iron interference resulting from magnetic sources o n the PCB. Magnetic disturbance, defined as 
+resulting from sources in the global frame unlike h ard and soft iron interference which are fixed in t he 
+PCB frame, can vary from zero to clipping the magne tometer sensor at 1000uT or more when a magnet 
+is brought close. The magnetometer provides the est imate of the geomagnetic vector to stabilize the 
+gyroscope orientation estimate and the accuracy of this estimate also varies dramatically by a similar  
+factor of 60dB. 
+There are two approaches to estimating the accelera tion and magnetic disturbance: 
+a) the acceleration and magnetic disturbance vector s are estimated in the Kalman filter on a sample by  
+sample basis in order to allow the estimated accele ration and magnetic disturbance vectors to be 
+subtracted from the accelerometer and magnetometer measurements  
+b) the acceleration and magnetic disturbance magnit udes are estimated independently of the Kalman 
+filter and used in the Kalman filter to determine t he weighting of the gyroscope orientation estimate 
+versus the accelerometer and magnetometer estimate.  
+The first approach is computationally expensive sin ce the Kalman filter is more complicated and must 
+execute at a rate sufficient to accurately track th e linear acceleration and magnetic disturbance vect ors 
+without aliasing. In conditions of highly aggressiv e gaming motion, the Kalman filter needs to run at 
+several hundred Hz which dramatically increases bot h the microcontroller cost and the power 
+dissipation. 
+The second approach is computationally cheap since it permits a relatively simple Kalman filter which 
+can run at rates of just 25Hz with the associated c ost and power savings. The Kalman filter will, for 
+example, compute its orientation estimate predomina ntly from the gyroscope and magnetometer 
+sensors when a high accelerometer noise covariance is present from acceleration. Gyroscope 
+integration errors will accumulate slowly over time  in the orientation estimate but given that the 
+orientation is, by definition, changing rapidly und er these conditions, the error is academic. Once th e 
+acceleration stops, the Kalman filter rapidly corre cts the orientation error between the gyroscope and  
+accelerometer estimates of the gravity vector. 
+Similarly, the Kalman filter will compute its orien tation estimate predominantly from the gyroscope an d 
+accelerometer sensors when a magnet is brought clos e by giving an accurate tilt estimate from vertical  
+and a compass heading angle determined from the gyr oscope. Once the magnetic disturbance is 
+removed, the deviation between the gyroscope and ma gnetometer estimates of compass heading is 
+rapidly corrected. 
+The approach taken in this document is the second a pproach where acceleration and magnetic 
+disturbance are treated as noise terms whose magnit ude only is needed in the noise covariance 
+matrices. 
+The measurement from a perfectly calibrated acceler ometer with no sensor noise and experiencing no 
+acceleration will have magnitude 1g and lie exactly  on the 1g sphere. In the presence of sensor noise,  
+imperfect calibration and acceleration, the measure ment will no longer have magnitude 1g and no 
+Estimating Acceleration and Magnetic Disturbance 
+10   Sensor Fusion Kalman Filters 
+Mark  Pedley and Michael Stanley, 1, 9/2015 
+ 
+  © Freescale Semiconductor, Inc. longer lie on the 1g sphere. The deviation of the a ccelerometer measurement from the 1g sphere 
+therefore provides a simple estimate of noise. 
+Similarly, the measurement from a perfectly calibra ted magnetometer with no sensor noise and 
+experiencing no magnetic disturbance will have magn itude equal to the geomagnetic field strength and 
+lie exactly on the geomagnetic sphere. In the prese nce of sensor noise, imperfect calibration and 
+magnetic disturbance, the measurement will no longe r lie on the geomagnetic sphere and the deviation 
+of the measurement from the geomagnetic sphere ther efore provides an estimate of magnetometer 
+noise. 
+These approximations can be inaccurate for a single  measurement where the vector sum of the noise 
+terms cancels out and results in measurements lying  on or close to the 1g gravity or geomagnetic 
+spheres respectively. A simple example for the acce lerometer would be a 2g acceleration downwards 
+resulting in a net accelerometer measurement of 1g and a zero noise estimate rather than the true 2g 
+acceleration noise value. Statistically, however th e approximations used are valid over large numbers 
+of measurements.  
+2.2 Accelerometer Sensor Model and Noise Covariance  
+The accelerometer measurement /g2163/g3038/…ni0009/g3020 combines acceleration /g2183/g3038/…ni0009/g3020, the gravitational component /g2189/g3038/…ni0009/g3020 and 
+a noise term /g2204/g3008,/g3038. 
+ 
+The Aerospace (NED) and Windows 8 are 'gravity posi tive' standards whereas Android is an 
+'acceleration positive' standard. The accelerometer  sensor models for these three cases are: 
+ 
+/g2163/g3038/…ni0009/g3020=−/g2183/g3038/…ni0009/g3020+/g2189/g3038/…ni0009/g3020−/g2204/g3008,/g3038 (Aerospace, Windows 8) (1) 
+ 
+/g2163/g3038/…ni0009/g3020=/g2183/g3038/…ni0009/g3020−/g2189/g3038/…ni0009/g3020+/g2204/g3008,/g3038, (Android) (2) 
+The accelerometer sensor noise component /g2204/g3008,/g3038 comprises the high frequency, nearly white, noise 
+which is approximately uncorrelated from sample to sample plus the low frequency noise resulting from 
+imperfect sensor gain, offset and cross-axis, calib ration. The bandwidth of the low frequency is 
+proportional to the bandwidth of the acceleration a nd PCB orientation dynamics and is approximately 
+DC if the PCB is stationary at a fixed orientation.  
+For all three coordinate systems: 
+/…ni007C/g2163/g3038/…ni0009/g3020/…ni007C/g2870−/g1859/g2870=/g3627/g2183/g3038/…ni0009/g3020−/g2189/g3038/…ni0009/g3020+/g2204/g3008,/g3038/g3627/g2870−/g1859/g2870 (3) 
+ 
+Taking the expectation value over samples /g1863 gives: 
+/g1831[/…ni007C/g2163/g3038/…ni0009/g3020/…ni007C/g2870−/g1859/g2870]=/g1831/g4674/g3627/g2183/g3038/…ni0009/g3020−/g2189/g3038/…ni0009/g3020+/g2204/g3008,/g3038/g3627/g2870/g4675−/g1859/g2870 (4) 
+ 
+  
+Sensor Fusion Kalman Filters 
+Mark Pedley and Michael Stanley, 1, 9/2015  
+ 
+© Freescale Semiconductor, Inc.  =/g1831/g3427/g3435/g2183/g3038/…ni0009/g3020−/g2189/g3038/…ni0009/g3020+/g2204/g3008,/g3038/g3439./g3435/g2183/g3038/…ni0009/g3020−/g2189/g3038/…ni0009/g3020+/g2204/g3008,/g3038/g3439/g3431−/g1859/g2870 (5) 
+The vectors /g2183/g3038/…ni0009/g3020, /g2204/g3008,/g3038 and /g2189/g3038/…ni0009/g3020 can be assumed to be statistically uncorrelated ov er time giving the 
+simplification:  
+/g1831[/…ni007C/g2163/g3038/…ni0009/g3020/…ni007C/g2870−/g1859/g2870]=/g1831[/g2183/g3038/…ni0009/g3020./g2183/g3038/…ni0009/g3020]+/g1831[/g2189/g3038/…ni0009/g3020./g2189/g3038/…ni0009/g3020]+/g1831/g3427/g2204/g3008,/g3038./g2204/g3008,/g3038/g3431−/g1859/g2870=/g1831[/…ni007C/g2183/g3038/…ni0009/g3020/…ni007C/g2870]+/g1831/g4674/g3627/g2204/g3008,/g3038/g3627/g2870/g4675 (6) 
+The acceleration covariance /g1843/g3028,/g3038 is defined as: 
+/g1843/g3028,/g3038=/g1831[/…ni007C/g2183/g3038/…ni0009/g3020/…ni007C/g2870] (7) 
+The accelerometer sensor noise covariance /g1843/g3049/g3008,/g3038 (including high frequency sensor noise and low 
+frequency orientation-dependent noise from calibrat ion errors) is defined as: 
+/g1843/g3049/g3008 ,/g3038=/g1831/g4674/g3627/g2204/g3008,/g3038/g3627/g2870/g4675 (8) 
+Substituting back shows that the deviation of the s quared accelerometer measurement from the 1g 
+sphere is therefore a reasonable estimate of the su m of the acceleration covariance and the 
+accelerometer sensor noise covariance. This is the model for the noise covariance affecting the qualit y 
+of the accelerometer estimate of the gravity vector . 
+/g1831[/…ni007C/g2163/g3038/…ni0009/g3020/…ni007C/g2870−/g1859/g2870]=/g1843/g3049/g3008 ,/g3038+/g1843/g3028,/g3038 (9) 
+Magnetometer Sensor Model and Noise Covariance 
+The calibrated magnetometer measurement /g2158/g3030,/g3038/…ni0009/g3020 is modeled as the sum of the geomagnetic 
+component /g2195/g3038/…ni0009/g3020, any magnetic disturbance /g2186/g3038/…ni0009/g3020 and sensor noise /g2204/g3003,/g3038: 
+/g2158/g3030,/g3038/…ni0009/g3020=/g2195/g3038/…ni0009/g3020+/g2186/g3038/…ni0009/g3020+/g2204/g3003,/g3038 (10) 
+The magnetic calibration algorithms remove hard and  soft iron magnetic distortion effects which are 
+constant in the sensor frame leaving the calibrated  measurement /g2158/g3030,/g3038/…ni0009/g3020. The magnetic disturbance /g2186/g3038/…ni0009/g3020 
+is defined any magnetic interference which does not  rotate with the sensor frame and not, therefore, 
+included in the hard and soft iron calibration. 
+ 
+With perfect magnetic calibration and in the absenc e of any magnetic disturbance and sensor noise, 
+the magnetometer measurement lies on the geomagneti c sphere and has magnitude equal to the 
+geomagnetic field strength /g1828. In practice the measurement will not lie on the g eomagnetic sphere as a 
+consequence of i) magnetometer sensor noise ii) imp erfect hard and soft iron calibration and iii) the 
+presence of magnetic disturbance in the environment . 
+ 
+Using the same arguments and algebra used for the a ccelerometer, the deviation of the squared 
+modulus of the magnetometer measurement from the ge omagnetic sphere is given by: 
+/g3627/g2158/g3030,/g3038/…ni0009/g3020/g3627/g2870−/g1828/g2870=/g3627/g2195/g3038/…ni0009/g3020+/g2186/g3038/…ni0009/g3020+/g2204/g3003,/g3038/g3627/g2870−/g1828/g2870 (11) 
+Since the vectors /g2186/g3038/…ni0009/g3020, /g2204/g3003,/g3038 and /g2195/g3038/…ni0009/g3020 are uncorrelated over time: 
+Least Squares Accelerometer and Magnetometer Orient ation Matrix 
+12   Sensor Fusion Kalman Filters 
+Mark  Pedley and Michael Stanley, 1, 9/2015 
+ 
+  © Freescale Semiconductor, Inc. /g1831/g4674/g3627/g2158/g3030,/g3038/…ni0009/g3020/g3627/g2870−/g1828/g2870/g4675=/g1831[/g2195/g3038/…ni0009/g3020./g2195/g3038/…ni0009/g3020]+/g1831[/g2186/g3038/…ni0009/g3020./g2186/g3038/…ni0009/g3020]+/g1831/g3427/g2204/g3003,/g3038./g2204/g3003,/g3038/g3431−/g1828/g2870=/g1831[/…ni007C/g2186/g3038/…ni0009/g3020/…ni007C/g2870]+/g1831/g4674/g3627/g2204/g3003,/g3038/g3627/g2870/g4675 (12) 
+The magnetic disturbance covariance /g1843/g3031,/g3038 is defined as: 
+/g1843/g3031,/g3038=/g1831[/…ni007C/g2186/g3038/…ni0009/g3020/…ni007C/g2870] (13) 
+The magnetometer noise covariance /g1843/g3049/g3003,/g3038 (including high frequency sensor noise and low fre quency 
+orientation-dependent noise from calibration errors ) is defined as: 
+/g1843/g3049/g3003 ,/g3038=/g1831/g4674/g3627/g2204/g3003,/g3038/g3627/g2870/g4675 (14) 
+Substituting back shows that the deviation of the s quared magnetometer measurement from the 
+geomagnetic sphere is therefore a reasonable estima te of the sum of the magnetic disturbance 
+covariance and the magnetometer noise covariance. T his is the model for the noise covariance 
+affecting the quality of the magnetometer estimate of the geomagnetic vector. 
+/g1831/g4674/g3627/g2158/g3030,/g3038/…ni0009/g3020/g3627/g2870−/g1828/g2870/g4675=/g1843/g3049/g3003 ,/g3038+/g1843/g3031,/g3038 (15) 
+2.3 Compile Time Constants 
+The sensor fusion software applies a lower bound to  the estimate in equation (15).  This is defined in  
+the compile time constants found in file fusion.h f or the Kalman filters of section 7.  
+#define FQVBQD_MIN_9DOF_GBY_KALMAN 7E0F 
+3 Least Squares Accelerometer and Magnetometer 
+Orientation Matrix 
+3.1 Introduction 
+This section contains the mathematics to compute th e least squares fit to the orientation matrix using  
+gravity and geomagnetic vector estimates from the a ccelerometer and magnetometer sensors 
+respectively weighted according to the confidence i n those estimates derived from the noise 
+covariances as defined in section 2. 
+For the case where the PCB is at a fixed orientatio n with no acceleration and no magnetic disturbance 
+then the gravity vector and geomagnetic will both b e given approximately equal weighting. 
+During gaming motions, where accelerations exceed 1 g and can reach 8g or more, the gravity vector 
+estimate is meaningless and the geomagnetic vector estimate is given the higher weighting. The 
+resulting orientation remains stabilized relative t o the geomagnetic vector. 
+In the presence of magnetic disturbance, such as th at caused by a magnet being brought up to the 
+PCB while stationary on a desk, the geomagnetic vec tor estimate is unreliable but the gravity vector 
+remains reliable. A high weighting is then given to  the gravity vector estimate resulting in an orient ation 
+correctly stabilized in tilt relative to the vertic al gravity vector. 
+The derivation in this section solves the general p roblem with /g1840 reference orientation vectors and then 
+restricts this to /g1840 = 2  for the case of interest with gravity and geomagne tic reference vectors only. The 
+  
+Sensor Fusion Kalman Filters 
+Mark Pedley and Michael Stanley, 1, 9/2015  
+ 
+© Freescale Semiconductor, Inc.  geomagnetic inclination angle /g2012 is assumed known in this section and the mathemati cs used to 
+estimate /g2012 described in sections 6 and 7. 
+3.2 Matrix Trace Lemma 
+The trace of a matrix product is unchanged if the o rder of the two matrices is commuted. 
+ 
+/g1872/g1870 (/g2157/g2158 )=/g1872/g1870 (/g2158/g2157 ) (16) 
+Proof: If the matrix /g2157 has dimensions /g1839/g1876/g1840  and a matrix /g2158 has dimensions /g1840/g1876/g1839 , then /g2159 = /g2157/g2158  has 
+dimensions /g1839/g1876/g1839  and /g2160 = /g2158/g2157  has dimensions /g1840/g1876/g1840 . 
+The element /g1829/g3036/g3037  of matrix /g2159 = /g2157/g2158  has value: 
+ 
+/g1829/g3036/g3037 =/g3533/g1827/g3036/g3038 /g1828/g3038/g3037 /g3015/g2879/g2869
+/g3038/g2880/g2868⇒/g1872/g1870 (/g2159)=/g1872/g1870 (/g2157/g2158 )=/g3533/g1829/g3036/g3036 /g3014/g2879/g2869
+/g3036/g2880/g2868=/g3533/g3533/g1827/g3036/g3038 /g1828/g3038/g3036 /g3015/g2879/g2869
+/g3038/g2880/g2868/g3014/g2879/g2869
+/g3036/g2880/g2868 (17) 
+The element /g1830/g3036/g3037  of matrix /g2160 = /g2158/g2157  has value: 
+/g1830/g3036/g3037 =/g3533/g1828/g3036/g3038 /g1827/g3038/g3037 /g3014/g2879/g2869
+/g3038/g2880/g2868⇒/g1872/g1870 (/g2160)=/g1872/g1870 (/g2158/g2157 )=/g3533/g1830/g3036/g3036 /g3015/g2879/g2869
+/g3036/g2880/g2868=/g3533/g3533/g1828/g3036/g3038 /g1827/g3038/g3036 /g3014/g2879/g2869
+/g3038/g2880/g2868/g3015/g2879/g2869
+/g3036/g2880/g2868 (18) 
+Swapping the dummy summation variables gives: 
+ 
+/g1872/g1870 (/g2160)=/g1872/g1870 (/g2158/g2157 )=/g3533/g3533/g1828/g3038/g3036 /g1827/g3036/g3038 /g3014/g2879/g2869
+/g3036/g2880/g2868/g3015/g2879/g2869
+/g3038/g2880/g2868=/g3533/g3533/g1827/g3036/g3038 /g1828/g3038/g3036 /g3015/g2879/g2869
+/g3038/g2880/g2868/g3014/g2879/g2869
+/g3036/g2880/g2868=/g1872/g1870 (/g2157/g2158 )=/g1872/g1870 (/g2159) (19) 
+An obvious extension of this result is that the tra ce operation is invariant under forwards and backwa rds 
+cyclic permutations of matrix products: 
+/g1872/g1870 (/g2157/g2869/g2157/g2870/g2157/g2871…/g2157/g3015)=/g1872/g1870 (/g2157/g3015/g2157/g2869/g2157/g2870…/g2157/g3015/g2879/g2869)=/g1872/g1870 (/g2157/g2870…/g2157/g3015/g2879/g2869/g2157/g3015/g2157/g2869) (20) 
+ 
+A special case is that for any invertible matrix /g2158: 
+ 
+/g1872/g1870 (/g2158/g2879/g2869/g2157/g2158 )=/g1872/g1870 (/g2157/g2158 /g2158/g2879/g2869)=/g1872/g1870 (/g2157) (21) 
+ 
+3.3 Definition of the Error Function 
+The error function /g1831(/g2174)  is defined as the weighted sum of the squared vect or differences between /g1840 
+sensor frame measurements /g2201/g3036 and rotated global frame reference vectors /g2200/g3038. The rotation matrix /g2174 
+follows the Freescale convention of transforming ve ctors from the global (reference) frame to the 
+sensor frame as a result of a coordinate system rot ation. 
+Least Squares Accelerometer and Magnetometer Orient ation Matrix 
+14   Sensor Fusion Kalman Filters 
+Mark  Pedley and Michael Stanley, 1, 9/2015 
+ 
+  © Freescale Semiconductor, Inc.  
+/g1831(/g2174)=/g34361
+2/g3440/g3533/g2009/g3038/g3015/g2879/g2869
+/g3038/g2880/g2868/…ni007C/g2201/g3038−/g2174/g2200/g3038/…ni007C/g2870=/g34361
+2/g3440/g3533/g2009/g3038/g3015/g2879/g2869
+/g3038/g2880/g2868/g1872/g1870 /g4668(/g2201/g3038−/g2174/g2200/g3038)(/g2201/g3038−/g2174/g2200/g3038)/g3021/g4669 (22) 
+ 
+=/g34361
+2/g3440/g3533/g2009/g3038/g3015/g2879/g2869
+/g3038/g2880/g2868/g1872/g1870 /g4668/g2201/g3038(/g2201/g3038−/g2174/g2200/g3038)/g3021−/g2174/g2200/g3038(/g2201/g3038−/g2174/g2200/g3038)/g3021/g4669 (23) 
+ 
+=/g34361
+2/g3440/g3533/g2009/g3038/g3015/g2879/g2869
+/g3038/g2880/g2868/g4668/g1872/g1870 (/g2201/g3038/g2201/g3038/g3021)−/g1872/g1870 (/g2201/g3038/g2200/g3038/g3021/g2174/g3021)−/g1872/g1870 (/g2174/g2200/g3038/g2201/g3038/g3021)+/g1872/g1870 (/g2174/g2200/g3038/g2200/g3038/g3021/g2174/g3021)/g4669 (24) 
+The weights /g2009/g3036 determine the confidence of the individual measure ments and later will be defined in 
+terms of the noise covariances of the accelerometer  and magnetometer measurements. The factor of 
+/g4672/g2869
+/g2870/g4673 has no effect on the solution and is for mathemati cal convenience. 
+ 
+Since /g1872/g1870 (/g2157)= /g1872/g1870 (/g2157/g3021), the second and third terms of equation (24) are e qual: 
+ 
+/g1872/g1870 (/g2174/g2200/g3038/g2201/g3038/g3021)=/g1872/g1870 (/g2201/g3038/g2200/g3038/g3021/g2174/g3021) (25) 
+ 
+So far no assumption has been made about the form o f the unknown matrix /g2174. Restricting /g2174 to be a 
+rotation matrix for which /g2174/g3021= /g2174/g2879/g2869 simplifies the final term of equation (24) to: 
+ 
+/g1872/g1870 (/g2174/g2200/g3038/g2200/g3038/g3021/g2174/g3021)=/g1872/g1870 (/g2174/g3021/g2174/g2200/g3038/g2200/g3038/g3021)=/g1872/g1870 (/g2174/g2879/g2869/g2174/g2200/g3038/g2200/g3038/g3021)=/g1872/g1870 (/g2200/g3038/g2200/g3038/g3021) (26) 
+ 
+Substituting back into the error function gives: 
+ 
+/g1831(/g2174)=/g34361
+2/g3440/g3533/g1872/g1870 (/g2009/g3038/g2201/g3038/g2201/g3038/g3021)/g3015/g2879/g2869
+/g3038/g2880/g2868+/g34361
+2/g3440/g3533/g1872/g1870 (/g2009/g3038/g2200/g3038/g2200/g3038/g3021)/g3015/g2879/g2869
+/g3038/g2880/g2868−/g3533/g1872/g1870 (/g2009/g3038/g2201/g3038/g2200/g3038/g3021/g2174/g3021)/g3015/g2879/g2869
+/g3038/g2880/g2868 (27) 
+ 
+=/g34361
+2/g3440/g3533/g1872/g1870 (/g2009/g3038/g2201/g3038/g2201/g3038/g3021)/g3015/g2879/g2869
+/g3038/g2880/g2868+/g34361
+2/g3440/g3533/g1872/g1870 (/g2009/g3038/g2200/g3038/g2200/g3038/g3021)/g3015/g2879/g2869
+/g3038/g2880/g2868−/g1872/g1870 /g3421/g3437/g3533(/g2009/g3038/g2201/g3038/g2200/g3038/g3021)/g3015/g2879/g2869
+/g3038/g2880/g2868/g3441/g2174/g3021/g3425 (28) 
+ 
+The matrix /g2158 is defined in terms of the weighted reference and measured vectors as: 
+ 
+  
+Sensor Fusion Kalman Filters 
+Mark Pedley and Michael Stanley, 1, 9/2015  
+ 
+© Freescale Semiconductor, Inc.  /g2158=/g3533/g2009/g3038/g2201/g3038/g2200/g3038/g3021/g3015/g2879/g2869
+/g3038/g2880/g2868 (29) 
+The error function /g1831(/g2174) then equals: 
+ 
+/g1831(/g2174)=/g34361
+2/g3440/g3533/g2009/g3038/g1872/g1870 (/g2201/g3038/g2201/g3038/g3021)/g3015/g2879/g2869
+/g3038/g2880/g2868+/g34361
+2/g3440/g3533/g2009/g3038/g1872/g1870 (/g2200/g3038/g2200/g3038/g3021)/g3015/g2879/g2869
+/g3038/g2880/g2868−/g1872/g1870 (/g2158/g2174/g3021) (30) 
+ 
+For orientation applications it can be assumed that  both the measured sensor frame vectors /g2201/g3038 and the 
+reference vectors /g2200/g3038 have unit norm: 
+/g1872/g1870 (/g2201/g3038/g2201/g3038/g3021)=/…ni007C/g2201/g3038/…ni007C/g2870=1 (31) 
+ 
+/g1872/g1870 (/g2200/g3038/g2200/g3038/g3021)=/…ni007C/g2200/g3038/…ni007C/g2870=1 (32) 
+In addition, the relative weightings /g2009/g3038 sum to unity giving: 
+ 
+/g1831(/g2174)=/g34361
+2/g3440/g3533/g2009/g3038/g3015/g2879/g2869
+/g3038/g2880/g2868+/g34361
+2/g3440/g3533/g2009/g3038/g3015/g2879/g2869
+/g3038/g2880/g2868−/g1872/g1870 (/g2158/g2174/g3021)=1−/g1872/g1870 (/g2158/g2174/g3021)=1−/g1872/g1870 (/g2174/g2158/g3021) (33) 
+ 
+The error function /g1831(/g2174) is then minimized by maximizing the final term /g1872/g1870 (/g2158/g2174/g3021) with respect to /g2174 to 
+give the optimum orientation matrix /g2174. 
+ 
+3.4 Solution by Eigen-Decomposition 
+The optimum rotation matrix /g2174 can be written in terms of its equivalent quaterni on /g1869 using the standard 
+relationship between an orientation matrix and orie ntation quaternion: 
+ 
+/g2174=/g4684/g1844/g3051/g3051 /g1844/g3051/g3052 /g1844/g3051/g3053 
+/g1844/g3052/g3051 /g1844/g3052/g3052 /g1844/g3052/g3053 
+/g1844/g3053/g3051 /g1844/g3053/g3052 /g1844/g3053/g3053 /g4685=/g4684/g1869/g2868/g2870+/g1869/g2869/g2870−/g1869/g2870/g2870−/g1869/g2871/g28702/g1869/g2869/g1869/g2870+2/g1869/g2868/g1869/g2871 2/g1869/g2869/g1869/g2871−2/g1869/g2868/g1869/g2870
+2/g1869/g2869/g1869/g2870−2/g1869/g2868/g1869/g2871/g1869/g2868/g2870−/g1869/g2869/g2870+/g1869/g2870/g2870−/g1869/g2871/g28702/g1869/g2870/g1869/g2871+2/g1869/g2868/g1869/g2869
+2/g1869/g2869/g1869/g2871+2/g1869/g2868/g1869/g2870 2/g1869/g2870/g1869/g2871−2/g1869/g2868/g1869/g2869/g1869/g2868/g2870−/g1869/g2869/g2870−/g1869/g2870/g2870+/g1869/g2871/g2870/g4685 (34) 
+ 
+The error function  can then be written as /g1831(/g1869) in terms of the four components of the optimum 
+orientation quaternion /g1869 as: 
+/g1831(/g1869)=1−/g1872/g1870 (/g2174/g2158/g3021) (35) 
+ 
+Least Squares Accelerometer and Magnetometer Orient ation Matrix 
+16   Sensor Fusion Kalman Filters 
+Mark  Pedley and Michael Stanley, 1, 9/2015 
+ 
+  © Freescale Semiconductor, Inc. =1−/g1872/g1870 /g4688/g4684/g1869/g2868/g2870+/g1869/g2869/g2870−/g1869/g2870/g2870−/g1869/g2871/g28702/g1869/g2869/g1869/g2870+2/g1869/g2868/g1869/g2871 2/g1869/g2869/g1869/g2871−2/g1869/g2868/g1869/g2870
+2/g1869/g2869/g1869/g2870−2/g1869/g2868/g1869/g2871/g1869/g2868/g2870−/g1869/g2869/g2870+/g1869/g2870/g2870−/g1869/g2871/g28702/g1869/g2870/g1869/g2871+2/g1869/g2868/g1869/g2869
+2/g1869/g2869/g1869/g2871+2/g1869/g2868/g1869/g2870 2/g1869/g2870/g1869/g2871−2/g1869/g2868/g1869/g2869/g1869/g2868/g2870−/g1869/g2869/g2870−/g1869/g2870/g2870+/g1869/g2871/g2870/g4685/g3533/g2009/g3038/g3437/g1871/g3038,/g3051/g1870/g3038,/g3051/g1871/g3038,/g3052/g1870/g3038,/g3051/g1871/g3038,/g3053/g1870/g3038,/g3051
+/g1871/g3038,/g3051/g1870/g3038,/g3052/g1871/g3038,/g3052/g1870/g3038,/g3052/g1871/g3038,/g3053/g1870/g3038,/g3052
+/g1871/g3038,/g3051/g1870/g3038,/g3053/g1871/g3038,/g3052/g1870/g3038,/g3053/g1871/g3038,/g3053/g1870/g3038,/g3053/g3441/g3015/g2879/g2869
+/g3038/g2880/g2868/g4689 (36) 
+ 
+=1−/g3533/g3419/g2009/g3038(/g1869/g2868/g2870+/g1869/g2869/g2870−/g1869/g2870/g2870−/g1869/g2871/g2870)/g1854/g3038,/g3051/g1870/g3038,/g3051+/g2009/g3038(/g1869/g2868/g2870+/g1869/g2870/g2870−/g1869/g2869/g2870−/g1869/g2871/g2870)/g1871/g3038,/g3052/g1870/g3038,/g3052/g3015/g2879/g2869
+/g3038/g2880/g2868
++ /g2009/g3038(/g1869/g2868/g2870+ /g1869/g2871/g2870− /g1869/g2869/g2870− /g1869/g2870/g2870)/g1871/g3038,/g3053/g1870/g3038,/g3053/g3423/…ni0009
+− /g3533/g34192/g2009 /g3038(/g1869/g2869/g1869/g2870− /g1869/g2868/g1869/g2871)/g1871/g3038,/g3052/g1870/g3038,/g3051+ 2/g2009/g3038(/g1869/g2869/g1869/g2870+ /g1869/g2868/g1869/g2871)/g1871/g3038,/g3051/g1870/g3038,/g3052+ 2/g2009/g3038(/g1869/g2869/g1869/g2871− /g1869/g2868/g1869/g2870)/g1871/g3038,/g3051/g1870/g3038,/g3053/g3015/g2879/g2869
+/g3038/g2880/g2868
++2/g2009/g3038(/g1869/g2869/g1869/g2871+/g1869/g2868/g1869/g2870)/g1871/g3038,/g3053/g1870/g3038,/g3051+2/g2009/g3038(/g1869/g2870/g1869/g2871−/g1869/g2868/g1869/g2869)/g1871/g3038,/g3053/g1870/g3038,/g3052+2/g2009/g3038(/g1869/g2870/g1869/g2871+/g1869/g2868/g1869/g2869)/g1871/g3038,/g3052/g1870/g3038,/g3053/g4669 (37) 
+ 
+It is mathematically convenient to define the 4 com ponent solution vector /g2199 containing the four 
+components of the optimum rotation quaternion /g1869: 
+ 
+/g2199=/g3438/g1869/g2868
+/g1869/g2869
+/g1869/g2870
+/g1869/g2871/g3442 (38) 
+ 
+/g2199 as defined here is not the three component vector quaternion /g4668/g1869/g2869,/g1869/g2870,/g1869/g2871/g4669 but contains all four 
+quaternion components. 
+The error function /g1831(/g1869) is, by inspection, a quadratic function of the com ponents of the optimum 
+quaternion and can therefore be written in terms of  a 4x4 matrix /g2244 as: 
+ 
+/g1831(/g1869)=1−/g2199/g3021/g2244/g2199  (39) 
+ 
+Since /g1831(/g1869) is a scalar, it is easily proved that /g2244 must be symmetric: 
+ 
+/g1831(/g1869)=/g1831(/g1869)/g3021⇒1−/g2199/g3021/g2244/g2199 =(1−/g2199/g3021/g2244/g2199 )/g3021⇒/g2199/g3021(/g2244−/g2244/g3021)/g2199=0⇒/g2244=/g2244/g3021 (40) 
+ 
+By direct evaluation: 
+ 
+/g2244=/g3533/g2009/g3038/g3438/g1871/g3038,/g3051/g1870/g3038,/g3051+/g1871/g3038,/g3052/g1870/g3038,/g3052+/g1871/g3038,/g3053/g1870/g3038,/g3053 /g1871/g3038,/g3052/g1870/g3038,/g3053−/g1871/g3038,/g3053/g1870/g3038,/g3052 /g1871/g3038,/g3053/g1870/g3038,/g3051−/g1871/g3038,/g3051/g1870/g3038,/g3053 /g1871/g3038,/g3051/g1870/g3038,/g3052−/g1871/g3038,/g3052/g1870/g3038,/g3051
+/g1871/g3038,/g3052/g1870/g3038,/g3053−/g1871/g3038,/g3053/g1870/g3038,/g3052 /g1871/g3038,/g3051/g1870/g3038,/g3051−/g1871/g3038,/g3052/g1870/g3038,/g3052−/g1871/g3038,/g3053/g1870/g3038,/g3053 /g1871/g3038,/g3051/g1870/g3038,/g3052+/g1871/g3038,/g3052/g1870/g3038,/g3051 /g1871/g3038,/g3051/g1870/g3038,/g3053+/g1871/g3038,/g3053/g1870/g3038,/g3051
+/g1871/g3038,/g3053/g1870/g3038,/g3051−/g1871/g3038,/g3051/g1870/g3038,/g3053 /g1871/g3038,/g3052/g1870/g3038,/g3051+/g1871/g3038,/g3051/g1870/g3038,/g3052 −/g1871/g3038,/g3051/g1870/g3038,/g3051+/g1871/g3038,/g3052/g1870/g3038,/g3052−/g1871/g3038,/g3053/g1870/g3038,/g3053 /g1871/g3038,/g3052/g1870/g3038,/g3053+/g1871/g3038,/g3053/g1870/g3038,/g3052
+/g1871/g3038,/g3051/g1870/g3038,/g3052−/g1871/g3038,/g3052/g1870/g3038,/g3051 /g1871/g3038,/g3053/g1870/g3038,/g3051+/g1871/g3038,/g3051/g1870/g3038,/g3053 /g1871/g3038,/g3053/g1870/g3038,/g3052+/g1871/g3038,/g3052/g1870/g3038,/g3053 −/g1871/g3038,/g3051/g1870/g3038,/g3051−/g1871/g3038,/g3052/g1870/g3038,/g3052+/g1871/g3038,/g3053/g1870/g3038,/g3053/g3442/g3015/g2879/g2869
+/g3038/g2880/g2868 (41) 
+ 
+Since /g1869 is a rotation quaternion it is constrained to have  unit norm and therefore 1 − /g2199/g3021/g2199 = 0 . The 
+method of Lagrange Multipliers can be applied to fi nd the stationary point of /g1831(/g1869) subject to this 
+  
+Sensor Fusion Kalman Filters 
+Mark Pedley and Michael Stanley, 1, 9/2015  
+ 
+© Freescale Semiconductor, Inc.  constraint by looking for the stationary point of t he modified error function /g1831/g4593(/g1869) defined with Lagrange 
+Multiplier /g2019: 
+ 
+/g1831/g4593(/g1869)=1−/g2199/g3021/g2244/g2199 +/g2019(1−/g2199/g3021/g2199) (42) 
+ 
+Applying the stationary constraint /g1831/g4593(/g1869 + /g2012/g1869 )= /g1831/g4593(/g1869) gives: 
+ 
+(/g2199+/g2012/g2199)/g3021/g2244(/g2199+/g2012/g2199)+/g2019/g34351−(/g2199+/g2012/g2199)/g3021(/g2199+/g2012/g2199)/g3439=/g2199/g3021/g2244/g2199 +/g2019(1−/g2199/g3021/g2199) (43) 
+ 
+⇒/g2012/g2199/g3021/g2244/g2199 +/g2199/g3021/g2244/g2012/g2199−/g2019(/g2199/g3021/g2012/g2199+/g2012/g2199/g3021/g2199)=0 (44) 
+ 
+⇒/g2012/g2199/g3021/g2244/g2199 =/g2019/g2012/g2199/g3021/g2199⇒/g2012/g2199/g3021(/g2244/g2199 −/g2019/g2199)=0/…ni0009/g1858/g1867/g1870 /…ni0009/g1853/g1864/g1864 /…ni0009/g2012/g2199 (45) 
+ 
+⇒/g2244/g2199 =/g2019/g2199 (46) 
+ 
+The solution vector  /g2199 containing the four component of the optimum quater nion /g1869 is therefore one of the 
+four eigenvectors of  /g2244. 
+ 
+Since /g2244 is symmetric, it has real eigenvalues and real eig envectors. Eigenvectors associated with 
+different eigenvalues are orthogonal and if eigenva lues are repeated then linear combinations of 
+eigenvectors can still be chosen which are orthogon al. 
+ 
+Substituting gives the error function /g1831(/g1869) as a function of the eigenvalue /g2019: 
+ 
+/g1831(/g1869)=1−/g2199/g3021/g2244/g2199 =1−/g2019/g2199/g3021/g2199=1−/g2019 (47) 
+ 
+The optimum rotation quaternion which minimizes  /g1831(/g1869) is therefore the four component eigenvector 
+associated with the largest  eigenvalue of /g2244. 
+ 
+3.5 /g2244 Matrix For Gravity and Geomagnetic Vectors 
+For /g1840 = 2  with /g2009/g3034 representing the weighting of the measured and ref erence gravity vectors /g2200/g3034 and /g2201/g3034 
+and /g2009/g3040 representing the weighting of the measured and ref erence geomagnetic vectors /g2200/g3040 and /g2201/g3040, 
+equation (41) simplifies to: 
+Least Squares Accelerometer and Magnetometer Orient ation Matrix 
+18   Sensor Fusion Kalman Filters 
+Mark  Pedley and Michael Stanley, 1, 9/2015 
+ 
+  © Freescale Semiconductor, Inc. /g2244 = /g2009/g3034/g3438/g1871/g3034,/g3051/g1870/g3034,/g3051+/g1871/g3034,/g3052/g1870/g3034,/g3052+/g1871/g3034,/g3053/g1870/g3034,/g3053 /g1871/g3034,/g3052/g1870/g3034,/g3053−/g1871/g3034,/g3053/g1870/g3034,/g3052 /g1871/g3034,/g3053/g1870/g3034,/g3051−/g1871/g3034,/g3051/g1870/g3034,/g3053 /g1871/g3034,/g3051/g1870/g3034,/g3052−/g1871/g3034,/g3052/g1870/g3034,/g3051
+/g1871/g3034,/g3052/g1870/g3034,/g3053−/g1871/g3034,/g3053/g1870/g3034,/g3052 /g1871/g3034,/g3051/g1870/g3034,/g3051−/g1871/g3034,/g3052/g1870/g3034,/g3052−/g1871/g3034,/g3053/g1870/g3034,/g3053 /g1871/g3034,/g3051/g1870/g3034,/g3052+/g1871/g3034,/g3052/g1870/g3034,/g3051 /g1871/g3034,/g3051/g1870/g3034,/g3053+/g1871/g3034,/g3053/g1870/g3034,/g3051
+/g1871/g3034,/g3053/g1870/g3034,/g3051− /g1871/g3034,/g3051/g1870/g3034,/g3053 /g1871/g3034,/g3052/g1870/g3034,/g3051+ /g1871/g3034,/g3051/g1870/g3034,/g3052 −/g1871/g3034,/g3051/g1870/g3034,/g3051+ /g1871/g3034,/g3052/g1870/g3034,/g3052− /g1871/g3034,/g3053/g1870/g3034,/g3053 /g1871/g3034,/g3052/g1870/g3034,/g3053+ /g1871/g3034,/g3053/g1870/g3034,/g3052
+/g1871/g3034,/g3051/g1870/g3034,/g3052− /g1871/g3034,/g3052/g1870/g3034,/g3051 /g1871/g3034,/g3053/g1870/g3034,/g3051+ /g1871/g3034,/g3051/g1870/g3034,/g3053 /g1871/g3034,/g3053/g1870/g3034,/g3052+ /g1871/g3034,/g3052/g1870/g3034,/g3053 −/g1871/g3034,/g3051/g1870/g3034,/g3051− /g1871/g3034,/g3052/g1870/g3034,/g3052+ /g1871/g3034,/g3053/g1870/g3034,/g3053/g3442 + 
+/g2009/g3040/g3438/g1871/g3040,/g3051/g1870/g3040,/g3051+ /g1871/g3040,/g3052/g1870/g3040,/g3052+ /g1871/g3040,/g3053/g1870/g3040,/g3053 /g1871/g3040,/g3052/g1870/g3040,/g3053− /g1871/g3040,/g3053/g1870/g3040,/g3052 /g1871/g3040,/g3053/g1870/g3040,/g3051− /g1871/g3040,/g3051/g1870/g3040,/g3053 /g1871/g3040,/g3051/g1870/g3040,/g3052− /g1871/g3040,/g3052/g1870/g3040,/g3051
+/g1871/g3040,/g3052/g1870/g3040,/g3053− /g1871/g3040,/g3053/g1870/g3040,/g3052 /g1871/g3040,/g3051/g1870/g3040,/g3051− /g1871/g3040,/g3052/g1870/g3040,/g3052− /g1871/g3040,/g3053/g1870/g3040,/g3053 /g1871/g3040,/g3051/g1870/g3040,/g3052+ /g1871/g3040,/g3052/g1870/g3040,/g3051 /g1871/g3040,/g3051/g1870/g3040,/g3053+ /g1871/g3040,/g3053/g1870/g3040,/g3051
+/g1871/g3040,/g3053/g1870/g3040,/g3051−/g1871/g3040,/g3051/g1870/g3040,/g3053 /g1871/g3040,/g3052/g1870/g3040,/g3051+/g1871/g3040,/g3051/g1870/g3040,/g3052 −/g1871/g3040,/g3051/g1870/g3040,/g3051+/g1871/g3040,/g3052/g1870/g3040,/g3052−/g1871/g3040,/g3053/g1870/g3040,/g3053 /g1871/g3040,/g3052/g1870/g3040,/g3053+/g1871/g3040,/g3053/g1870/g3040,/g3052
+/g1871/g3040,/g3051/g1870/g3040,/g3052−/g1871/g3040,/g3052/g1870/g3040,/g3051 /g1871/g3040,/g3053/g1870/g3040,/g3051+/g1871/g3040,/g3051/g1870/g3040,/g3053 /g1871/g3040,/g3053/g1870/g3040,/g3052+/g1871/g3040,/g3052/g1870/g3040,/g3053 −/g1871/g3040,/g3051/g1870/g3040,/g3051−/g1871/g3040,/g3052/g1870/g3040,/g3052+/g1871/g3040,/g3053/g1870/g3040,/g3053/g3442 (48) 
+The following sub-sections evaluate the /g2244 matrix for the three coordinate systems supported.  
+3.5.1 Aerospace Coordinate System (NED) 
+The reference vector /g2200/g3034 is the downwards pointing gravity vector with magn itude 1g aligned with the z 
+axis: 
+/g2200/g3034=/g2189/g3038/…ni0009/g3008=/g34370
+0
+1/g3441 (49) 
+The measured vector /g2201/g3034 is the gravity vector rotated into the sensor fram e and computed from the 
+normalized accelerometer measurement: 
+/g2201/g3034=/g2189/g3038/…ni0009/g3020=/g2163/g3038/…ni0009/g3020
+/…ni007C/g2163/g3038/…ni0009/g3020/…ni007C (50) 
+ 
+The reference vector /g2200/g3040 points northwards ( x axis) and downwards ( z axis) from horizontal by the 
+inclination angle /g2012: 
+/g2200/g3040=/g2195/g3038/…ni0009/g3008=/g3437/g1855/g1867/g1871/g2012 
+0
+/g1871/g1861/g1866/g2012 /g3441 (51) 
+The measured vector /g2201/g3040/g3034  is the geomagnetic vector rotated into the sensor frame and computed from 
+the normalized calibrated magnetometer measurement:  
+ 
+/g2201/g3040=/g2195/g3038/…ni0009/g3020=/g2158/g3030,/g3038/…ni0009/g3020
+/g3627/g2158/g3030,/g3038/…ni0009/g3020/g3627 (52) 
+ 
+The /g2244 matrix evaluates to: 
+/g2244/g3015/g3006/g3005 = /g2009/g3034
+/g1737/g1736/g1735/g1871/g3034,/g3053/g1871/g3034,/g3052−/g1871/g3034,/g30510
+/g1871/g3034,/g3052−/g1871/g3034,/g30530/g1871/g3034,/g3051
+−/g1871/g3034,/g30510 −/g1871 /g3034,/g3053/g1871/g3034,/g3052
+0 /g1871 /g3034,/g3051/g1871/g3034,/g3052/g1871/g3034,/g3053/g1740/g1739/g1738+ 
+/g2009/g3040
+/g1737/g1736/g1735/g1871/g3040,/g3051/g1855/g1867/g1871/g2012 + /g1871 /g3040,/g3053/g1871/g1861/g1866/g2012 /g1871 /g3040,/g3052/g1871/g1861/g1866/g2012 /g1871 /g3040,/g3053/g1855/g1867/g1871/g2012 − /g1871 /g3040,/g3051/g1871/g1861/g1866/g2012 −/g1871 /g3040,/g3052/g1855/g1867/g1871/g2012 
+/g1871/g3040,/g3052/g1871/g1861/g1866/g2012 /g1871 /g3040,/g3051/g1855/g1867/g1871/g2012 − /g1871 /g3040,/g3053/g1871/g1861/g1866/g2012 /g1871 /g3040,/g3052/g1855/g1867/g1871/g2012 /g1871 /g3040,/g3051/g1871/g1861/g1866/g2012 + /g1871 /g3040,/g3053/g1855/g1867/g1871/g2012 
+/g1871/g3040,/g3053/g1855/g1867/g1871/g2012 −/g1871/g3040,/g3051/g1871/g1861/g1866/g2012 /g1871/g3040,/g3052/g1855/g1867/g1871/g2012 −/g1871/g3040,/g3051/g1855/g1867/g1871/g2012 −/g1871/g3040,/g3053/g1871/g1861/g1866/g2012 /g1871/g3040,/g3052/g1871/g1861/g1866/g2012 
+−/g1871/g3040,/g3052/g1855/g1867/g1871/g2012 /g1871/g3040,/g3053/g1855/g1867/g1871/g2012 +/g1871/g3040,/g3051/g1871/g1861/g1866/g2012 /g1871/g3040,/g3052/g1871/g1861/g1866/g2012 −/g1871/g3040,/g3051/g1855/g1867/g1871/g2012 +/g1871/g3040,/g3053/g1871/g1861/g1866/g2012 /g1740/g1739/g1738 (53) 
+ 
+  
+Sensor Fusion Kalman Filters 
+Mark Pedley and Michael Stanley, 1, 9/2015  
+ 
+© Freescale Semiconductor, Inc.  3.5.2 Android Coordinate System (ENU) 
+The reference vector /g2200/g3034 is the downwards pointing gravity vector with magn itude 1g aligned in the 
+opposite direction to the upwards pointing z axis: 
+ 
+/g2200/g3034=/g2189/g3038/…ni0009/g3008=/g34370
+0
+−1/g3441 (54) 
+ 
+The measured vector /g2201/g3034 is the gravity vector rotated into the sensor fram e and computed from the 
+normalized negated accelerometer measurement. The n egation occurs because the Android coordinate 
+system is acceleration positive and gravity negativ e. 
+ 
+/g2201/g3034=/g2189/g3038/…ni0009/g3020=−/g2163/g3038/…ni0009/g3020
+/…ni007C/g2163/g3038/…ni0009/g3020/…ni007C (55) 
+The reference vector /g2200/g3040 points northwards ( y axis) and downwards (negative z axis) from horizontal by 
+the inclination angle /g2012: 
+ 
+/g2200/g3040=/g2195/g3038/…ni0009/g3008=/g34370
+/g1855/g1867/g1871/g2012 
+−/g1871/g1861/g1866/g2012 /g3441 (56) 
+ 
+The measured vector /g2201/g3040/g3034  is the geomagnetic vector rotated into the sensor frame and computed from 
+the normalized calibrated magnetometer measurement:  
+ 
+ 
+/g2201/g3040=/g2195/g3038/…ni0009/g3020=/g2158/g3030,/g3038/…ni0009/g3020
+/g3627/g2158/g3030,/g3038/…ni0009/g3020/g3627 (57) 
+  
+The /g2244 matrix evaluates to: 
+ 
+/g2244= /g2009/g1859
+/g1737/g1735−/g1871/g1859,/g1878−/g1871/g1859,/g1877/g1871/g1859,/g18760
+−/g1871/g1859,/g1877/g1871/g1859,/g1878 0−/g1871/g1859,/g1876
+/g1871/g1859,/g1876 0 /g1871/g1859,/g1878−/g1871/g1859,/g1877
+0 −/g1871/g1859,/g1876−/g1871/g1859,/g1877−/g1871/g1859,/g1878/g1740/g1738+ 
+/g2009/g3040
+/g1737/g1736/g1735/g1871/g3040,/g3052/g1855/g1867/g1871/g2012 − /g1871 /g3040,/g3053/g1871/g1861/g1866/g2012 −/g1871 /g3040,/g3052/g1871/g1861/g1866/g2012 − /g1871 /g3040,/g3053/g1855/g1867/g1871/g2012 /g1871 /g3040,/g3051/g1871/g1861/g1866/g2012 /g1871 /g3040,/g3051/g1855/g1867/g1871/g2012 
+−/g1871/g3040,/g3052/g1871/g1861/g1866/g2012 − /g1871 /g3040,/g3053/g1855/g1867/g1871/g2012 −/g1871 /g3040,/g3052/g1855/g1867/g1871/g2012 + /g1871 /g3040,/g3053/g1871/g1861/g1866/g2012 /g1871 /g3040,/g3051/g1855/g1867/g1871/g2012 −/g1871 /g3040,/g3051/g1871/g1861/g1866/g2012 
+/g1871/g3040,/g3051/g1871/g1861/g1866/g2012 /g1871/g3040,/g3051/g1855/g1867/g1871/g2012 /g1871/g3040/g3052 /g1855/g1867/g1871/g2012 +/g1871/g3040,/g3053/g1871/g1861/g1866/g2012 −/g1871/g3040,/g3052/g1871/g1861/g1866/g2012 +/g1871/g3040,/g3053/g1855/g1867/g1871/g2012 
+/g1871/g3040,/g3051/g1855/g1867/g1871/g2012 −/g1871/g3040,/g3051/g1871/g1861/g1866/g2012 −/g1871/g3040,/g3052/g1871/g1861/g1866/g2012 +/g1871/g3040,/g3053/g1855/g1867/g1871/g2012 −/g1871/g3040,/g3052/g1855/g1867/g1871/g2012 −/g1871/g3040,/g3053/g1871/g1861/g1866/g2012 /g1740/g1739/g1738 (58) 
+ 
+ 
+Least Squares Accelerometer and Magnetometer Orient ation Matrix 
+20   Sensor Fusion Kalman Filters 
+Mark  Pedley and Michael Stanley, 1, 9/2015 
+ 
+  © Freescale Semiconductor, Inc. 3.5.3 Windows 8 Coordinate System (ENU) 
+The reference vector /g2200/g3034 is the downwards pointing gravity vector with magn itude 1g aligned in the 
+opposite direction to the upwards pointing z axis: 
+/g2200/g3034=/g2189/g3038/…ni0009/g3008=/g34370
+0
+−1/g3441 (59) 
+The measured vector /g2201/g3034 is the gravity vector rotated into the sensor fram e and computed from the 
+normalized accelerometer measurement: 
+ 
+/g2201/g3034=/g2189/g3038/…ni0009/g3020=/g2163/g3038/…ni0009/g3020
+/…ni007C/g2163/g3038/…ni0009/g3020/…ni007C (60) 
+ 
+The reference vector /g2200/g3040 points northwards ( y axis) and downwards (negative z axis) from horizontal by 
+the inclination angle /g2012: 
+ 
+/g2200/g3040=/g2195/g3038/…ni0009/g3008=/g34370
+/g1855/g1867/g1871/g2012 
+−/g1871/g1861/g1866/g2012 /g3441 (61) 
+ 
+The measured vector /g2201/g3040/g3034  is the geomagnetic vector rotated into the sensor frame and computed from 
+the normalized calibrated magnetometer measurement:  
+ 
+/g2201/g3040=/g2195/g3038/…ni0009/g3020=/g2158/g3030,/g3038/…ni0009/g3020
+/g3627/g2158/g3030,/g3038/…ni0009/g3020/g3627 (62) 
+ 
+The /g2244 matrix evaluates to: 
+ 
+/g2167 = /g2009 /g3034
+/g1737/g1736/g1735−/g1871/g3034,/g3053−/g1871/g3034,/g3052/g1871/g3034,/g30510
+−/g1854/g3034,/g3052/g1871/g3034,/g3053 0−/g1871/g3034,/g3051
+/g1871/g3034,/g3051 0 /g1871 /g3034,/g3053−/g1871/g3034,/g3052
+0 −/g1871 /g3034,/g3051−/g1871/g3034,/g3052−/g1871/g3034,/g3053/g1740/g1739/g1738+ 
+/g2009/g3040
+/g1737/g1736/g1735/g1871/g3040,/g3052/g1855/g1867/g1871/g2012 − /g1871 /g3040,/g3053/g1871/g1861/g1866/g2012 −/g1871 /g3040,/g3052/g1871/g1861/g1866/g2012 − /g1871 /g3040,/g3053/g1855/g1867/g1871/g2012 /g1871 /g3040,/g3051/g1871/g1861/g1866/g2012 /g1871 /g3040,/g3051/g1855/g1867/g1871/g2012 
+−/g1871/g3040,/g3052/g1871/g1861/g1866/g2012 − /g1871 /g3040,/g3053/g1855/g1867/g1871/g2012 −/g1871 /g3040,/g3052/g1855/g1867/g1871/g2012 + /g1871 /g3040,/g3053/g1871/g1861/g1866/g2012 /g1871 /g3040,/g3051/g1855/g1867/g1871/g2012 −/g1871 /g3040,/g3051/g1871/g1861/g1866/g2012 
+/g1871/g3040,/g3051/g1871/g1861/g1866/g2012 /g1871/g3040,/g3051/g1855/g1867/g1871/g2012 /g1871/g3040,/g3052/g1855/g1867/g1871/g2012 +/g1871/g3040,/g3053/g1871/g1861/g1866/g2012 −/g1871/g3040,/g3052/g1871/g1861/g1866/g2012 +/g1871/g3040,/g3053/g1855/g1867/g1871/g2012 
+/g1871/g3040,/g3051/g1855/g1867/g1871/g2012 −/g1871/g3040,/g3051/g1871/g1861/g1866/g2012 /g1871/g3040,/g3053/g1855/g1867/g1871/g2012 −/g1871/g3040,/g3052/g1871/g1861/g1866 /g2012−/g1871/g3040,/g3052/g1855/g1867/g1871/g2012 −/g1871/g3040,/g3053/g1871/g1861/g1866/g2012 /g1740/g1739/g1738 (63) 
+ 
+3.6 Relative Weightings 
+The weightings /g2009/g3034 and /g2009/g3040 applied to the accelerometer and magnetometer esti mates of the gravity and 
+geomagnetic vectors must be inversely proportional to the noise covariances defined in equations (9) 
+and (15) and sum to unity giving: 
+  
+Sensor Fusion Kalman Filters 
+Mark Pedley and Michael Stanley, 1, 9/2015  
+ 
+© Freescale Semiconductor, Inc.  /g2009/g3034=/g3436/g1843/g3031,/g3038+/g1843/g3049/g3003 ,/g3038
+/g1828/g2870/g3440
+/g3435/g1843/g3028,/g3038+ /g1843/g3049/g3008,/g3038/g3439+ /g3436/g1843/g3031,/g3038+ /g1843/g3049/g3003,/g3038
+/g1828/g2870/g3440=/g3629/g3627/g2158/g3030,/g3038/…ni0009/g3020/g3627/g2870
+/g1828/g2870−1/g3629
+/…ni007C/…ni007C/g2163/g3038/…ni0009/g3020/…ni007C/g2870− 1/…ni007C+/g3629/g3627/g2158/g3030,/g3038/…ni0009/g3020/g3627/g2870
+/g1828/g2870− 1/g3629 
+ (64) 
+ 
+/g2009/g3040=/g3435/g1843/g3028,/g3038+/g1843/g3049/g3008 ,/g3038/g3439
+/g3435/g1843/g3028,/g3038+/g1843/g3049/g3008 ,/g3038/g3439+/g3436/g1843/g3031,/g3038+/g1843/g3049/g3003,/g3038
+/g1828/g2870/g3440=/…ni007C/…ni007C/g2163/g3038/…ni0009/g3020/…ni007C/g2870−1/…ni007C
+/…ni007C/…ni007C/g2163/g3038/…ni0009/g3020/…ni007C/g2870−1/…ni007C+/g3629/g3627/g2158/g3030,/g3038/…ni0009/g3020/g3627/g2870
+/g1828/g2870−1/g3629 (65) 
+In the limit of increasingly high accelerometer noi se, the weightings asymptote to /g2009/g3034= 0 and /g2009/g3040= 1 
+(full weighting to the magnetometer measurement) an d, in the limit of increasingly high magnetometer 
+noise, asymptote to /g2009/g3034= 1 and /g2009/g3040= 0 (full weighting to the accelerometer measurement).  
+ 
+Gravity and Geomagnetic Tilt Error Quaternions 
+22   Sensor Fusion Kalman Filters 
+Mark  Pedley and Michael Stanley, 1, 9/2015 
+ 
+  © Freescale Semiconductor, Inc. 4 Gravity and Geomagnetic Tilt Error Quaternions 
+4.1 Introduction 
+The orientation algorithm documented in the previou s section gives the optimum (in a least squares 
+sense) orientation fit to the instantaneous acceler ometer and magnetometer measurements weighted 
+proportionally to the confidence (which is inversel y proportionally to the acceleration and magnetic 
+disturbance noise) in the two readings. This orient ation is termed the six degree of freedom or 6DOF 
+acceleration plus magnetometer orientation estimate  since it is computed from a total of six sensor 
+channels. 
+The 6DOF estimate is used in the Kalman filter to s tabilize the 3DOF gyroscope orientation estimate 
+which is unaffected by acceleration or magnetic dis turbance but which does drift as a result of an 
+imperfectly estimated gyroscope zero rotation rate offset. The combined Kalman filter orientation 
+estimate is termed the nine degree of freedom or 9D OF orientation estimate since it is computed from a  
+total of nine sensor channels. Sensor fusion can th erefore be viewed as attempting to produce an 
+orientation estimate which combines the excellent h igh frequency response of the 3DOF gyroscope 
+estimate with the low drift characteristics of the 6DOF accelerometer plus magnetometer estimate. 
+Section 4.2 first derives the mathematical expressi on for the rotation quaternion that rotates one 
+arbitrary vector onto another with equal magnitude.  
+In sections 4.3 and 4.4, two pairs of vectors are d iscussed: i) the gravity vectors computed from the 
+3DOF gyroscope and 6DOF accelerometer plus magnetom eter orientation estimates and ii) the 
+geomagnetic vectors computed from the 3DOF gyroscop e and 6DOF accelerometer plus 
+magnetometer orientation estimates. The gravity and  geomagnetic rotation quaternions computed 
+between these two pairs of vectors form the measure ment error quaternions used in the Kalman filter. 
+The Kalman filter attempts to drive the two measure ment error quaternions to zero taking proper 
+account of the confidence in the measurements: 
+- If a low value of accelerometer noise (including acceleration as discussed in section 2) is present then 
+the 9DOF Kalman filter estimate of tilt from vertic al is rapidly updated to the 6DOF tilt angle from 
+vertical. If a high value of accelerometer noise is  detected then the gravity tilt estimate from integ rating 
+the gyroscope is used with little or no change. 
+- Similarly, if a low value of magnetometer noise ( including magnetic disturbance as discussed in 
+section 2) is detected then the 9DOF Kalman filter estimate of the tilt angle away from the 
+geomagnetic vector is rapidly updated to the 6DOF t ilt angle away from the geomagnetic vector. If a 
+high value of magnetic disturbance is detected then  the geomagnetic tilt estimate from integrating the  
+gyroscope is used with little or no change. 
+Since the gravity and geomagnetic vectors are not a ligned, except at the north and south geomagnetic 
+poles, the continuous correction of the two tilt an gles relative to these two distinct vectors gives a  
+complete estimate of orientation. 
+ 
+4.2 Rotation Quaternion Between Two Vectors 
+This section therefore derives the expression for t he rotation quaternion /g1869 required to rotate vector /g2203 
+onto vector /g2204 such that: 
+/g2204=/g1869∗/g2203/g1869 (66) 
+  
+Sensor Fusion Kalman Filters 
+Mark Pedley and Michael Stanley, 1, 9/2015  
+ 
+© Freescale Semiconductor, Inc.  The rotation quaternion /g1869 is unchanged if both /g2203 and /g2204/…ni0009are negated: 
+ 
+(−/g2204)=/g1869∗(−/g2203)/g1869 (67) 
+Obviously the norm of both vectors must be the same  since rotation does not change a vector's 
+magnitude. The rotation sign is defined as the Free scale standard which uses a rotation of the 
+coordinate frame rather a rotation of the vector wi thin the coordinate frame. 
+The angle /g2015 between the two vectors can be determined from the  scalar product /g2203./g2204: 
+/g1855/g1867/g1871/g2015 =2/g1855/g1867/g1871 /g2870/g4672/g2015
+2/g4673−1=/g2203./g2204
+/…ni007C/g2203/…ni007C/…ni007C/g2204/…ni007C (68) 
+Rearranging gives the scalar component /g1869/g2868 of the quaternion /…ni0009/g1869: 
+ 
+/g1869/g2868=/g1855/g1867/g1871 /g4672/g2015
+2/g4673=/g34961
+2+/g2203./g2204
+2/…ni007C/g2203/…ni007C/…ni007C/g2204/…ni007C=/g3496/…ni007C/g2203/…ni007C/…ni007C/g2204/…ni007C+/g2203./g2204
+2/…ni007C/g2203/…ni007C/…ni007C/g2204/…ni007C (69) 
+ 
+The rotation axis /g2196/g3549 is calculated from the vector product /g2203 × /g2204 : 
+ 
+/g2196/g3549/g1871/g1861/g1866/g2015 =2/g2196/g3549/g1871/g1861/g1866 /g4672/g2015
+2/g4673/g1855/g1867/g1871 /g4672/g2015
+2/g4673=−/g2203×/g2204
+/…ni007C/g2203/…ni007C/…ni007C/g2204/…ni007C (70) 
+ 
+The minus sign in equation (70) derives from calcul ating the rotation axis for a coordinate system 
+rotation by /g2015 rather than the axis required to rotate the vector  /g2203 onto /g2204 in a fixed coordinate system. 
+Substitution gives the vector component /g2199 = /g4668/g1869 /g2869,/g1869/g2870,/g1869/g2871/g4669 of the quaternion /g1869: 
+ 
+/g2199=/g3437/g1869/g2869
+/g1869/g2870
+/g1869/g2871/g3441=/g2196/g3549/g1871/g1861/g1866 /g4672/g2015
+2/g4673=−/g2203×/g2204
+2/…ni007C/g2203/…ni007C/…ni007C/g2204/…ni007C/g3495/…ni007C/g2203/…ni007C/…ni007C/g2204/…ni007C+/g2203./g2204
+2/…ni007C/g2203/…ni007C/…ni007C/g2204/…ni007C (71) 
+ 
+The required rotation quaternion /g1869 is then: 
+ 
+/g1869=/g1855/g1867/g1871 /g4672/g2015
+2/g4673+/g2196/g3549/g1871/g1861/g1866 /g4672/g2015
+2/g4673=/g3496/…ni007C/g2203/…ni007C/…ni007C/g2204/…ni007C+/g2203./g2204
+2/…ni007C/g2203/…ni007C/…ni007C/g2204/…ni007C−/g2203×/g2204
+2/…ni007C/g2203/…ni007C/…ni007C/g2204/…ni007C/g3495/…ni007C/g2203/…ni007C/…ni007C/g2204/…ni007C+/g2203./g2204
+2/…ni007C/g2203/…ni007C/…ni007C/g2204/…ni007C=/…ni007C/g2203/…ni007C/…ni007C/g2204/…ni007C+/g2203./g2204−/g2203×/g2204
+/g34932/…ni007C/g2203/…ni007C/…ni007C/g2204/…ni007C(/…ni007C/g2203/…ni007C/…ni007C/g2204/…ni007C+/g2203./g2204) (72) 
+ 
+Gravity and Geomagnetic Tilt Error Quaternions 
+24   Sensor Fusion Kalman Filters 
+Mark  Pedley and Michael Stanley, 1, 9/2015 
+ 
+  © Freescale Semiconductor, Inc. Equation (72) correctly gives zero scalar quaternio n component /g1869/g2868 for the 180 o rotation case where 
+/…ni007C/g2203/…ni007C/…ni007C/g2204/…ni007C+ /g2203./g2204 = 0 . 
+ 
+/g1869/g2868=/g1855/g1867/g1871 /g4672/g2015
+2/g4673=/g3496/…ni007C/g2203/…ni007C/…ni007C/g2204/…ni007C+/g2203./g2204
+2/…ni007C/g2203/…ni007C/…ni007C/g2204/…ni007C=0 (73) 
+The vector quaternion component /g2199 is, however, undefined for the 180 o rotation case. Mathematically, 
+/g2203 × /g2204 = /g2777  and /…ni007C/g2203/…ni007C/…ni007C/g2204/…ni007C+ /g2203./g2204 = 0  resulting in zero numerator and denominator. Physi cally, there are an 
+infinite number of rotation axes orthogonal to both  /g2203 and /g2204 when /g2203 and /g2204 are anti-parallel. 
+By inspection, one solution (of the infinite number  available) to the vector component /g2199 for the 180 o 
+rotation case valid for all cases except /g1873/g3051= /g1873/g3052= /g1873/g3053 is: 
+ 
+/g2199=/g3437/g1869/g2869
+/g1869/g2870
+/g1869/g2871/g3441=1
+/g3495/g3435/g1873/g3052−/g1873/g3053/g3439/g2870+(/g1873/g3053−/g1873/g3051)/g2870+/g3435/g1873/g3051−/g1873/g3052/g3439/g2870/g3437/g1873/g3052−/g1873/g3053
+/g1873/g3053−/g1873/g3051
+/g1873/g3051−/g1873/g3052/g3441 (74) 
+ 
+For the special case /g1873/g3051= /g1873/g3052= /g1873/g3053 and 180 o rotation, the solution is: 
+ 
+/g2199=/g3437/g1869/g2869
+/g1869/g2870
+/g1869/g2871/g3441=1
+/…ni221A2/g34371
+−1
+0/g3441 (75) 
+ 
+For the case when the vectors /g2203 and /g2204 have unit norm, equation (72) can be simplified to : 
+ 
+/g1869=/g1855/g1867/g1871 /g4672/g2015
+2/g4673+/g2196/g3549/g1871/g1861/g1866 /g4672/g2015
+2/g4673=1+/g2203./g2204−/g2203×/g2204
+/g34932(1+/g2203./g2204)=1
+/…ni221A2/g4678/…ni221A1+/g2203./g2204−/g2203×/g2204
+/g3493(1+/g2203./g2204)/g4679/…ni0009/g1858/g1867/g1870 /…ni0009/…ni007C/g2203/…ni007C=/…ni007C/g2204/…ni007C=1 (76) 
+ 
+Equation (76) is implemented in function fveqconjgquq  in file orientation.c . 
+ 
+4.3 Gravity Tilt Error Quaternion Measurement 
+The gravity vector /g2189/g3038/…ni0009/g3008 in the global reference frame is defined in sectio n 3.5 for the three coordinate 
+systems. The gravity vector /g2189/g3038/…ni0009/g3020 in the sensor frame for any orientation matrix /g2174 can be computed by 
+multiplying /g2189/g3038/…ni0009/g3008 by the orientation matrix /g2174 to transform from the global to sensor frame: 
+ 
+/g2189/g3038/…ni0009/g3020=/g2174/g2189/g3038/…ni0009/g3008 (77) 
+The rotated gravity vector /g2189/g3038/…ni0009/g3020 in equation (77) can easily be determined from the  z axis column vector 
+of the orientation matrix /g2174: 
+  
+Sensor Fusion Kalman Filters 
+Mark Pedley and Michael Stanley, 1, 9/2015  
+ 
+© Freescale Semiconductor, Inc.   
+/g2189/g3038/…ni0009/g3020=/g4684/g1844/g3051/g3051 /g1844/g3051/g3052 /g1844/g3051/g3053 
+/g1844/g3052/g3051 /g1844/g3052/g3052 /g1844/g3052/g3053 
+/g1844/g3053/g3051 /g1844/g3053/g3052 /g1844/g3053/g3053 /g4685/g34370
+0
+1/g3441=/g4684/g1844/g3051/g3053 
+/g1844/g3052/g3053 
+/g1844/g3053/g3053 /g4685/g1858/g1867/g1870 /…ni0009/g1827/g1857/g1870/g1867/g1871/g1868/g1853/g1855/g1857 //g1840/g1831/g1830  (78) 
+ 
+/g2189/g3038/…ni0009/g3020=/g4684/g1844/g3051/g3051 /g1844/g3051/g3052 /g1844/g3051/g3053 
+/g1844/g3052/g3051 /g1844/g3052/g3052 /g1844/g3052/g3053 
+/g1844/g3053/g3051 /g1844/g3053/g3052 /g1844/g3053/g3053 /g4685/g34370
+0
+−1/g3441=−/g4684/g1844/g3051/g3053 
+/g1844/g3052/g3053 
+/g1844/g3053/g3053 /g4685=/g1858/g1867/g1870 /…ni0009/g1827/g1866/g1856/g1870/g1867/g1861/g1856 ,/g1849/g1861/g1866/g1856/g1867/g1875/g1871 /…ni00098 (79) 
+ 
+The derivation in section 4.2 can now be applied to  determine the quaternion /g1869/g3053/g3034/g3084,/g3038 which rotates the 
+6DOF estimate of the gravity vector onto the Kalman  filter estimate of the gravity vector. At the star t of 
+iteration /g1863, the best orientation estimate is the a priori  estimate obtained by applying the gyroscope 
+sensor measurement to the a posteriori  quaternion /g1869 /g3548/g3038/g2879 and orientation matrix /g2174/g3553/g3038/g2879 estimates from the 
+previous iteration. This is discussed in detail in sections 7 and 8 which document the Kalman filters.  
+With the vector definitions of /g2203/g3034,/g3038 and /g2204/g3034,/g3038 as the 6DOF and a priori  estimates of the gravity vector at  
+iteration /g1863: 
+ 
+/g2203/g3034,/g3038=/g3438/g1844/g3038,/g3051/g3053 /g2874/g3005/g3016/g3007 
+/g1844/g3038,/g3052/g3053 /g2874/g3005/g3016/g3007 
+/g1844/g3038,/g3053/g3053 /g2874/g3005/g3016/g3007 /g3442,/g2204/g3034,/g3038=/g3438/g1844/g3552/g3038,/g3051/g3053 /g2879
+/g1844/g3552/g3038,/g3052/g3053 /g2879
+/g1844/g3552/g3038,/g3053/g3053 /g2879/g3442/…ni0009/g1858/g1867/g1870 /…ni0009/g1827/g1857/g1870/g1867/g1871/g1868/g1853/g1855/g1857 //g1840/g1831/g1830  (80) 
+ 
+/g2203/g3034,/g3038=−/g3438/g1844/g3038,/g3051/g3053 /g2874/g3005/g3016/g3007 
+/g1844/g3038,/g3052/g3053 /g2874/g3005/g3016/g3007 
+/g1844/g3038,/g3053/g3053 /g2874/g3005/g3016/g3007 /g3442,/g2204/g3034,/g3038=−/g3438/g1844/g3552/g3038,/g3051/g3053 /g2879
+/g1844/g3552/g3038,/g3052/g3053 /g2879
+/g1844/g3552/g3038,/g3053/g3053 /g2879/g3442/…ni0009/g1858/g1867/g1870 /…ni0009/g1827/g1866/g1856/g1870/g1867/g1861/g1856 ,/g1849/g1861/g1866/g1856/g1867/g1875/g1871 /…ni00098 (81) 
+then substituting into equation (76) gives the meas ured error quaternion /g1869/g3053/g3034/g3084,/g3038 between the two gravity 
+vector estimates with the sign convention that /g1869/g3053/g3034/g3084,/g3038 rotates the 6DOF gravity vector estimate onto the 
+a priori  gravity vector estimate: 
+/g1869/g3053/g3034/g3084,/g3038=1
+/…ni221A2
+/g1737/g1735/g34951+/g2203/g3034,/g3038./g2204/g3034,/g3038−/g2203/g3034,/g3038×/g2204/g3034,/g3038
+/g3495/g34351+/g2203/g3034,/g3038./g2204/g3034,/g3038/g3439/g1740/g1738/…ni0009 (82) 
+The vector component /g2199/g3053/g3034/g3084,/g3038 of /g1869/g3053/g3034/g3084,/g3038 comprises the first three of the seven rows of the Kalman filter 
+measurement vector /g2208/g3084,/g3038/…ni0009 documented in sections 7 and 8. 
+ 
+4.4 Geomagnetic Tilt Error Quaternion Measurement 
+The geomagnetic vector /g2195/g3038/…ni0009/g3008 in the global reference frame is also defined in s ection 3.5 for the three 
+coordinate systems. The geomagnetic vector /g2195/g3038/…ni0009/g3020 in the sensor frame for any orientation matrix /g2174 can 
+be computed by multiplying by the orientation matri x: 
+ 
+Gyroscope Sensor Model 
+26   Sensor Fusion Kalman Filters 
+Mark  Pedley and Michael Stanley, 1, 9/2015 
+ 
+  © Freescale Semiconductor, Inc. /g2195/g3038/…ni0009/g3020=/g2174/g2195/g3038/…ni0009/g3008 (83) 
+Evaluating equation (83) for the three coordinate s ystems gives: 
+ 
+/g2195/g3038/…ni0009/g3020=/g4684/g1844/g3051/g3051 /g1844/g3051/g3052 /g1844/g3051/g3053 
+/g1844/g3052/g3051 /g1844/g3052/g3052 /g1844/g3052/g3053 
+/g1844/g3053/g3051 /g1844/g3053/g3052 /g1844/g3053/g3053 /g4685/g1828/g3437/g1855/g1867/g1871/g2012 
+0
+/g1871/g1861/g1866/g2012 /g3441=/g1828/g4684/g1844/g3051/g3051 /g1855/g1867/g1871/g2012 +/g1844/g3051/g3053 /g1871/g1861/g1866/g2012 
+/g1844/g3052/g3051 /g1855/g1867/g1871/g2012 +/g1844/g3052/g3053 /g1871/g1861/g1866/g2012 
+/g1844/g3053/g3051 /g1855/g1867/g1871/g2012 +/g1844/g3053/g3053 /g1871/g1861/g1866/g2012 /g4685/…ni0009/g1858/g1867/g1870 /…ni0009/g1827/g1857/g1870/g1867/g1871/g1868/g1853/g1855/g1857 //g1840/g1831/g1830  (84) 
+ 
+/g2195/g3038/…ni0009/g3020=/g4684/g1844/g3051/g3051 /g1844/g3051/g3052 /g1844/g3051/g3053 
+/g1844/g3052/g3051 /g1844/g3052/g3052 /g1844/g3052/g3053 
+/g1844/g3053/g3051 /g1844/g3053/g3052 /g1844/g3053/g3053 /g4685/g1828/g34370
+/g1855/g1867/g1871/g2012 
+−/g1871/g1861/g1866/g2012 /g3441=/g1828/g4684/g1844/g3051/g3052 /g1855/g1867/g1871/g2012 −/g1844/g3051/g3053 /g1871/g1861/g1866/g2012 
+/g1844/g3052/g3052 /g1855/g1867/g1871/g2012 −/g1844/g3052/g3053 /g1871/g1861/g1866/g2012 
+/g1844/g3053/g3052 /g1855/g1867/g1871/g2012 −/g1844/g3053/g3053 /g1871/g1861/g1866/g2012 /g4685/…ni0009/g1858/g1867/g1870 /…ni0009/g1827/g1866/g1856/g1870/g1867/g1861 /g1856,/g1849/g1861/g1866/g1856/g1867/g1875/g1871 /…ni00098 (85) 
+ 
+With the vector definitions of /g2203/g3040,/g3038 and /g2204/g3040,/g3038 as the normalized 6DOF and a priori  estimates of the 
+geomagnetic vector at  filter iteration /g1863: 
+ 
+/g2203/g3040,/g3038=/g3438/g1844/g3038,/g3051/g3051 /g2874/g3005/g3016/g3007 /g1855/g1867/g1871/g2012 +/g1844/g3038,/g3051/g3053 /g2874/g3005/g3016/g3007 /g1871/g1861/g1866/g2012 
+/g1844/g3038,/g3052/g3051 /g2874/g3005/g3016/g3007 /g1855/g1867/g1871/g2012 +/g1844/g3038,/g3052/g3053 /g2874/g3005/g3016/g3007 /g1871/g1861/g1866/g2012 
+/g1844/g3038,/g3053/g3051 /g2874/g3005/g3016/g3007 /g1855/g1867/g1871/g2012 +/g1844/g3038,/g3053/g3053 /g2874/g3005/g3016/g3007 /g1871/g1861/g1866/g2012 /g3442,/g2204/g3040,/g3038=/g3438/g1844/g3552/g3038,/g3051/g3051 /g2879/g1855/g1867/g1871/g2012 +/g1844/g3552/g3038,/g3051/g3053 /g2879/g1871/g1861/g1866/g2012 
+/g1844/g3552/g3038,/g3052/g3051 /g2879/g1855/g1867/g1871/g2012 +/g1844/g3552/g3038,/g3052/g3053 /g2879/g1871/g1861/g1866/g2012 
+/g1844/g3552/g3038,/g3053/g3051 /g2879/g1855/g1867/g1871/g2012 +/g1844/g3552/g3038,/g3053/g3053 /g2879/g1871/g1861/g1866/g2012 /g3442/…ni0009/g1858/g1867/g1870 /…ni0009/g1827/g1857/g1870/g1867/g1871/g1868/g1853/g1855/g1857 //g1840/g1831/g1830  (86) 
+ 
+/g2203/g3040,/g3038=/g3438/g1844/g3038,/g3051/g3052 /g2874/g3005/g3016/g3007 /g1855/g1867/g1871/g2012 −/g1844/g3038,/g3051/g3053 /g2874/g3005/g3016/g3007 /g1871/g1861/g1866/g2012 
+/g1844/g3038,/g3052/g3052 /g2874/g3005/g3016/g3007 /g1855/g1867/g1871/g2012 −/g1844/g3038,/g3052/g3053 /g2874/g3005/g3016/g3007 /g1871/g1861/g1866/g2012 
+/g1844/g3038,/g3053/g3052 /g2874/g3005/g3016/g3007 /g1855/g1867/g1871/g2012 −/g1844/g3038,/g3053/g3053 /g2874/g3005/g3016/g3007 /g1871/g1861/g1866/g2012 /g3442,/g2204/g3040,/g3038=/g3438/g1844/g3552/g3038,/g3051/g3052 /g2879/g1855/g1867/g1871/g2012 −/g1844/g3552/g3038,/g3051/g3053 /g2879/g1871/g1861/g1866/g2012 
+/g1844/g3552/g3038,/g3052/g3052 /g2879/g1855/g1867/g1871/g2012 −/g1844/g3552/g3038,/g3052/g3053 /g2879/g1871/g1861/g1866/g2012 
+/g1844/g3552/g3038,/g3053/g3052 /g2879/g1855/g1867/g1871/g2012 −/g1844/g3552/g3038,/g3053/g3053 /g2879/g1871/g1861/g1866/g2012 /g3442/…ni0009/g1858/g1867/g1870 /…ni0009/g1827/g1866/g1856/g1870/g1867/g1861/g1856 ,/g1849/g1861/g1866/g1856/g1867/g1875/g1871 /…ni00098 (87) 
+ 
+then substituting into equation (76) gives the meas urement error quaternion /g1869/g3053/g3040/g3084,/g3038  between the two 
+geomagnetic vector estimates. The vector component /g2199/g3053/g3040/g3084,/g3038  of /g1869/g3053/g3040/g3084,/g3038  comprises the second three of 
+the seven rows of the Kalman filter measurement vec tor /g2208/g3084,/g3038/…ni0009 documented in section 7. 
+ 
+/g1869/g3053/g3040/g3084,/g3038=1
+/…ni221A2
+/g1737/g1735/g34931+/g2203/g3040,/g3038./g2204/g3040,/g3038−/g2203/g3040,/g3038×/g2204/g3040,/g3038
+/g3495/g34351+/g2203/g3040,/g3038./g2204/g3040,/g3038/g3439/g1740/g1738/…ni0009 (88) 
+5 Gyroscope Sensor Model 
+5.1 Zero Rate Offset Model 
+The model of the gyroscope sensor measurement /g2181/g3038/…ni0009/g3020 (with units deg/s) is: 
+/g2181/g3038/…ni0009/g3020=/g2259/g3038+/g2184/g3038+/g2204/g3026,/g3038 (89) 
+  
+Sensor Fusion Kalman Filters 
+Mark Pedley and Michael Stanley, 1, 9/2015  
+ 
+© Freescale Semiconductor, Inc.  where /g2259/g3038 is the true angular velocity in deg/s and /g2184/g3038 the gyroscope offset vector (deg/s). /g2204/g3026,/g3038 is the 
+additive gyroscope noise vector (deg/s) with covari ance /g2173/g3049/g3026  assumed to be constant over time, 
+uncorrelated between axes (diagonal) and to have th e same value /g1843/g3049/g3026  in each axis: 
+ 
+/g2173/g3049/g3026 =/g1831/g3427/g2204/g3026,/g3038/g2204/g3026,/g3038/g3021/g3431=/g1843/g3049/g3026 /g2165 (90) 
+ 
+The value of /g1843/g3049/g3026  is set for the 6DOF and 9DOF Kalman filter algorit hms in the compile time constants 
+FQVY_9DOF_GBY_KALMAN and  FQVY_6DOF_GY_KALMAN defined in file fusion.h . Increasing the value of 
+/g1843/g3049/g3026,/g3038 gives a lower weighting to the gyroscope orientati on estimate which results in more rapid 
+convergence to the gravity and geomagnetic vector e stimate from the accelerometer and 
+magnetometer but increased sensitivity to accelerat ion and magnetic disturbance noise. 
+ 
+The gyroscope offset /g2184/g3038 vector (units deg/s) is modeled as the random walk : 
+ 
+/g2184/g3038=/g2184/g3038/g2879/g2869+/g2205/g3029,/g3038 (91) 
+ 
+where /g2205/g3029,/g3038 is a zero mean white Gaussian noise vector with un its of deg/s with covariance /g2173/g3050/g3029  
+assumed to be constant over time, uncorrelated betw een axes (diagonal) and to have the same value 
+/g1843/g3050/g3029  in each axis: 
+ 
+/g2173/g3050/g3029 =/g1831/g3427/g2205/g3029,/g3038/g2205/g3029,/g3038/g3021/g3431=/g1843/g3050/g3029 /g2165 (92) 
+ 
+The value of /g1843/g3050/g3029  is set for the 6DOF and 9DOF Kalman filter algorit hms in the compile time constants 
+FQWB_9DOF_GBY_KALMAN  and  FQWB_6DOF_GY_KALMAN  defined in file fusion.h . Increasing the value of 
+/g1843/g3050/g3029  allows more rapid tracking of changes in the zero rate offset, including the initial estimation at 
+power on, but has the drawback of increased sensiti vity to acceleration and magnetic disturbance 
+noise. 
+ 
+The a priori  estimate of the gyroscope offset is simply the a posteriori  estimate from the previous 
+sample since /g2205/g3029,/g3038 is zero mean and white: 
+ 
+/g2184/g3553/g3038/g2879=/g2184/g3553/g3038/g2879/g2869/g2878 (93) 
+ 
+Simple algebra gives /g2184/g3553/g3084,/g3038/g2879 as a function of  /g2184/g3553/g3084,/g3038/g2879/g2869/g2878: 
+ 
+/g2184/g3553/g3084,/g3038/g2879=/g2184/g3553/g3038/g2879−/g2184/g3038=/g2184/g3553/g3038/g2879/g2869/g2878−/g2184/g3038=/g2184/g3553/g3038/g2879/g2869/g2878−/g3435/g2184/g3038/g2879/g2869+/g2205/g3029,/g3038/g3439=/g3435/g2184/g3553/g3038/g2879/g2869/g2878−/g2184/g3038/g2879/g2869/g3439−/g2205/g3029,/g3038 (94) 
+ 
+⇒/g2184/g3553/g3084,/g3038/g2879=/g2184/g3553/g3084,/g3038/g2879/g2869/g2878−/g2205/g3029,/g3038 (95) 
+ 
+ 
+Magnetic Inclination Model 
+28   Sensor Fusion Kalman Filters 
+Mark  Pedley and Michael Stanley, 1, 9/2015 
+ 
+  © Freescale Semiconductor, Inc. 5.2 Angular Velocity Model 
+The a priori estimate  /g2259/g3549/g3038/g2879 of the true angular velocity /g2259/g3038 is computed from the gyroscope reading in the 
+sensor frame /g2181/g3038/…ni0009/g3020 by subtracting off the current a priori  zero rate gyroscope offset /g2184/g3553/g3038/g2879 which equals the 
+a posteriori offset estimate /g2184/g3553/g3038/g2879/g2869/g2878 from the previous iteration: 
+ 
+/g2259/g3549/g3038/g2879=/g3435/g2181/g3038/…ni0009/g3020−/g2184/g3553/g3038/g2879/g3439=/g3435/g2181/g3038/…ni0009/g3020−/g2184/g3553/g3038/g2879/g2869/g2878/g3439 (96) 
+ 
+Substituting for /g2181/g3038/…ni0009/g3020 gives the relationship between the error component s: 
+ 
+/g2259/g3549/g3038/g2879=/g2259/g3038+/g2184/g3038+/g2204/g3026,/g3038−/g2184/g3553/g3038/g2879/g2869/g2878 (97) 
+ 
+By definition: 
+ 
+/g2259/g3549/g3038/g2879=/g2259/g3038+/g2259/g3549/g3084,/g3038/g2879 (98) 
+ 
+ 
+⇒/g2259/g3549/g3084,/g3038/g2879=/g2184/g3038/g2879/g2869+/g2205/g3029,/g3038+/g2204/g3026,/g3038−/g2184/g3553/g3038/g2879/g2869/g2878 (99) 
+ 
+By definition: 
+/g2184/g3553/g3084,/g3038/g2879/g2869/g2878=/g2184/g3553/g3038/g2879/g2869/g2878−/g2184/g3038/g2879/g2869 (100)  
+ 
+ 
+⇒/g2259/g3549/g3084,/g3038/g2879=−/g2184/g3553/g3084,/g3038/g2879/g2869/g2878+/g2205/g3029,/g3038+/g2204/g3026,/g3038=−/g2184/g3553/g3084,/g3038/g2879+/g2205/g3029,/g3038+/g2204/g3026,/g3038 (101)  
+ 
+Equation (101) states that the error in the a priori  estimate of angular velocity comprises three terms : 
+i) The error in the a priori  estimate /g2184/g3553/g3084,/g3038/g2879 of the gyroscope zero rate sensor. The minus sign results from 
+the fact that an over-estimate of the gyroscope zer o rate gyroscope leads to an under-estimate of the 
+angular velocity. 
+ii) The noise /g2205/g3029,/g3038 in the gyroscope zero rate offset drift. 
+iii) The additive gyroscope sensor noise /g2204/g3026,/g3038. 
+The sensor noise term /g2204/g3026,/g3038 can only be separated from the offset drift term /g2205/g3029,/g3038 by observing the 
+gyroscope over a period long enough for the drift t o be measurable. On a sample by sample basis, the 
+gyroscope offset drift term /g2205/g3029,/g3038 is indistinguishable from the gyroscope noise term  /g2204/g3026,/g3038. 
+6 Magnetic Inclination Model 
+6.1 Definition of the Inclination Angle 
+The inclination angle δ is the angle by which the geomagnetic vector dips below horizontal. Broadly 
+speaking, δ has value -90 o at the south geomagnetic pole (the geomagnetic vec tor points upwards), 
+  
+Sensor Fusion Kalman Filters 
+Mark Pedley and Michael Stanley, 1, 9/2015  
+ 
+© Freescale Semiconductor, Inc.  +90 o at the north geomagnetic pole (the geomagnetic vec tor points downwards) and approximately 0 o 
+deg at the equator (where the geomagnetic vector is  horizontal). 
+Matters are further complicated indoors where steel  building framing and steel cabinets can radically 
+change the inclination angle. It cannot be assumed that δ is constant with respect to small position 
+changes at any point on the earth's surface. Not on ly is δ not known but indoors it must be tracked with 
+a time constant of a few seconds. 
+A sample by sample estimate of δ can be computed from the accelerometer and magneto meter vectors 
+but this estimate is extremely noisy as a result of  linear acceleration and magnetic disturbance. The 
+approach taken is to track the inclination angle wi thin the Kalman filter and use the accelerometer an d 
+noise covariances defined in section 2 to define th e confidence in the instantaneous estimate and 
+consequently the relative weighting applied by the Kalman filter. 
+ 
+6.2 Inclination Angle Model 
+The inclination angle /g2012/g3038 (units deg) at iteration /g1863 is modeled as the random walk: 
+/g2012/g3038=/g2012/g3038/g2879/g2869+/g1875/g3083,/g3038 (102)  
+where /g1875/g3083,/g3038 is a zero mean white noise terms (with units of de g) and covariance /g1843/g3050/g3083  (with units of deg 2): 
+ 
+/g1843/g3050/g3083 =/g1831/g3427/g1875/g3083,/g3038/g2870/g3431 (103)  
+ 
+The value of /g1843/g3050/g3083  is set for the 9DOF Kalman filter algorithms in th e compile time constant 
+FQWDLT_9DOF_GBY_KALMAN defined in file fusion.h . Increasing the value of /g1843/g3050/g3083  allows more rapid 
+tracking of changes in the geomagnetic inclination angle /g2012 at the expense of increased sensitivity to 
+acceleration and magnetic disturbance noise. 
+ 
+The a priori  estimate of the inclination angle is simply the a posteriori  estimate from the previous 
+sample since /g1875/g3083,/g3038 is zero mean and white: 
+ 
+/g2012/g4632/g3038/g2879=/g2012/g4632/g3038/g2879/g2869/g2878 (104)  
+ 
+Simple algebra gives /g2012/g4632/g3084,/g3038/g2879 as a function of  /g2012/g4632/g3084,/g3038/g2879/g2869/g2878: 
+ 
+/g2012/g4632/g3084,/g3038/g2879=/g2012/g4632/g3038/g2879−/g2012/g3038=/g2012/g4632/g3038/g2879/g2869/g2878−/g2012/g3038=/g2012/g4632/g3038/g2879/g2869/g2878−/g3435/g2012/g3038/g2879/g2869+/g1875/g3083,/g3038/g3439=/g3435/g2012/g4632/g3038/g2879/g2869/g2878−/g2012/g3038/g2879/g2869/g3439−/g1875/g3083,/g3038 (105)  
+ 
+⇒/g2012/g4632/g3084,/g3038/g2879=/g2012/g4632/g3084,/g3038/g2879/g2869/g2878−/g1875/g3083,/g3038 (106)  
+ 
+6.3 Inclination Angle Error Measurement 
+The inclination angle /g2012 equals 90 o minus the angle between the gravity and geomagneti c vectors in the 
+global frame and can be computed from the scalar pr oduct of the two vectors as: 
+Magnetic Inclination Model 
+30   Sensor Fusion Kalman Filters 
+Mark  Pedley and Michael Stanley, 1, 9/2015 
+ 
+  © Freescale Semiconductor, Inc. /g2189/…ni0009/g3008∙/g2195/…ni0009/g3008=/…ni007C/g2189/…ni0009/g3008/…ni007C∙/…ni007C/g2195/…ni0009/g3008/…ni007C/g1855/g1867/g1871 /g4672/g2024
+2−/g2012/g4673=/…ni007C/g2189/…ni0009/g3008/…ni007C∙/…ni007C/g2195/…ni0009/g3008/…ni007C/g1871/g1861/g1866 /g2012 (107)  
+The scalar product is invariant under arbitrary rot ation /g2174 since rotation changes neither the magnitude 
+of vectors nor the angle between them. 
+/g2189/…ni0009/g3020∙/g2195/…ni0009/g3020=(/g2174/g2189/…ni0009/g3008)∙(/g2174/g2195/…ni0009/g3008)=(/g2174/g2189/…ni0009/g3008)/g3021/g2174/g2195/…ni0009/g3008=(/g2189/…ni0009/g3008)/g3021/g2174/g3021/g2174/g2195/…ni0009/g3008=(/g2189/…ni0009/g3008)/g3021/g2195/…ni0009/g3008=/g2189/…ni0009/g3008∙/g2195/…ni0009/g3008 (108)  
+ 
+The instantaneous (noisy) 6DOF estimate of the incl ination angle /g2012/g3038/g2874/g3005/g3016/g3007  at iteration /g1863 is computed from 
+the accelerometer /g2163/g3038/…ni0009/g3020 and calibrated magnetometer /g2158/g3030,/g3038/…ni0009/g3020 measurements on the assumption of no 
+acceleration and no magnetic disturbance as: 
+ 
+/g2163/g3038/…ni0009/g3020∙/g2158/g3030,/g3038/…ni0009/g3020=/…ni007C/g2163/g3038/…ni0009/g3020/…ni007C/g3627/g2158/g3030,/g3038/…ni0009/g3020/g3627/g1871/g1861/g1866 /g2012/g3038/g2874/g3005/g3016/g3007 /…ni0009/g1858/g1867/g1870 /…ni0009/g1827/g1857/g1870/g1867/g1871/g1868/g1853/g1855/g1857 /…ni0009(/g1840/g1831/g1830 ),/g1849/g1861/g1866/g1856/g1867/g1875/g1871 /…ni0009 (109) 
+ 
+⇒/g2012/g3038/g2874/g3005/g3016/g3007 =/g1871/g1861/g1866 /g2879/g2869/g4678/g2163/g3038/…ni0009/g3020∙/g2158/g3030,/g3038/…ni0009/g3020
+/…ni007C/g2163/g3038/…ni0009/g3020/…ni007C/g3627/g2158/g3030,/g3038/…ni0009/g3020/g3627/g4679/…ni0009/g1858/g1867/g1870 /…ni0009/g1827/g1857/g1870/g1867/g1871/g1868/g1853/g1855/g1857 /…ni0009(/g1840/g1831/g1830 ),/g1849/g1861/g1866/g1856/g1867/g1875/g1871 /…ni00098/…ni0009(110) 
+ 
+/g2163/g3038/…ni0009/g3020∙/g2158/g3030,/g3038/…ni0009/g3020=−/…ni007C/g2163/g3038/…ni0009/g3020/…ni007C/g3627/g2158/g3030,/g3038/…ni0009/g3020/g3627/g1871/g1861/g1866 /g2012/g3038/g2874/g3005/g3016/g3007 /…ni0009/g1858/g1867/g1870 /…ni0009/g1827/g1866/g1856/g1870/g1867/g1861/g1856 /…ni0009 (111) 
+ 
+⇒/g2012/g3038/g2874/g3005/g3016/g3007 =−/g1871/g1861/g1866 /g2879/g2869/g4678/g2163/g3038/…ni0009/g3020∙/g2158/g3030,/g3038/…ni0009/g3020
+/…ni007C/g2163/g3038/…ni0009/g3020/…ni007C/g3627/g2158/g3030,/g3038/…ni0009/g3020/g3627/g4679/…ni0009/g1858/g1867/g1870 /…ni0009/g1827/g1866/g1856/g1870/g1867/g1861/g1856 /…ni0009(112) 
+ 
+The minus sign for the Android coordinate system re sults from Android being acceleration positive 
+whereas the Aerospace and Windows 8 coordinate syst ems are gravity positive. 
+The measurement error /g2012/g3053/g3084,/g3038 in the inclination angle is defined as the differen ce between the a 
+posteriori  Kalman filter and the instantaneous 6DOF measureme nts as: 
+ 
+/g2012/g3053/g3084 ,/g3038=/g2012/g3038/g2879/g2869/g2878−/g2012/g3038/g2874/g3005/g3016/g3007 =/g2012/g3038/g2879−/g2012/g3038/g2874/g3005/g3016/g3007 /…ni0009 (116) 
+/…ni0009(113) 
+ 
+ 
+  
+Sensor Fusion Kalman Filters 
+Mark Pedley and Michael Stanley, 1, 9/2015  
+ 
+© Freescale Semiconductor, Inc.  7 Accelerometer, Magnetometer and Gyroscope Sensor 
+Fusion Kalman Filter 
+7.1 Introduction 
+This section derives the Kalman filter equations fo r the sensor fusion of accelerometer, magnetometer 
+and gyroscope data. It is also commonly referred to  as a 9 degree of freedom or 9DOF sensor fusion 
+model since each of the three sensors has three axe s and provides three degrees of freedom. 
+ 
+7.2 Kalman Filter Process Model 
+The Kalman filter process state vector /g2206/g3038 comprises i) the orientation quaternion /g1869/g3038 ii) the zero rate 
+gyroscope offset /g2184/g3038 and the inclination angle /g2012/g3038 at iteration /g1863: 
+ 
+/g2206/g3038=/…ni0009/g3437/g1869/g3038
+/g2184/g3038
+/g2012/g3038/g3441 (114)  
+ 
+Instead of estimating the process state vector /g2206/g3038 directly, an indirect form of Kalman filter is use d which 
+estimates the error process /g2206/g3084,/g3038 described next.  
+ 
+7.3 Kalman Filter Error Process Model 
+The standard linear Kalman filter model is applied in the indirect Kalman filter by modeling the error  
+process /g2206/g3084,/g3038 as: 
+ 
+/g2206/g3084,/g3038=/g2157/g3038/g2206/g3084,/g3038/g2879/g2869+/g2205/g3038 (115)  
+where /g2206/g3084,/g3038 is the 10x1 vector with components: 
+ 
+/g2206/g3084,/g3038=/g3438/g2199/g3034/g3084 ,/g3038
+/g2199/g3040/g3084 ,/g3038
+/g2184/g3084,/g3038
+/g2012/g3084,/g3038/g3442 (116)  
+and where /g2205/g3038 is a white noise component. 
+ 
+The 3x1 vector /g2199/g3034/g3084,/g3038 is the vector component  of the quaternion /g1869/g3034/g3084,/g3038 which models the error in tilt angle 
+relative to the true gravity vector and the 3x1 vec tor /g2199/g3040/g3084,/g3038 is the vector component  of the quaternion 
+/g1869/g3040/g3084,/g3038 which models the error in tilt angle relative to th e true geomagnetic vector. The state vector 
+orientation quaternion /g1869/g3038 is then related to the estimate /g1869 /g3548/g3038 of the orientation quaternion by: 
+/g1869/g3038=/g1869/g3548/g3038/g3435/g1869/g3034/g3084 ,/g3038/g3439∗/g3435/g1869/g3040/g3084 ,/g3038/g3439∗ (117)  
+Accelerometer, Magnetometer and Gyroscope Sensor Fu sion Kalman Filter 
+32   Sensor Fusion Kalman Filters 
+Mark  Pedley and Michael Stanley, 1, 9/2015 
+ 
+  © Freescale Semiconductor, Inc. Strictly speaking, the order of the corrections on the right hand side of equation (117) is significan t 
+since quaternion multiplication does not, in genera l, commute. In the limit of small orientation 
+corrections, both /g1869/g3034/g3084,/g3038 and /g1869/g3040/g3084,/g3038 approximate the unit quaternion and the multiplica tion does commute. 
+ 
+The 3x1 vector /g2184/g3084,/g3038 (deg/s) models the error in the estimate of the ze ro rate gyroscope offset such that 
+the true gyroscope offset /g2184/g3038 is related to the estimated gyroscope offset /g2184/g3553/g3038 by: 
+/g2184/g3038=/g2184/g3553/g3038−/g2184/g3084,/g3038 (118)  
+The scalar /g2012/g3084,/g3038 (deg) models the error in the estimate of the geoma gnetic inclination angle such that the 
+true geomagnetic inclination angle /g2012/g3038 is related to the estimated geomagnetic inclinatio n angle /g2012/g4632/g3038 by: 
+/g2012/g3038=/g2012/g4632/g3038−/g2012/g3084,/g3038 (119)  
+7.4 A Priori Estimate of the State Vector 
+The a priori  estimate /g1869 /g3548/g3038/g2879 of the orientation quaternion at iteration /g1863 is computed by rotating the a 
+posteriori  orientation estimate by the incremental rotation v ector /g2259/g3549/g3038/g2879/g2012/g1872  during the Kalman filter interval 
+/g2012/g1872 . 
+ 
+The rotation vector during the period /g2012/g1872  equals /g2259/g3549/g3038/g2879/g2012/g1872  where the a priori  angular velocity /g2259/g3549/g3038/g2879 is given by 
+equation (96). With the notation that Δ/g1869(/g2259/g3549/g3038/g2879/g2012/g1872 ) the incremental rotation quaternion modeling the 
+rotation /g2259/g3549/g3038/g2879/g2012/g1872 , the a priori  rotation quaternion /g1869 /g3548/g3038/g2879 is computed from the previous iteration's a posteriori  
+orientation quaternion /g1869 /g3548/g3038/g2879/g2869/g2878 as: 
+/g1869/g3548/g3038/g2879=/g1869/g3548/g3038/g2879/g2869/g2878Δ/g1869(/g2259/g3549/g3038/g2879/g2012/g1872 ) (120)  
+From equation (93) and (104), the a priori  estimates of the gyroscope zero rate offset /g2184/g3553/g3038/g2879 and 
+geomagnetic inclination angle /g2012/g4632/g3038/g2879 are given by: 
+ 
+/g2184/g3553/g3038/g2879=/g2184/g3553/g3038/g2879/g2869/g2878 (121)  
+ 
+/g2012/g4632/g3038/g2879=/g2012/g4632/g3038/g2879/g2869/g2878 (122)  
+ 
+7.5 A Posteriori Error Corrections 
+In the indirect sensor fusion Kalman filter, the er ror vector /g2206/g3549/g3084,/g3038/g2879/g2869/g2879/…ni0009at iteration /g1863 − 1  is explicitly 
+incorporated into the a posteriori  state vector /g2206/g3549/g3038/g2879/g2869/g2878 via the a posteriori  error state vector /g2206/g3549/g3084,/g3038/g2879/g2869/g2878 at 
+iteration /g1863 − 1 . 
+The a posteriori  gravity vector tilt error /g1869 /g3548/g3034/g3084,/g3038/g2878 and geomagnetic vector tilt error /g1869 /g3548/g3040/g3084,/g3038/g2878 quaternions  are 
+applied as corrections to the a priori  orientation quaternion /g1869 /g3548/g3038/g2879 as: 
+/g1869/g3548/g3038/g2878=/g1869/g3548/g3038/g2879/g3435/g1869/g3548/g3034/g3084 ,/g3038/g2878/g3439∗/g3435/g1869/g3548/g3040/g3084 ,/g3038/g2878/g3439∗ (123)  
+  
+Sensor Fusion Kalman Filters 
+Mark Pedley and Michael Stanley, 1, 9/2015  
+ 
+© Freescale Semiconductor, Inc.   
+The gyroscope offset error component /g2184/g3553/g3084,/g3038/g2878 of the error vector /g2206/g3549/g3084,/g3038/g2878 is applied as a subtractive correction 
+to the a priori  gyroscope offset vector /g2184/g3553/g3038/g2879 as: 
+ 
+/g2184/g3553/g3038/g2878=/g2184/g3553/g3038/g2879−/g2184/g3553/g3084,/g3038/g2878 (124)  
+The a posteriori  geomagnetic inclination angle /g2012/g4632/g3038/g2878 is calculated from the a priori  estimate by subtracting 
+the estimate error term /g2012/g4632/g3084,/g3038/g2878: 
+ 
+/g2012/g4632/g3038/g2878=/g2012/g4632/g3038/g2879−/g2012/g4632/g3084,/g3038/g2878 (125)  
+ 
+A consequence of applying the a posteriori  error corrections /g2206/g3549/g3084,/g3038/g2878 to the state vector /g2206/g3549/g3038/g2878 is that the error 
+vector /g2206/g3549/g3084,/g3038/g2879/g2869/g2879 at iteration /g1863 − 1  is uncorrelated with /g2206/g3549/g3084,/g3038/g2879 at iteration /g1863. Since equation (115) also applies 
+to the a priori  estimate /g2206/g3549/g3084,/g3038/g2879 of the process error vector /g2206/g3084,/g3038: 
+/g2206/g3549/g3084,/g3038/g2879/…ni0009=
+/g1737/g1736/g1735/g2199/g3549/g3034/g3084 ,/g3038/g2879
+/g2199/g3549/g3040/g3084,/g3038/g2879
+/g2184/g3553/g3084,/g3038/g2879
+/g2012/g4632/g3084,/g3038/g2879/g1740/g1739/g1738= /g2157/g3038/g2206/g3549/g3084,/g3038/g2879/g2869/g2879/…ni0009+ /g2205/g3038 (126)  
+it follows that the 10x10 linear prediction matrix /g2157/g3038 is zero giving: 
+/g2157/g3038=/g2777 (127)  
+Since the noise component /g2205/g3038 is white and unpredictable, the a priori  error vector /g2206/g3549/g3084,/g3038/g2879 is zero:  
+/g2206/g3549/g3084,/g3038/g2879/…ni0009=
+/g1737/g1736/g1735/g2199/g3549/g3034/g3084 ,/g3038/g2879
+/g2199/g3549/g3040/g3084,/g3038/g2879
+/g2184/g3553/g3084,/g3038/g2879
+/g2012/g4632/g3084,/g3038/g2879/g1740/g1739/g1738= /g2777 (128)  
+The standard Kalman filter calculates the a posteriori  estimate of the state vector /g2206/g3549/g3038/g2878 from a weighted 
+sum of measurement /g2208/g3084,/g3038/…ni0009 and a priori estimate /g2206/g3549/g3038/g2879 of the state vector as: 
+/g2206/g3549/g3038/g2878=/g2206/g3549/g3038/g2879+/g2167/g3038(/g2208/g3038/…ni0009−/g2159/g3038/g2206/g3549/g3038/g2879) (129)  
+where /g2167/g3038 is the Kalman filter gain matrix. 
+The same expression applies in the indirect Kalman filter operating on the error process /g2206/g3549/g3084,/g3038/g2879 and 
+measurement error /g2208/g3084,/g3038/…ni0009: 
+ 
+/g2206/g3549/g3084,/g3038/g2878=/g2206/g3549/g3084,/g3038/g2879+/g2167/g3038/g3435/g2208/g3084,/g3038/…ni0009−/g2159/g3038/g2206/g3549/g3084,/g3038/g2879/g3439 (130)  
+Substituting /g2206/g3549/g3084,/g3038/g2879= /g2777 gives the expression for the a posteriori  error vector estimate /g2206/g3549/g3084,/g3038/g2878 as: 
+ 
+Accelerometer, Magnetometer and Gyroscope Sensor Fu sion Kalman Filter 
+34   Sensor Fusion Kalman Filters 
+Mark  Pedley and Michael Stanley, 1, 9/2015 
+ 
+  © Freescale Semiconductor, Inc. /g2206/g3549/g3084,/g3038/g2878=
+/g1737/g1736/g1735/g2199/g3549/g3034/g3084 ,/g3038/g2878
+/g2199/g3549/g3040/g3084,/g3038/g2878
+/g2184/g3553/g3084,/g3038/g2878
+/g2012/g4632/g3084,/g3038/g2878/g1740/g1739/g1738= /g2167/g3038/g2208/g3084,/g3038/…ni0009 (131)  
+ 
+7.6 Kalman Filter Measurement Error Model 
+The 7x1 measurement error vector /g2208/g3084,/g3038/…ni0009 is defined as: 
+ 
+/g2208/g3084,/g3038/…ni0009=/g3437/g2199/g3053/g3034/g3084 ,/g3038
+/g2199/g3053/g3040/g3084 ,/g3038
+/g2012/g3053/g3084 ,/g3038/g3441 (132)  
+ 
+where the 3x1 vectors /g2199/g3053/g3034/g3084,/g3038 and /g2199/g3053/g3040/g3084,/g3038  are defined in section 4 as the vector components of the 
+gravity and geomagnetic vector tilt error quaternio ns measured between the a priori  and the 6DOF 
+accelerometer plus magnetometer estimates of the gr avity and geomagnetic vectors. 
+The scalar /g2012/g3053/g3084,/g3038 is defined in section 4 as the measured difference  between the a priori  Kalman filter 
+estimate of the inclination angle and the instantan eous 6DOF estimate. 
+The signs of the angle errors are defined such that  a Kalman filter estimate leading the 6DOF estimate  
+results in a positive error. 
+In the conventional manner for Kalman filters, the measurement error vector /g2208/g3084,/g3038/…ni0009 is modeled as being 
+related to the error process vector /g2206/g3084,/g3038 through the 7x10 measurement matrix /g2159/g3038 plus measurement 
+noise /g2204/g3038: 
+/g2208/g3084,/g3038/…ni0009=/g3437/g2199/g3053/g3034/g3084 ,/g3038
+/g2199/g3053/g3040/g3084,/g3038
+/g2012/g3053/g3084 ,/g3038/g3441=/g2159/g3038/g2206/g3084,/g3038+/g2204/g3038=/g2159/g3038/g3438/g2199/g3034/g3084 ,/g3038
+/g2199/g3040/g3084 ,/g3038
+/g2184/g3084,/g3038
+/g2012/g3084,/g3038/g3442+/g3437/g2204/g3044/g3053/g3034 ,/g3038
+/g2204/g3044/g3053/g3040,/g3038
+/g1874/g3083,/g3038/g3441 (133)  
+The measured gravity tilt error quaternion /g1869/g3053/g3034/g3084,/g3038 is related to the true gravity tilt error quaterni on /g1869/g3034/g3084,/g3038 
+by: 
+/g1869/g3053/g3034/g3084 ,/g3038=/g1869/g3034/g3084 ,/g3038/g1869/g3435/g2259/g3549/g3084,/g3038/g2879/g2012/g1872 /g3439/g1869(/g2204/g3038)=/g1869/g3034/g3084 ,/g3038/g1869/g4672/g3435−/g2184/g3553/g3084,/g3038/g2879/g2869/g2878+/g2205/g3029,/g3038+/g2204/g3026,/g3038/g3439/g2012/g1872 /g4673/g1869/g3435/g2204/g3044/g3053/g3034 ,/g3038/g3439 (134)  
+ 
+=/g1869/g3034/g3084 ,/g3038/g1869/g3435−/g2184/g3553/g3084,/g3038/g2879/g2869/g2878/g2012/g1872 /g3439/g1869/g3435/g2205/g3029,/g3038/g2012/g1872 /g3439/g1869/g3435/g2204/g3026,/g3038/g2012/g1872 /g3439/g1869/g3435/g2204/g3044/g3053/g3034 ,/g3038/g3439 (135)  
+ 
+With the assumption that the angular errors and noi se terms are small, the scalar component of the 
+quaternions is near unity and equation (134) can be  written as: 
+/g34191,/g2199/g3053/g3034/g3084 ,/g3038/g3423=/g34191,/g2199/g3034/g3084 ,/g3038/g3423/g34191,/g2199/g3435−/g2184/g3553/g3084,/g3038/g2879/g2869/g2878/g2012/g1872 /g3439/g3423/g34191,/g2199/g3435/g2205/g3029,/g3038/g2012/g1872 /g3439/g3423/g34191,/g2199/g3435/g2204/g3026,/g3038/g2012/g1872 /g3439/g3423/g34191,/g2199/g3435/g2204/g3044/g3053/g3034 ,/g3038/g3439/g3423 (136)  
+The vector components of equation (136) then satisf y, for small rotation angles: 
+  
+Sensor Fusion Kalman Filters 
+Mark Pedley and Michael Stanley, 1, 9/2015  
+ 
+© Freescale Semiconductor, Inc.   
+/g2199/g3053/g3034/g3084 ,/g3038≈/g2199/g3034/g3084 ,/g3038+/g34361
+2/g3440/g3436/g2024/g2012/g1872 
+180 /g3440/g3435−/g2184/g3553/g3084,/g3038/g2879/g2869/g2878+/g2205/g3029,/g3038+/g2204/g3026,/g3038/g3439+/g2204/g3044/g3053/g3034 ,/g3038 (137)  
+ 
+The factor /g4672/g2869
+/g2870/g4673/g4672/g3095/g3083/g3047 
+/g2869/g2876/g2868 /g4673 converts from the native units of deg/s in the gyr o offset error, random walk and 
+noise vectors to the sine of half the subtended ang le (equal to half the subtended angle in radians) 
+used in the quaternion vector. 
+ 
+Similarly for the measured geomagnetic tilt error v ector quaternion /g2199/g3053/g3040/g3084,/g3038 : 
+ 
+/g2199/g3053/g3040/g3084 ,/g3038≈/g2199/g3040/g3084 ,/g3038+/g34361
+2/g3440/g3436/g2024/g2012/g1872 
+180 /g3440/g3435−/g2184/g3553/g3084,/g3038/g2879/g2869/g2878+/g2205/g3029,/g3038+/g2204/g3026,/g3038/g3439+/g2204/g3044/g3040/g3034 ,/g3038 (138)  
+ 
+The measured inclination angle error /g2012/g3053/g3084,/g3038 is purely a function of the accelerometer and magn etometer 
+measurements with no gyro dependence giving: 
+/g2012/g3053/g3084 ,/g3038=/g2012/g3084,/g3038+/g1874/g3083,/g3038 (139)  
+ 
+With the definition of the constant /g2009 as: 
+ 
+/g2009=/g3436/g2024/g2012/g1872 
+180 /g3440 (140)  
+ 
+the 7x10 measurement matrix /g2159/g3038 can then be written as: 
+ 
+/g2159/g3038=
+/g1737/g1736/g1735/g2165/g2871/g2777/g2871/g4672−/g2009
+2/g4673/g2165/g28710
+/g2777/g2871/g2165/g2871/g4672−/g2009
+2/g4673/g2165/g28710
+0 0 0 1 /g1740/g1739/g1738=
+/g1737/g1736/g1736/g1736/g1736/g1736/g1736/g1736/g1736/g1736/g1735100000/g4672−/g2009
+2/g46730 00
+0 1 0 0 0 0 0 /g4672−/g2009
+2/g4673 0 0
+0 0 1 0 0 0 0 0 /g4672−/g2009
+2/g4673 0
+0 0 0 1 0 0 /g4672−/g2009
+2/g4673 0 0 0
+0 0 0 0 1 0 0 /g4672−/g2009
+2/g4673 0 0
+0000010 0/g4672−/g2009
+2/g46730
+0000000 0 01/g1740/g1739/g1739/g1739/g1739/g1739/g1739/g1739/g1739/g1739/g1738
+ (141)  
+ 
+7.7 Process Error Covariance Matrix 
+The 10x10 error process noise covariance matrix /g2173/g3050,/g3038 measures the error covariance in the a priori  
+linear prediction of the error state vector /g2206/g3084,/g3038 from one iteration to the next in equation (126). It is 
+Accelerometer, Magnetometer and Gyroscope Sensor Fu sion Kalman Filter 
+36   Sensor Fusion Kalman Filters 
+Mark  Pedley and Michael Stanley, 1, 9/2015 
+ 
+  © Freescale Semiconductor, Inc. defined as: 
+ 
+/g2173/g3050,/g3038= /g1831[/g2205/g3038/g2205/g3038/g3021]=
+/g1737/g1736/g1736/g1736/g1735/g1831/g4674/g2199/g3549/g3034/g3084,/g3038/g2879/g3435/g2199/g3549/g3034/g3084,/g3038/g2879/g3439/g3021/g4675/g1831/g4674/g2199/g3549/g3034/g3084,/g3038/g2879/g3435/g2199/g3549/g3040/g3084,/g3038/g2879/g3439/g3021/g4675/g1831/g4674/g2199/g3549/g3034/g3084,/g3038/g2879/g3435/g2184/g3553/g3084,/g3038/g2879/g3439/g3021/g4675/g1831/g3427/g2199/g3549/g3034/g3084,/g3038/g2879/g2012/g4632/g3084,/g3038/g2879/g3431
+/g1831/g4674/g2199/g3549/g3040/g3084,/g3038/g2879/g3435/g2199/g3549/g3034/g3084,/g3038/g2879/g3439/g3021/g4675/g1831/g4674/g2199/g3549/g3040/g3084,/g3038/g2879/g3435/g2199/g3549/g3040/g3084,/g3038/g2879/g3439/g3021/g4675/g1831/g4674/g2199/g3549/g3040/g3084,/g3038/g2879/g3435/g2184/g3553/g3084,/g3038/g2879/g3439/g3021/g4675/g1831/g3427/g2199/g3549/g3040/g3084,/g3038/g2879/g2012/g4632/g3084,/g3038/g2879/g3431
+/g1831/g4674/g2184/g3553/g3084,/g3038/g2879/g3435/g2199/g3549/g3034/g3084,/g3038/g2879/g3439/g3021/g4675/g1831/g4674/g2184/g3553/g3084,/g3038/g2879/g3435/g2199/g3549/g3040/g3084,/g3038/g2879/g3439/g3021/g4675/g1831/g4674/g2184/g3553/g3084,/g3038/g2879/g3435/g2184/g3553/g3084,/g3038/g2879/g3439/g3021/g4675/g1831/g3427/g2184/g3553/g3084,/g3038/g2879/g2012/g4632/g3084,/g3038/g2879/g3431
+/g1831/g4674/g2012/g4632/g3084,/g3038/g2879/g3435/g2199/g3549/g3034/g3084 ,/g3038/g2879/g3439/g3021/g4675/g1831/g4674/g2012/g4632/g3084,/g3038/g2879/g3435/g2199/g3549/g3040/g3084 ,/g3038/g2879/g3439/g3021/g4675/g1831/g4674/g2012/g4632/g3084,/g3038/g2879/g3435/g2184/g3553/g3084,/g3038/g2879/g3439/g3021/g4675/g1831/g3427/g2012/g4632/g3084,/g3038/g2879/g2012/g4632/g3084,/g3038/g2879/g3431/g1740/g1739/g1739/g1739/g1738
+ (142)  
+ 
+The gravity tilt error covariance /g1831/g4674/g2199/g3549/g3034/g3084,/g3038/g2879/g3435/g2199/g3549/g3034/g3084,/g3038/g2879/g3439/g3021/g4675 is the covariance of the a priori  estimate of the tilt error 
+between the 6DOF accelerometer plus magnetometer an d the a priori  gyroscope estimates of the 
+gravity vector. 
+ 
+/g1831/g4674/g2199/g3549/g3034/g3084 ,/g3038/g2879/g3435/g2199/g3549/g3034/g3084 ,/g3038/g2879/g3439/g3021/g4675=/g1831/g3428/g2199/g3549/g3034/g3084 ,/g3038/g2879/g2869/g2878+/g4672/g2009
+2/g4673/g3435−/g2184/g3553/g3084,/g3038/g2879/g2869/g2878+/g2205/g3029,/g3038+/g2204/g3026,/g3038/g3439/g4676/g2199/g3549/g3034/g3084 ,/g3038/g2879/g2869/g2878+/g4672/g2009
+2/g4673/g3435−/g2184/g3553/g3084,/g3038/g2879/g2869/g2878+/g2205/g3029,/g3038+/g2204/g3026,/g3038/g3439/g4677/g3021
+/g3432 (143)  
+ 
+=/g2173/g3044/g3282/g3332 /g3044/g3282/g3332 ,/g3038/g2879/g2869/g2878+/g4672/g2009
+2/g4673/g2870
+/g3435/g2173/g3029/g3332/g3029/g3332,/g3038/g2879/g2869/g2878+/g1843/g3049/g3026 /g2165/g2871+/g1843/g3050/g3029 /g2165/g2871/g3439 (144)  
+ 
+where /g2173/g3044/g3282/g3332 /g3044/g3282/g3332 ,/g3038/g2879/g2869/g2878 is approximated by the values at iteration /g1863 − 1  ignoring off-diagonal terms: 
+/g2173/g3044/g3282/g3332 /g3044/g3282/g3332 ,/g3038/g2879/g2869/g2878= /g1831/g4674/g2199/g3549/g3034/g3084,/g3038/g2879/g2869/g2878/g3435/g2199/g3549/g3034/g3084,/g3038/g2879/g2869/g2878/g3439/g3021/g4675≈
+/g1737/g1736/g1735/g3435/g1869/g3548/g3034/g3051/g3084 ,/g3038/g2879/g2869/g2878/g3439/g28700 0
+0 /g3435/g1869 /g3548/g3034/g3052/g3084,/g3038/g2879/g2869/g2878/g3439/g28700
+0 0 /g3435/g1869/g3548/g3034/g3053/g3084 ,/g3038/g2879/g2869/g2878/g3439/g2870
+/g1740/g1739/g1738 (145)  
+ 
+Similarly, the geomagnetic tilt error covariance /g1831/g4674/g2199/g3549/g3040/g3084,/g3038/g2879/g3435/g2199/g3549/g3040/g3084,/g3038/g2879/g3439/g3021/g4675 can be written as: 
+ 
+/g1831/g4674/g2199/g3549/g3040/g3084 ,/g3038/g2879/g3435/g2199/g3549/g3040/g3084 ,/g3038/g2879/g3439/g3021/g4675=/g1831/g3428/g2199/g3549/g3040/g3084 ,/g3038/g2879/g2869/g2878+/g4672/g2009
+2/g4673/g3435−/g2184/g3553/g3084,/g3038/g2879/g2869/g2878+/g2205/g3029,/g3038+/g2204/g3026,/g3038/g3439/g4676/g2199/g3549/g3040/g3084 ,/g3038/g2879/g2869/g2878+/g4672/g2009
+2/g4673/g3435−/g2184/g3553/g3084,/g3038/g2879/g2869/g2878+/g2205/g3029,/g3038+/g2204/g3026,/g3038/g3439/g4677/g3021
+/g3432 (146) 
+  
+=/g2173/g3044/g3288/g3332 /g3044/g3288/g3332 ,/g3038/g2879/g2869/g2878+/g4672/g2009
+2/g4673/g2870
+/g3435/g2173/g3029/g3332/g3029/g3332,/g3038/g2879/g2869/g2878+/g1843/g3049/g3026 /g2165/g2871+/g1843/g3050/g3029 /g2165/g2871/g3439 (147)  
+ 
+where /g2173/g3044/g3288/g3332 /g3044/g3288/g3332 ,/g3038/g2879/g2869/g2878 is approximated by the value of iteration /g1863 − 1  ignoring off-diagonal terms: 
+ 
+  
+Sensor Fusion Kalman Filters 
+Mark Pedley and Michael Stanley, 1, 9/2015  
+ 
+© Freescale Semiconductor, Inc.  /g2173/g3044/g3288/g3332 /g3044/g3288/g3332 ,/g3038/g2879/g2869/g2878= /g1831/g4674/g2199/g3549/g3040/g3084,/g3038/g2879/g2869/g2878/g3435/g2199/g3549/g3040/g3084,/g3038/g2879/g2869/g2878/g3439/g3021/g4675≈
+/g1737/g1736/g1735/g3435/g1869/g3548/g3040/g3051/g3084 ,/g3038/g2879/g2869/g2878/g3439/g28700 0
+0 /g3435/g1869 /g3548/g3040/g3052/g3084,/g3038/g2879/g2869/g2878/g3439/g28700
+0 0 /g3435/g1869/g3548/g3040/g3053/g3084 ,/g3038/g2879/g2869/g2878/g3439/g2870
+/g1740/g1739/g1738 (148)  
+ 
+The gravity tilt and geomagnetic tilt errors are as sumed uncorrelated and the 
+covariance /…ni0009/g1831/g4674/g2199/g3549/g3034/g3084,/g3038/g2879/g3435/g2199/g3549/g3040/g3084,/g3038/g2879/g3439/g3021/g4675 is set to zero.  
+ 
+The covariance /g1831/g4674/g2199/g3549/g3034/g3084,/g3038/g2879/g3435/g2184/g3553/g3084,/g3038/g2879/g3439/g3021/g4675 evaluates to: 
+ 
+/g1831/g4674/g2199/g3549/g3034/g3084 ,/g3038/g2879/g3435/g2184/g3553/g3084,/g3038/g2879/g3439/g3021/g4675=/g1831/g4674/g4676/g2199/g3549/g3034/g3084 ,/g3038/g2879/g2869/g2878+/g4672/g2009
+2/g4673/g3435−/g2184/g3553/g3084,/g3038/g2879/g2869/g2878+/g2205/g3029,/g3038+/g2204/g3026,/g3038/g3439/g4677/g3435/g2184/g3553/g3084,/g3038/g2879/g2869/g2878−/g2205/g3029,/g3038/g3439/g3021/g4675 (149)  
+ 
+=/g2173/g3034/g3332/g3029/g3332,/g3038/g2879/g2869/g2878−/g4672/g2009
+2/g4673/g1843/g3050/g3029 /g2165/g2871 (150)  
+where /g2173/g3034/g3332/g3029/g3332,/g3038/g2879/g2869/g2878 is approximated with the values at iteration /g1863 − 1  ignoring off-diagonal terms: 
+ 
+/g2173/g3034/g3332/g3029/g3332,/g3038/g2879/g2869/g2878=/g1831/g4674/g2199/g3549/g3034/g3084,/g3038/g2879/g2869/g2878/g3435/g2184/g3553/g3084,/g3038/g2879/g2869/g2878/g3439/g3021/g4675≈/g3438/g1869/g3548/g3034/g3051/g3084 ,/g3038/g2879/g2869/g2878/g1854/g3552/g3051/g3084 ,/g3038/g2879/g2869/g28780 0
+0 /g1869/g3548/g3034/g3052/g3084,/g3038/g2879/g2869/g2878/g1854/g3552/g3052/g3084,/g3038/g2879/g2869/g28780
+0 0 /g1869/g3548/g3034/g3053/g3084 ,/g3038/g2879/g2869/g2878/g1854/g3552/g3053/g3084 ,/g3038/g2879/g2869/g2878/g3442 (151)  
+ 
+The covariance /g1831/g4674/g2199/g3549/g3040/g3084,/g3038/g2879/g3435/g2184/g3553/g3084,/g3038/g2879/g3439/g3021/g4675 evaluates to: 
+ 
+/g1831/g4674/g2199/g3549/g3040/g3084 ,/g3038/g2879/g3435/g2184/g3553/g3084,/g3038/g2879/g3439/g3021/g4675=/g1831/g4674/g4676/g2199/g3549/g3040/g3084 ,/g3038/g2879/g2869/g2878+/g4672/g2009
+2/g4673/g3435−/g2184/g3553/g3084,/g3038/g2879/g2869/g2878+/g2205/g3029,/g3038+/g2204/g3026,/g3038/g3439/g4677/g3435/g2184/g3553/g3084,/g3038/g2879/g2869/g2878−/g2205/g3029,/g3038/g3439/g3021/g4675 (152)  
+ 
+=/g2173/g3040/g3332/g3029/g3332,/g3038/g2879/g2869/g2878−/g4672/g2009
+2/g4673/g1843/g3050/g3029 /g2165/g2871 (153)  
+ 
+where /g2173/g3040/g3332/g3029/g3332,/g3038/g2879/g2869/g2878 is approximated with the values at iteration /g1863 − 1  ignoring off-diagonal terms: 
+ 
+/g2173/g3040/g3332/g3029/g3332,/g3038/g2879/g2869/g2878=/g1831/g4674/g2199/g3549/g3040/g3084,/g3038/g2879/g2869/g2878/g3435/g2184/g3553/g3084,/g3038/g2879/g2869/g2878/g3439/g3021/g4675≈/g3438/g1869/g3548/g3040/g3051/g3084 ,/g3038/g2879/g2869/g2878/g1854/g3552/g3051/g3084 ,/g3038/g2879/g2869/g28780 0
+0 /g1869/g3548/g3040/g3052/g3084,/g3038/g2879/g2869/g2878/g1854/g3552/g3052/g3084,/g3038/g2879/g2869/g28780
+0 0 /g1869/g3548/g3040/g3053/g3084 ,/g3038/g2879/g2869/g2878/g1854/g3552/g3053/g3084 ,/g3038/g2879/g2869/g2878/g3442 (154)  
+ 
+The covariance /g1831/g4674/g2184/g3553/g3084,/g3038/g2879/g3435/g2184/g3553/g3084,/g3038/g2879/g3439/g3021/g4675 evaluates to: 
+ 
+Accelerometer, Magnetometer and Gyroscope Sensor Fu sion Kalman Filter 
+38   Sensor Fusion Kalman Filters 
+Mark  Pedley and Michael Stanley, 1, 9/2015 
+ 
+  © Freescale Semiconductor, Inc. /g1831/g4674/g2184/g3553/g3084,/g3038/g2879/g3435/g2184/g3553/g3084,/g3038/g2879/g3439/g3021/g4675=/g1831/g4674/g3435/g2184/g3553/g3084,/g3038/g2879/g2869/g2878−/g2205/g3029,/g3038/g3439/g3435/g2184/g3553/g3084,/g3038/g2879/g2869/g2878−/g2205/g3029,/g3038/g3439/g3021/g4675=/g2173/g3029/g3332/g3029/g3332,/g3038/g2879/g2869/g2878+/g1843/g3050/g3029 /g2165/g2871 (155)  
+where /g2173/g3029/g3332/g3029/g3332,/g3038/g2879/g2869/g2878 is approximated with the values at iteration /g1863 − 1  ignoring off-diagonal terms 
+ 
+/g2173/g3029/g3332/g3029/g3332,/g3038/g2879/g2869/g2878= /g1831/g4674/g2184/g3553/g3084,/g3038/g2879/g2869/g2878/g3435/g2184/g3553/g3084,/g3038/g2879/g2869/g2878/g3439/g3021/g4675≈
+/g1737/g1736/g1735/g3435/g1854/g3552/g3051/g3084 ,/g3038/g2879/g2869/g2878/g3439/g28700 0
+0 /g3435/g1854/g3552/g3052/g3084,/g3038/g2879/g2869/g2878/g3439/g28700
+0 0 /g3435/g1854/g3552/g3053/g3084 ,/g3038/g2879/g2869/g2878/g3439/g2870
+/g1740/g1739/g1738
+ (156)  
+ 
+The covariance /g1831/g3427/g2012/g4632/g3084,/g3038/g2879/g2012/g4632/g3084,/g3038/g2879/g3431 evaluates to: 
+ 
+/g1831/g3427/g2012/g4632/g3084,/g3038/g2879/g2012/g4632/g3084,/g3038/g2879/g3431=/g1831/g3427/g3435/g2012/g4632/g3084,/g3038/g2879/g2869/g2878−/g1875/g3083,/g3038/g3439/g3435/g2012/g4632/g3084,/g3038/g2879/g2869/g2878−/g1875/g3083,/g3038/g3439/g3431=/g1843/g3083/g3332/g3083/g3332,/g3038/g2879/g2869/g2878+/g1843/g3050/g3083  (157)  
+where: 
+/g1843/g3083/g3332/g3083/g3332,/g3038/g2879/g2869/g2878=/g1831/g4674/g3435/g2012/g4632/g3084,/g3038/g2879/g2869/g2878/g3439/g2870/g4675≈/g3435/g2012/g4632/g3084,/g3038/g2879/g2869/g2878/g3439/g2870 (158)  
+ 
+The covariance /g1831/g4674/g2184/g3553/g3084,/g3038/g2879/g2012/g4632/g3084,/g3038/g2879/g3021/g4675 evaluates to: 
+ 
+/g1831/g4674/g2184/g3553/g3084,/g3038/g2879/g2012/g4632/g3084,/g3038/g2879/g3021/g4675=/g1831/g4674/g3435/g2184/g3553/g3084,/g3038/g2879/g2869/g2878−/g2205/g3029,/g3038/g3439/g3435/g2012/g4632/g3084,/g3038/g2879/g2869/g2878−/g1875/g3083,/g3038/g3439/g3021/g4675=/g2777 (159)  
+ 
+7.8 Measurement Error Covariance Matrix 
+The measurement noise vector /g2204/g3038 has size 7x1 with covariance matrix defined as: 
+ 
+/g2173/g3049,/g3038=/g1831[/g2204/g3038/g2204/g3038/g3021]=/g1831/g4686/g3437/g2204/g3044/g3053/g3034 ,/g3038
+/g2204/g3044/g3053/g3040,/g3038
+/g1874/g3083,/g3038/g3441/g3437/g2204/g3044/g3053/g3034 ,/g3038
+/g2204/g3044/g3053/g3040,/g3038
+/g1874/g3083,/g3038/g3441/g3021
+/g4687 (160)  
+ 
+=
+/g1737/g1736/g1735/g1831/g4674/g2204/g3044/g3053/g3034 ,/g3038/g3435/g2204/g3044/g3053/g3034 ,/g3038/g3439/g3021/g4675/g1831/g4674/g2204/g3044/g3053/g3034 ,/g3038/g3435/g2204/g3044/g3053/g3040 ,/g3038/g3439/g3021/g4675/g1831/g3427/g2204/g3044/g3053/g3034 ,/g3038/g1874/g3083,/g3038/g3431
+/g1831/g4674/g2204/g3044/g3053/g3040,/g3038/g3435/g2204/g3044/g3053/g3034,/g3038/g3439/g3021/g4675/g1831/g4674/g2204/g3044/g3053/g3040,/g3038/g3435/g2204/g3044/g3053/g3040,/g3038/g3439/g3021/g4675/g1831/g3427/g2204/g3044/g3053/g3040,/g3038/g1874/g3083,/g3038/g3431
+/g1831/g4674/g1874/g3083,/g3038/g3435/g2204/g3044/g3053/g3034 ,/g3038/g3439/g3021/g4675/g1831/g4674/g1874/g3083,/g3038/g3435/g2204/g3044/g3053/g3040 ,/g3038/g3439/g3021/g4675/g1831/g4674/g3435/g1874/g3083,/g3038/g3439/g2870/g4675/g1740/g1739/g1738 (161)  
+ 
+The measurement quaternion vector /g2199/g3053/g3034/g3084,/g3038 is proportional to the sine of half  the rotation angle between 
+the a priori  and 6DOF measurements of the gravity vector. Its n oise term /g2204/g3044/g3053/g3034,/g3038 therefore includes i) the 
+accelerometer sensor noise plus acceleration noise and ii) the gyroscope sensor and zero rate offset 
+noise. It is unaffected by magnetometer noise and m agnetic disturbance.  
+  
+Sensor Fusion Kalman Filters 
+Mark Pedley and Michael Stanley, 1, 9/2015  
+ 
+© Freescale Semiconductor, Inc.   
+Similarly, the measurement quaternion vector /g2199/g3053/g3040/g3084,/g3038  is the sine of half  the rotation angle between the a 
+priori  and 6DOF measurements of the geomagnetic vector an d its noise term /g2204/g3044/g3053/g3040,/g3038  therefore includes 
+i) the magnetometer sensor noise plus magnetic dist urbance noise and ii) the gyroscope sensor and 
+zero rate offset noise. It is unaffected by acceler ometer noise and acceleration. 
+ 
+The noise in the measurement /g2012/g3053/g3084,/g3038 of the geomagnetic inclination angle has no depende nce on the 
+gyroscope sensor but its noise term /g1874/g3083,/g3038 is the sum of i) the accelerometer sensor noise pl us 
+acceleration noise and ii) the magnetometer sensor noise plus magnetic disturbance noise. 
+ 
+With a small angle approximation and, remembering t hat the native units of the vector quaternion are 
+radians and the native units of the gyroscope are d eg/s, then the terms in /g2173/g3049,/g3038 are: 
+ 
+/g1831/g4674/g2204/g3044/g3053/g3034 ,/g3038/g3435/g2204/g3044/g3053/g3034 ,/g3038/g3439/g3021/g4675=/g4682/g34361
+4/g3440/g3435/g1843/g3049/g3008 ,/g3038+/g1843/g3028,/g3038/g3439+/g4678/g2009/g2870
+4/g4679/g3435/g1843/g3049/g3026 ,/g3038+/g1843/g3050/g3029 ,/g3038/g3439/g4683/g2165/g2871 (162)  
+ 
+/g1831/g4674/g2204/g3044/g3053/g3040 ,/g3038/g3435/g2204/g3044/g3053/g3040 ,/g3038/g3439/g3021/g4675=/g4682/g34361
+4/g1828/g2870/g3440/g3435/g1843/g3049/g3003 ,/g3038+/g1843/g3031,/g3038/g3439+/g4678/g2009/g2870
+4/g4679/g3435/g1843/g3049/g3026 ,/g3038+/g1843/g3050/g3029 ,/g3038/g3439/g4683/g2165/g2871 (163)  
+ 
+/g1831/g4674/g3435/g1874/g3083,/g3038/g3439/g2870/g4675=/g3436180 
+/g2024/g3440/g2870
+/g4678/g3435/g1843/g3049/g3008 ,/g3038+/g1843/g3028,/g3038/g3439+/g3436/g1843/g3049/g3003 ,/g3038+/g1843/g3031,/g3038
+/g1828/g2870/g3440/g4679 (164)  
+ 
+The remaining terms are assumed to be uncorrelated:  
+/g1831/g4674/g2204/g3044/g3053/g3034 ,/g3038/g3435/g2204/g3044/g3053/g3034 ,/g3038/g3439/g3021/g4675=/g1831/g3427/g2204/g3044/g3053/g3034 ,/g3038/g1874/g3083,/g3038/g3431=/g1831/g3427/g2204/g3040/g3053/g3034 ,/g3038/g1874/g3083,/g3038/g3431=/g2777 (165)  
+ 
+7.9 A Priori Covariance Matrix Update 
+The Kalman filter updates the a priori  covariance matrix /g2172/g3038/g2879 as: 
+/g2172/g3038/g2879=/g2157/g3038/g2172/g3038/g2879/g2869/g2878/g2157/g3038/g3021+/g2173/g3050,/g3038 (166)  
+Since the linear prediction matrix /g2157/g3038 is zero, /g2172/g3038/g2879 need not be updated and simply equals the process 
+error covariance /g2173/g3050,/g3038: 
+/g2172/g3038/g2879=/g2173/g3050,/g3038 (167)  
+7.10 A Posteriori Covariance Matrix Update 
+The Kalman filter updates the a posteriori  covariance matrix /g2172/g3038/g2878 as: 
+ 
+Accelerometer, Magnetometer and Gyroscope Sensor Fu sion Kalman Filter 
+40   Sensor Fusion Kalman Filters 
+Mark  Pedley and Michael Stanley, 1, 9/2015 
+ 
+  © Freescale Semiconductor, Inc. /g2172/g3038/g2878=(/g2165−/g2167/g3038/g2159/g3038)/g2172/g3038/g2879 (168)  
+The only purpose of /g2172/g3038/g2878 is to allow the calculation of /g2172/g3038/g2879 in equation (166) but since /g2172/g3038/g2878 is multiplied by 
+/g2157/g3038= /g2777, there is no need to calculate /g2172/g3038/g2878. The a priori  and a posteriori  covariance matrices /g2172/g3038/g2879 and /g2172/g3038/g2878 
+are therefore both eliminated from this form of Kal man filter. 
+ 
+7.11 Kalman Filter Gain Matrix Update 
+The Kalman filter updates the 10x7 Kalman filter ga in matrix /g2167/g3038/…ni0009as: 
+ 
+/g2167/g3038=/g2172/g3038/g2879/g2159/g3038/g3021/g3435/g2159/g3038/g2172/g3038/g2879/g2159/g3038/g3021+/g2173/g3049,/g3038/g3439/g2879/g2869 (169)  
+ 
+Since /g2172/g3038/g2879= /g2173/g3050,/g3038 this simplifies to: 
+ 
+/g2167/g3038=/g2173/g3050,/g3038/g2159/g3038/g3021/g3435/g2159/g3038/g2173/g3050,/g3038/g2159/g3038/g3021+/g2173/g3049,/g3038/g3439/g2879/g2869 (170)  
+ 
+7.12 Compile Time Constants 
+These compile time constants are implemented with # define in file fusion.h.  
+ 
+The constants FQVY_9DOF_GBY_KALMAN , FQWB_9DOF_GBY_KALMAN  and FQWDLT_9DOF_GBY_KALMAN  define 
+covariances /g1843/g3049/g3026 , /g1843/g3050/g3029  and /g1843/g3050/g3083  respectively. 
+ 
+The constants FGYRO_OFFSET_MIN_9DOF_GBY_KALMAN  and FGYRO_OFFSET_MIN_9DOF_GBY_KALMAN  limit the 
+permissible range of the gyroscope zero rate offset  /g2184/g3038. The default range is -5 deg/s to +5 deg/s. 
+ 
+ 
+ 
+  
+Sensor Fusion Kalman Filters 
+Mark Pedley and Michael Stanley, 1, 9/2015  
+ 
+© Freescale Semiconductor, Inc.  8 Accelerometer and Gyroscope Sensor Fusion Kalman 
+Filter 
+8.1 Introduction 
+This section derives the Kalman filter equations fo r the sensor fusion of accelerometer and gyroscope 
+data. It is also commonly referred to as a 6 degree  of freedom or 6DOF sensor fusion model since each 
+of the two sensors has three axes and provides thre e degrees of freedom. This Kalman filter is a 
+simplified version of the 9DOF filter described in section 7. 
+ 
+8.2 Kalman Filter Process Model 
+The Kalman filter process state vector /g2206/g3038 comprises i) the orientation quaternion /g1869/g3038 ii) the zero rate 
+gyroscope offset /g2184/g3038 and the inclination angle /g2012/g3038 at iteration /g1863: 
+ 
+/g2206/g3038=/…ni0009/g4672/g1869/g3038
+/g2184/g3038/g4673 (171)  
+ 
+8.3 Kalman Filter Error Process Model 
+The Kalman filter model of the error process /g2206/g3084,/g3038 is: 
+/g2206/g3084,/g3038=/g2157/g3038/g2206/g3084,/g3038/g2879/g2869+/g2205/g3038 (172)  
+where /g2206/g3084,/g3038 is the 6x1 vector with components: 
+ 
+/g2206/g3084,/g3038=/g3436/g2199/g3034/g3084 ,/g3038
+/g2184/g3084,/g3038/g3440 (173)  
+and where /g2205/g3038 is a white noise component. 
+ 
+The 3x1 vector /g2199/g3034/g3084,/g3038 is the vector component  of the quaternion /g1869/g3034/g3084,/g3038 which models the error in tilt angle 
+relative to the gravity vector. The 3x1 vector /g2184/g3084,/g3038 (deg/s) models the error in the estimate of the ze ro 
+rate gyroscope offset. 
+ 
+The state vector orientation quaternion /g1869/g3038 is then related to the estimate /g1869 /g3548/g3038 of the orientation 
+quaternion by: 
+/g1869/g3038=/g1869/g3548/g3038/g3435/g1869/g3034/g3084 ,/g3038/g3439∗ (174)  
+8.4 A Priori Estimate of the State Vector 
+The a priori  rotation quaternion /g1869 /g3548/g3038/g2879 is computed from the previous iteration's a posteriori  orientation 
+quaternion /g1869 /g3548/g3038/g2879/g2869/g2878 as: 
+/g1869/g3548/g3038/g2879=/g1869/g3548/g3038/g2879/g2869/g2878Δ/g1869(/g2259/g3549/g3038/g2879/g2012/g1872 ) (175)  
+Accelerometer and Gyroscope Sensor Fusion Kalman Fi lter 
+42   Sensor Fusion Kalman Filters 
+Mark  Pedley and Michael Stanley, 1, 9/2015 
+ 
+  © Freescale Semiconductor, Inc. The a priori  estimate of the gyroscope zero rate offset /g2184/g3553/g3038/g2879 is: 
+/g2184/g3553/g3038/g2879=/g2184/g3553/g3038/g2879/g2869/g2878 (176)  
+8.5 A Posteriori Error Corrections 
+The a posteriori  gravity vector tilt error /g1869 /g3548/g3034/g3084,/g3038/g2878 quaternion  is applied as a correction to the a priori  
+orientation quaternion /g1869 /g3548/g3038/g2879 as: 
+/g1869/g3548/g3038/g2878=/g1869/g3548/g3038/g2879/g3435/g1869/g3548/g3034/g3084 ,/g3038/g2878/g3439∗ (177)  
+ 
+The gyroscope offset error component /g2184/g3553/g3084,/g3038/g2878 of the error vector /g2206/g3549/g3084,/g3038/g2878 is applied as a subtractive correction 
+to the a priori  gyroscope offset vector /g2184/g3553/g3038/g2879 as: 
+ 
+/g2184/g3553/g3038/g2878=/g2184/g3553/g3038/g2879−/g2184/g3553/g3084,/g3038/g2878 (178)  
+Since the a posteriori error corrections are applie d to the state vector /g2206/g3549/g3038/g2878, the linear prediction matrix 
+/g2157/g3038= /g2777. 
+ 
+The a posteriori  error vector is estimated from the measurement err or /g2208/g3084,/g3038/…ni0009 as: 
+/g2206/g3549/g3084,/g3038/g2878=/g4678/g2199/g3549/g3034/g3084 ,/g3038/g2878
+/g2184/g3553/g3084,/g3038/g2878/g4679=/g2167/g3038/g2208/g3084,/g3038/…ni0009 (179)  
+ 
+8.6 Kalman Filter Measurement Error Model 
+The 3x1 measurement error vector /g2208/g3084,/g3038/…ni0009 is defined in terms of the gravity tilt error quate rnion discussed 
+in section 4 as: 
+/g2208/g3084,/g3038/…ni0009=/g2199/g3053/g3034/g3084 ,/g3038 (180)  
+The measurement error vector /g2208/g3084,/g3038/…ni0009 is modeled as being related to the error process v ector /g2206/g3084,/g3038 through 
+the 3x6 measurement matrix /g2159/g3038 plus measurement noise /g2204/g3038: 
+/g2208/g3084,/g3038/…ni0009=/g2199/g3053/g3034/g3084 ,/g3038=/g2159/g3038/g2206/g3084,/g3038+/g2204/g3038=/g2159/g3038/g3436/g2199/g3034/g3084 ,/g3038
+/g2184/g3084,/g3038/g3440+/g2204/g3044/g3053/g3034 ,/g3038 (181)  
+where: 
+ 
+/g2159/g3038= /g4672/g2165/g2871/g4672−/g2009
+2/g4673/g2165/g2871/g4673 =
+/g1737/g1736/g1736/g1735100/g4672−/g2009
+2/g46730 0
+0 1 0 0 /g4672−/g2009
+2/g4673 0
+0010 0/g4672−/g2009
+2/g4673/g1740/g1739/g1739/g1738
+ (182)  
+ 
+  
+Sensor Fusion Kalman Filters 
+Mark Pedley and Michael Stanley, 1, 9/2015  
+ 
+© Freescale Semiconductor, Inc.  8.7 Process Error Covariance Matrix 
+The 6x6 error process noise covariance matrix /g2173/g3050,/g3038 is defined as: 
+ 
+/g2173/g3050,/g3038=/g1831[/g2205/g3038/g2205/g3038/g3021]=/g4684/g1831/g4674/g2199/g3549/g3034/g3084,/g3038/g2879/g3435/g2199/g3549/g3034/g3084,/g3038/g2879/g3439/g3021/g4675/g1831/g4674/g2199/g3549/g3034/g3084,/g3038/g2879/g3435/g2184/g3553/g3084,/g3038/g2879/g3439/g3021/g4675
+/g1831/g4674/g2184/g3553/g3084,/g3038/g2879/g3435/g2199/g3549/g3034/g3084 ,/g3038/g2879/g3439/g3021/g4675/g1831/g4674/g2184/g3553/g3084,/g3038/g2879/g3435/g2184/g3553/g3084,/g3038/g2879/g3439/g3021/g4675/g4685 (183)  
+ 
+where: 
+ 
+/g1831/g4674/g2199/g3549/g3034/g3084 ,/g3038/g2879/g3435/g2199/g3549/g3034/g3084 ,/g3038/g2879/g3439/g3021/g4675=/g2173/g3044/g3282/g3332 /g3044/g3282/g3332 ,/g3038/g2879/g2869/g2878+/g4672/g2009
+2/g4673/g2870
+/g3435/g2173/g3029/g3332/g3029/g3332,/g3038/g2879/g2869/g2878+/g1843/g3049/g3026 /g2165/g2871+/g1843/g3050/g3029 /g2165/g2871/g3439 (184)  
+ 
+/g1831/g4674/g2199/g3549/g3034/g3084 ,/g3038/g2879/g3435/g2184/g3553/g3084,/g3038/g2879/g3439/g3021/g4675=/g2173/g3034/g3332/g3029/g3332,/g3038/g2879/g2869/g2878−/g4672/g2009
+2/g4673/g1843/g3050/g3029 /g2165/g2871 (185)  
+ 
+/g1831/g4674/g2184/g3553/g3084,/g3038/g2879/g3435/g2184/g3553/g3084,/g3038/g2879/g3439/g3021/g4675=/g1831/g4674/g3435/g2184/g3553/g3084,/g3038/g2879/g2869/g2878−/g2205/g3029,/g3038/g3439/g3435/g2184/g3553/g3084,/g3038/g2879/g2869/g2878−/g2205/g3029,/g3038/g3439/g3021/g4675=/g2173/g3029/g3332/g3029/g3332,/g3038/g2879/g2869/g2878+/g1843/g3050/g3029 /g2165/g2871 (186)  
+ 
+8.8 Measurement Error Covariance Matrix 
+The measurement noise vector /g2204/g3038 has size 3x1 with covariance matrix defined as: 
+ 
+/g2173/g3049,/g3038=/g1831[/g2204/g3038/g2204/g3038/g3021]=/g1831/g4674/g2204/g3044/g3053/g3034 ,/g3038/g3435/g2204/g3044/g3053/g3034 ,/g3038/g3439/g3021/g4675 (187)  
+where: 
+/g1831/g4674/g2204/g3044/g3053/g3034 ,/g3038/g3435/g2204/g3044/g3053/g3034 ,/g3038/g3439/g3021/g4675=/g4682/g34361
+4/g3440/g3435/g1843/g3049/g3008 ,/g3038+/g1843/g3028,/g3038/g3439+/g4678/g2009/g2870
+4/g4679/g3435/g1843/g3049/g3026 ,/g3038+/g1843/g3050/g3029 ,/g3038/g3439/g4683/g2165/g2871 (188)  
+ 
+8.9 A Priori Covariance Matrix Update 
+The Kalman filter updates the a priori  covariance matrix /g2172/g3038/g2879 as: 
+ 
+/g2172/g3038/g2879=/g2157/g3038/g2172/g3038/g2879/g2869/g2878/g2157/g3038/g3021+/g2173/g3050,/g3038 (189)  
+Since the linear prediction matrix /g2157/g3038 is zero, /g2172/g3038/g2879 need not be updated and simply equals the process 
+error covariance /g2173/g3050,/g3038: 
+ 
+/g2172/g3038/g2879=/g2173/g3050,/g3038 (190)  
+References 
+44   Sensor Fusion Kalman Filters 
+Mark  Pedley and Michael Stanley, 1, 9/2015 
+ 
+  © Freescale Semiconductor, Inc.  
+8.10 A Posteriori Covariance Matrix Update 
+The Kalman filter updates the a posteriori  covariance matrix /g2172/g3038/g2878 as: 
+ 
+/g2172/g3038/g2878=(/g2165−/g2167/g3038/g2159/g3038)/g2172/g3038/g2879 (191)  
+The only purpose of /g2172/g3038/g2878 is to allow the calculation of /g2172/g3038/g2879 in equation (189) but since /g2172/g3038/g2878 it is multiplied by 
+/g2157/g3038= /g2777, there is no need to calculate /g2172/g3038/g2878. 
+ 
+8.11 Kalman Filter Gain Matrix Update 
+The Kalman filter updates the 6x3 Kalman filter gai n matrix /g2167/g3038/…ni0009as: 
+ 
+/g2167/g3038=/g2173/g3050,/g3038/g2159/g3038/g3021/g3435/g2159/g3038/g2173/g3050,/g3038/g2159/g3038/g3021+/g2173/g3049,/g3038/g3439/g2879/g2869 (192)  
+ 
+8.12 Compile Time Constants 
+The compile time constants below are implemented wi th #define in file fusion.h.  
+ 
+The constants FQVY_6DOF_GY_KALMAN  and FQWB_6DOF_GY_KALMAN define the covariances /g1843/g3049/g3026  and /g1843/g3050/g3029 . 
+9 References 
+1. Freescale Application Note (AN5018) Basic Kalman Filter Theory  
+10 Revision History 
+Table 2. Revision history 
+Rev. No. Date Description 
+1 9/2015 Initial release 
+ 
+ 
+Sensor Fusion Kalman Filters 
+Mark Pedley and Michael Stanley, 1, 9/2015  
+ 
+© Freescale Semiconductor, Inc.   
+How to Reach Us: 
+Home Page: 
+freescale.com 
+Web Support: 
+freescale.com/support Information in this document is provided solely to enable system and 
+software implementers to use Freescale products. Th ere are no 
+express or implied copyright licenses granted hereu nder to design or 
+fabricate any integrated circuits based on the info rmation in this 
+document. Freescale reserves the right to make chan ges without 
+further notice to any products herein. 
+Freescale makes no warranty, representation, or gua rantee regarding 
+the suitability of its products for any particular purpose, nor does 
+Freescale assume any liability arising out of the a pplication or use of 
+any product or circuit, and specifically disclaims any and all liability, 
+including without limitation consequential or incid ental damages. 
+“Typical” parameters that may be provided in Freesc ale data sheets 
+and/or specifications can and do vary in different applications, and 
+actual performance may vary over time. All operatin g parameters, 
+including “typicals,” must be validated for each cu stomer application 
+by customer's technical experts. Freescale does not  convey any 
+license under its patent rights nor the rights of o thers. Freescale sells 
+products pursuant to standard terms and conditions of sale, which can 
+be found at the following address: 
+freescale.com/SalesTermsandConditions. 
+Freescale and the Freescale logo, are trademarks of  Freescale 
+Semiconductor, Inc., Reg. U.S. Pat. & Tm. Off. All other product or 
+service names are the property of their respective owners. 
+© 2015 Freescale Semiconductor, Inc. 
+ 
+ 

@@ -31,21 +31,21 @@ from datetime import datetime
 class SensorSpec:
     """MPU9250 + AK8963 sensor specifications"""
 
-    # Accelerometer (MPU9250)
-    ACCEL_RANGE_G = 2.0                    # ±2g range
+    # Accelerometer (MPU9250) - MATCHING C CODE CONFIG (±4g range)
+    ACCEL_RANGE_G = 4.0                    # ±4g range (from sensor_spec_agm.h line 65)
     ACCEL_RESOLUTION_BITS = 16             # 16-bit ADC
-    ACCEL_COUNTS_PER_G = 32768 / ACCEL_RANGE_G  # 16384 counts/g
-    ACCEL_G_PER_COUNT = ACCEL_RANGE_G / 32768   # ~0.000061 g/count
-    ACCEL_NOISE_DENSITY = 300e-6           # 300 µg/√Hz
-    ACCEL_BIAS_STABILITY = 0.01            # ±0.01 g
+    ACCEL_COUNTS_PER_G = 32768 / ACCEL_RANGE_G  # 8192 counts/g
+    ACCEL_G_PER_COUNT = ACCEL_RANGE_G / 32768   # ~0.0001220703125 g/count
+    ACCEL_NOISE_DENSITY = 300e-6           # 300 µg/√Hz (from sensor_spec_agm.h line 83)
+    ACCEL_BIAS_STABILITY = 0.01            # ±0.01 g (typical for MPU9250)
 
-    # Gyroscope (MPU9250)
-    GYRO_RANGE_DPS = 250.0                 # ±250 dps range
+    # Gyroscope (MPU9250) - MATCHING C CODE CONFIG (±1000 dps range)
+    GYRO_RANGE_DPS = 1000.0                # ±1000 dps range (from sensor_spec_agm.h line 99)
     GYRO_RESOLUTION_BITS = 16              # 16-bit ADC
-    GYRO_COUNTS_PER_DPS = 32768 / GYRO_RANGE_DPS  # 131 counts/dps
-    GYRO_DPS_PER_COUNT = GYRO_RANGE_DPS / 32768   # ~0.00763 dps/count
-    GYRO_NOISE_DENSITY = 0.005             # 0.005 dps/√Hz
-    GYRO_BIAS_STABILITY = 0.5              # ±0.5 dps
+    GYRO_COUNTS_PER_DPS = 32768 / GYRO_RANGE_DPS  # 32.768 counts/dps
+    GYRO_DPS_PER_COUNT = GYRO_RANGE_DPS / 32768   # ~0.030518 dps/count
+    GYRO_NOISE_DENSITY = 0.01              # 0.01 dps/√Hz (from sensor_spec_agm.h line 117)
+    GYRO_BIAS_STABILITY = 0.5              # ±0.5 dps (typical for MPU9250)
 
     # Magnetometer (AK8963)
     MAG_RANGE_UT = 4800.0                  # ±4800 µT range
@@ -202,8 +202,8 @@ class IMUDataGenerator:
             # Add linear acceleration (already in sensor frame)
             total_accel = gravity_sensor + linear_accelerations[i] * self.spec.GRAVITY_MPS2
 
-            # Add bias (in g)
-            total_accel += self.accel_bias * bias_scale
+            # Add bias (in g) - convert to m/s² by multiplying by GRAVITY_MPS2
+            total_accel += self.accel_bias * bias_scale * self.spec.GRAVITY_MPS2
 
             # Add noise
             noise = np.random.normal(0, self.spec.ACCEL_NOISE_DENSITY * noise_scale, 3)

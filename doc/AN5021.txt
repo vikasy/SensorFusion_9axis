@@ -1,0 +1,898 @@
+ 
+© Freescale Semiconductor, Inc. 
+  Contents 
+1 Introduction ...................................... ................................................... ............................................ 2  
+1.1 Summary ....................................... ................................................... .......................................... 2 
+1.2 Terminology ................................... ................................................... ......................................... 2 
+1.3 Software functions ............................ ................................................... ....................................... 2 
+2 General Rotation Matrix ........................... ................................................... .................................... 3  
+2.1 Introduction .................................. ................................................... ........................................... 3 
+2.2 Eigenvector and Eigenvalue .................... ................................................... ................................ 3 
+3 Converting Between Rotation Matrix and Rotation Vec tor ............................................... ............ 4  
+3.1 Rotation Vector from Rotation Matrix .......... ................................................... ............................. 4 
+3.2 Rotation Matrix from Rotation Vector .......... ................................................... ............................. 6 
+4 Accelerometer Tilt Orientation Matrix ............. ................................................... ............................ 6  
+4.1 Introduction .................................. ................................................... ........................................... 6 
+4.2 Aerospace / NED ............................... ................................................... ..................................... 6 
+4.3 Android........................................ ................................................... ............................................ 8 
+4.4 Windows 8 ..................................... ................................................... ......................................... 9 
+5 Magnetometer Compass Orientation Matrix ........... ................................................... .................. 11  
+5.1 Introduction .................................. ................................................... ......................................... 11 
+5.2 Aerospace / NED ............................... ................................................... ................................... 12 
+5.3 Android........................................ ................................................... .......................................... 13 
+5.4 Windows 8 ..................................... ................................................... ....................................... 14 
+6 Accelerometer Magnetometer Tilt eCompass Orientatio n Matrix .......................................... .... 15  
+6.1 Introduction .................................. ................................................... ......................................... 15 
+6.2 Aerospace / NED ............................... ................................................... ................................... 15 
+6.3 Android........................................ ................................................... .......................................... 16 
+6.4 Windows 8 ..................................... ................................................... ....................................... 17 
+7 Revision History .................................. ................................................... ....................................... 18 
+ Freescale Semiconductor  Document Number: AN5021 
+APPLICATION NOTE  Rev. 1, 9/201 5
+ 
+Calculation of Orientation Matrices from 
+Sensor Data 
+Mark Pedley and Michael Stanley 
+ 
+ 
+Introduction 
+2   Calculation of Orientation Matrices from Sensor Dat a, 1, 9/2015 
+ 
+Freescale Semiconductor, Inc.   1 Introduction 
+1.1 Summary 
+This application note introduces the rotation or or ientation matrix and documents the functions in fil e 
+orientation.c  used by the Freescale Sensor Fusion Library  to compute an orientation matrix from sensor 
+measurements. 
+1.2 Terminology 
+Symbol Definition 
+/g1828 Geomagnetic field strength 
+/g2158/g3030 Calibrated magnetometer measurements in the sensor PCB frame 
+/g1828/g3030/g3051 ,/g1828/g3030/g3052 ,/g1828/g3030/g3053  x, y and z components of the calibrated magnetomet er reading in the 
+sensor frame 
+ENU x=East, y=North, z=Up coordinate system (Androi d and Windows 8) 
+/g2163/g3046 Accelerometer reading in the sensor frame 
+/g1833/g3046/g3051 ,/g1833/g3046/g3052 ,/g1833/g3046/g3053  x, y and z components of the accelerometer reading  in the sensor 
+frame 
+NED x=North, y=East, z=Down coordinate system (Aero space) 
+/g1844/g3036/g3037  Element in row i and column j of orientation matrix  /g2174 
+/g2174/g3002/g3041/g3031/g3045/g3042/g3036/g3031  Orientation matrix in the Android coordinate system  
+/g2174/g3015/g3006/g3005  Orientation matrix in the NED/Aerospace coordinate system 
+/g2174/g3024/g3036/g3041 /g2876 Orientation matrix in the Windows 8 coordinate syst em 
+/g1844/g3051/g3052  Element in row x and column y of orientation matrix  /g2174 
+/g2012 Geomagnetic inclination angle 
+/g2016 Pitch angle 
+/g2038 Roll angle 
+/g2032 Yaw angle 
+ 
+1.3 Software Functions 
+Table 1. Sensor Fusion software functions 
+Function  Description Section 
+void f3DOFTiltNED 
+(float fR[][3], float fGs[]) ; 
+ 
+void f3DOFTiltAndroid 
+(float fR[][3], float fGs[]); 
+ 
+void f3DOFTiltWin8 
+(float fR[][3], float fGs[]);  Computes the tilt orientation matrix from 
+accelerometer measurements in the 
+Aerospace/NED, Android and windows 
+8 coordinate systems. 4.2 
+4.3 
+4.4 
+   
+  
+Calculation of Orientation Matrices from Sensor Dat a, 1, 9/2015  
+ Function  Description Section 
+void f3DOFMagnetometerMatrixNED 
+(float fR[][3], float fBc[]); 
+ 
+void f3DOFMagnetometerMatrixAndroid 
+(float fR[][3], float fBc[]); 
+ 
+void f3DOFMagnetometerMatrixWin8 
+(float fR[][3], float fBc[]); Computes the 2D eCompass yaw 
+orientation matrix from calibrated 
+magnetometer measurements in the 
+Aerospace/NED, Android and Windows 
+8 coordinate systems. 5.2 
+5.3 
+5.4 
+void feCompassNED 
+(float fR[][3], float *pfDelta, float 
+fBc[], float fGs[]); 
+ 
+void feCompassAndroid 
+(float fR[][3], float *pfDelta, float 
+fBc[], float fGs[]); 
+ 
+void feCompassWin8 
+(float fR[][3], float *pfDelta, float 
+fBc[], float fGs[]); Computes the full orientation matrix 
+from accelerometer and calibrated 
+magnetometer measurements in the 
+Aerospace/NED, Android and Windows 
+8 coordinate systems and also returns 
+the geomagnetic inclination angle. 6.2 
+6.3 
+6.4 
+2 General Rotation Matrix 
+2.1 Introduction 
+The general rotation matrix /g2174 which transforms a vector as a result of a rotatio n of the coordinate 
+system around the axis /g2196/g3549 by angle /g2015 is: 
+/g2174=/g4684/g1844/g3051/g3051 /g1844/g3051/g3052 /g1844/g3051/g3053 
+/g1844/g3052/g3051 /g1844/g3052/g3052 /g1844/g3052/g3053 
+/g1844/g3053/g3051 /g1844/g3053/g3052 /g1844/g3053/g3053 /g4685=/g3438/g1866/g3548/g3051/g2870+/g34351−/g1866/g3548/g3051/g2870/g3439/g1855/g1867/g1871/g2015 /g1866/g3548/g3051/g1866/g3548/g3052/g46661−/g1855/g1867/g1871/g2015 /g4667+/g1866/g3548/g3053/g1871/g1861/g1866/g2015 /g1866/g3548/g3051/g1866/g3548/g3053/g46661−/g1855/g1867/g1871/g2015 /g4667−/g1866/g3548/g3052/g1871/g1861/g1866/g2015 
+/g1866 /g3548/g3051/g1866 /g3548/g3052/g46661−/g1855/g1867/g1871/g2015 /g4667−/g1866 /g3548/g3053/g1871/g1861/g1866/g2015 /g1866 /g3548 /g3052/g2870+/g34351−/g1866 /g3548/g3052/g2870/g3439/g1855/g1867/g1871/g2015 /g1866 /g3548 /g3052/g1866 /g3548/g3053/g46661−/g1855/g1867/g1871/g2015 /g4667+/g1866 /g3548/g3051/g1871/g1861/g1866/g2015 
+/g1866/g3548/g3051/g1866/g3548/g3053/g46661−/g1855/g1867/g1871/g2015 /g4667+/g1866/g3548/g3052/g1871/g1861/g1866/g2015 /g1866/g3548/g3052/g1866/g3548/g3053/g46661−/g1855/g1867/g1871/g2015 /g4667−/g1866/g3548/g3051/g1871/g1861/g1866/g2015 /g1866/g3548/g3053/g2870+/g34351−/g1866/g3548/g3053/g2870/g3439/g1855/g1867/g1871/g2015 /g3442 (1) 
+ 
+Equation (1) is known as the Rodrigues rotation mat rix. The product of the rotation axis /g2196/g3549 and rotation 
+angle /g2015 is termed the rotation vector /g2196/g3549/g2015. 
+If the coordinate system rotates by angle /g2015 about the z axis, then a vector rotates by angle −/g2015 about 
+the z axis, relative to the newly rotated coordinate sys tem. When we refers to a rotation vector defining 
+a rotation matrix, it always refers to a coordinate  system rotation. 
+In addition, when a rotation matrix /g2174 models the orientation of the sensors relative to the earth (global) 
+reference frame, the Freescale Sensor Fusion Library  standard is that the product /g2174/g2204  transforms the 
+vector /g2204 from the global to the sensor frame. The inverse r otation /g2174/g2879/g2869/g2204=/g2174/g3021/g2204 transforms the vector /g2204 
+from the sensor to the global frame. The orientatio n matrix is always defined relative to an initial 
+orientation in the global frame with the product fl at and pointed to magnetic north. 
+2.2 Eigenvector and Eigenvalue 
+The product /g2174/g2196/g3549 evaluates to /g2196/g3549 confirming that /g2196/g3549 is the eigenvector of /g2174 with eigenvalue 1. Because /g2174 
+is a rotation matrix, /g2196/g3549 is, therefore, the rotation axis. 
+Converting Between Rotation Matrix and Rotation Vec tor 
+4   Calculation of Orientation Matrices from Sensor Dat a, 1, 9/2015 
+ 
+Freescale Semiconductor, Inc.   /g2174/g2196/g3549=/g3438/g1866/g3548/g3051/g2870+/g34351−/g1866/g3548/g3051/g2870/g3439/g1855/g1867/g1871/g2015 /g1866/g3548/g3051/g1866/g3548/g3052/g46661−/g1855/g1867/g1871/g2015 /g4667+/g1866/g3548/g3053/g1871/g1861/g1866/g2015 /g1866/g3548/g3051/g1866/g3548/g3053/g46661−/g1855/g1867/g1871/g2015 /g4667−/g1866/g3548/g3052/g1871/g1861/g1866/g2015 
+/g1866 /g3548/g3051/g1866 /g3548/g3052/g46661−/g1855/g1867/g1871/g2015 /g4667−/g1866 /g3548/g3053/g1871/g1861/g1866/g2015 /g1866 /g3548 /g3052/g2870+/g34351−/g1866 /g3548/g3052/g2870/g3439/g1855/g1867/g1871/g2015 /g1866 /g3548 /g3052/g1866 /g3548/g3053/g46661−/g1855/g1867/g1871/g2015 /g4667+/g1866 /g3548/g3051/g1871/g1861/g1866/g2015 
+/g1866/g3548/g3051/g1866/g3548/g3053/g46661−/g1855/g1867/g1871/g2015 /g4667+/g1866/g3548/g3052/g1871/g1861/g1866/g2015 /g1866/g3548/g3052/g1866/g3548/g3053/g46661−/g1855/g1867/g1871/g2015 /g4667−/g1866/g3548/g3051/g1871/g1861/g1866/g2015 /g1866/g3548/g3053/g2870+/g34351−/g1866/g3548/g3053/g2870/g3439/g1855/g1867/g1871/g2015 /g3442/g4684/g1866/g3548/g3051
+/g1866 /g3548/g3052
+/g1866/g3548/g3053/g4685 (2) 
+ 
+ 
+ 
+ 
+We can take advantage that the norm of /g2196/g3549 has value 1 to rearrange and simplify (2) to the f orms shown 
+in (3): 
+ 
+/g2174/g2196/g3549=/g3438/g1866/g3548/g3051/g3435/g1866/g3548/g3051/g2870+/g1866/g3548/g3052/g2870+/g1866/g3548/g3053/g2870/g3439−/g1866/g3548/g3051/g1855/g1867/g1871/g2015 /g3435/g1866/g3548/g3051/g2870+/g1866/g3548/g3052/g2870+/g1866/g3548/g3053/g2870−1/g3439
+/g1866 /g3548/g3052/g3435/g1866 /g3548/g3051/g2870+/g1866 /g3548/g3052/g2870+/g1866 /g3548/g3053/g2870/g3439−/g1866 /g3548/g3052/g1855/g1867/g1871/g2015 /g3435/g1866 /g3548/g3051/g2870+/g1866 /g3548/g3052/g2870+/g1866 /g3548/g3053/g2870−1/g3439
+/g1866/g3548/g3053/g3435/g1866/g3548/g3051/g2870+/g1866/g3548/g3052/g2870+/g1866/g3548/g3053/g2870/g3439−/g1866/g3548/g3053/g1855/g1867/g1871/g2015 /g3435/g1866/g3548/g3051/g2870+/g1866/g3548/g3052/g2870/uni0009+/uni0009/g1866/g3548/g3053/g2870−1/g3439/g3442=/g4684/g1866/g3548/g3051
+/g1866/g3548/g3052
+/g1866/g3548/g3053/g4685 (3) 
+ 
+3 Converting Between Rotation Matrix and Rotation 
+Vector 
+3.1 Rotation Vector from Rotation Matrix 
+Referring back to (1), the rotation angle /g2015/uni0009can be determined from the trace of the rotation ma trix /g2174: 
+/g1872/g1870 /g4666/g2174/g4667=/g1844/g3051/g3051 +/g1844/g3052/g3052 +/g1844/g3053/g3053 =/g1866/g3548/g3051/g2870+/g34351−/g1866/g3548/g3051/g2870/g3439/g1855/g1867/g1871/g2015 +/g1866/g3548/g3052/g2870+/g34351−/g1866/g3548/g3052/g2870/g3439/g1855/g1867/g1871/g2015 +/g1866/g3548/g3053/g2870+/g34351−/g1866/g3548/g3053/g2870/g3439/g1855/g1867/g1871/g2015  (4) 
+=/g3435/g1866/g3548/g3051/g2870+/g1866/g3548/g3052/g2870+/g1866/g3548/g3053/g2870/g3439+3/g1855/g1867/g1871/g2015 −/g3435/g1866/g3548/g3051/g2870+/g1866/g3548/g3052/g2870+/g1866/g3548/g3053/g2870/g3439/g1855/g1867/g1871/g2015  (5) 
+⇒/g1872/g1870 /g4666/g2174/g4667=1+2/g1855/g1867/g1871/g2015  (6) 
+⇒/g2015=/g1855/g1867/g1871 /g2879/g2869/g4678/g1872/g1870 /g4666/g2174/g4667−1
+2/g4679 (7) 
+There is no angle ambiguity in equation (7) because  the inverse cosine returns an angle between 0°  
+and 180°  and the rotation angle /g2015 also varies between 0°  and 180° . Rotation angles b etween –180°  
+and 0°  are equivalent to rotation by the negated an gle −/g2015 about the negated rotation axis −/g2196/g3549. The 
+rotation vector /g2015/g2196/g3549 is unaltered by a double sign change. 
+The trace of the matrix varies between –1 and +3. A  trace of –1 corresponds to a rotation of 180°  and a 
+trace of +3 corresponds to a rotation of 0° . 
+In the general case, the rotation axis /g2196/g3549 and rotation vector /g2015/g2196/g3549 are determined by differencing matrix 
+elements across the leading diagonal in (1): 
+/g2196/g3549=1
+2/g1871/g1861/g1866/g2015 /g4684/g1844/g3052/g3053 −/g1844/g3053/g3052 
+/g1844/g3053/g3051 −/g1844/g3051/g3053 
+/g1844/g3051/g3052 −/g1844/g3052/g3051 /g4685 (8) 
+  
+Calculation of Orientation Matrices from Sensor Dat a, 1, 9/2015  
+ 2/g1871/g1861/g1866/g2015 =/g3495/g3435/g1844/g3052/g3053 −/g1844/g3053/g3052 /g3439/g2870+/g4666/g1844/g3053/g3051 −/g1844/g3051/g3053 /g4667/g2870+/g3435/g1844/g3051/g3052 −/g1844/g3052/g3051 /g3439/g2870 (9) 
+ 
+The positive square root can be taken in equation ( 9) because the sine of a rotation angle between 0°  
+and 180°  is always nonnegative. Substitution of equ ation (9) into (8) gives the rotation vector as: 
+/g2015/g2196/g3549=/g2015
+/g3495/g3435/g1844/g3052/g3053 −/g1844/g3053/g3052 /g3439/g2870+/g4666/g1844/g3053/g3051 −/g1844/g3051/g3053 /g4667/g2870+/g3435/g1844/g3051/g3052 −/g1844/g3052/g3051 /g3439/g2870/g4684/g1844/g3052/g3053 −/g1844/g3053/g3052 
+/g1844/g3053/g3051 −/g1844/g3051/g3053 
+/g1844/g3051/g3052 −/g1844/g3052/g3051 /g4685 (10) 
+ 
+Equations (9) and (10) fail when /g1871/g1861/g1866/g2015  approaches zero which occurs near /g2015=0°  and /g2015=180°  when 
+the rotation matrix /g2174 becomes symmetric. These two special cases can be detected using: 
+• equation (9) to determine /g1871/g1861/g1866/g2015  near zero  
+• equation (6) and the  matrix trace to distinguish the two cases of 0° rotation angle (with trace = 3) 
+and 180°  rotation angle (with trace = –1) both of w hich give /g1871/g1861/g1866/g2015=0 . 
+For the case of a rotation angle /g2015 near zero radians, /g1871/g1861/g1866/g2015≈/g2015  and the rotation vector becomes: 
+/g2015/g2196/g3549=1
+2/g4684/g1844/g3052/g3053 −/g1844/g3053/g3052 
+/g1844/g3053/g3051 −/g1844/g3051/g3053 
+/g1844/g3051/g3052 −/g1844/g3052/g3051 /g4685 (11) 
+ 
+For the case of the rotation angle /g2015 near 180° , the rotation matrix /g2174 approximates the form below with a 
+trace of –1: 
+/g2174=/g34382/g1866/g3548/g3051/g2870−1/g1866/g3548/g3051/g1866/g3548/g3052/g46661−/g1855/g1867/g1871/g2015 /g4667+/g1866/g3548/g3053/g1871/g1861/g1866/g2015 /g1866/g3548/g3051/g1866/g3548/g3053/g46661−/g1855/g1867/g1871/g2015 /g4667−/g1866/g3548/g3052/g1871/g1861/g1866/g2015 
+/g1866 /g3548/g3051/g1866 /g3548/g3052/g46661−/g1855/g1867/g1871/g2015 /g4667−/g1866 /g3548/g3053/g1871/g1861/g1866/g2015 2/g1866 /g3548 /g3052/g2870−1 /g1866 /g3548 /g3052/g1866 /g3548/g3053/g46661−/g1855/g1867/g1871/g2015 /g4667+/g1866 /g3548/g3051/g1871/g1861/g1866/g2015 
+/g1866/g3548/g3051/g1866/g3548/g3053/g46661−/g1855/g1867/g1871/g2015 /g4667+/g1866/g3548/g3052/g1871/g1861/g1866/g2015 /g1866/g3548/g3052/g1866/g3548/g3053/g46661−/g1855/g1867/g1871/g2015 /g4667−/g1866/g3548/g3051/g1871/g1861/g1866/g2015 2/g1866/g3548/g3053/g2870−1/g3442 (12) 
+⇒/g4684/g1866 /g3548/g3051
+/g1866 /g3548/g3052
+/g1866 /g3548/g3053/g4685=
+/g1737/g1736/g1736/g1736/g1736/g1736/g1736/g1735±/g3496/g1844/g3051/g3051 +1
+2
+±/g3496/g1844/g3052/g3052 +1
+2
+±/g3496/g1844/g3053/g3053 +1
+2/g1740/g1739/g1739/g1739/g1739/g1739/g1739/g1738
+ (13) 
+ 
+The sign ambiguity can be resolved by differencing across the leading diagonal and using the result 
+that /g1871/g1861/g1866/g2015  is nonnegative. 
+/g1844/g3052/g3053 −/g1844/g3053/g3052 =2/g1866/g3548/g3051/g1871/g1861/g1866/g2015 ⇒/g1871/g1861/g1859/g1866 /g4666/g1866/g3548/g3051/g4667=/g1871/g1861/g1859/g1866 /g3435/g1844/g3052/g3053 −/g1844/g3053/g3052 /g3439 (14) 
+Accelerometer Tilt Orientation Matrix 
+6   Calculation of Orientation Matrices from Sensor Dat a, 1, 9/2015 
+ 
+Freescale Semiconductor, Inc.   /g1844/g3053/g3051 −/g1844/g3051/g3053 =2/g1866/g3548/g3052/g1871/g1861/g1866/g2015 ⇒/g1871/g1861/g1859/g1866 /g3435/g1866/g3548/g3052/g3439=/g1871/g1861/g1859/g1866 /g4666/g1844/g3053/g3051 −/g1844/g3051/g3053 /g4667 (15) 
+/g1844/g3051/g3052 −/g1844/g3052/g3051 =2/g1866/g3548/g3053/g1871/g1861/g1866/g2015 ⇒/g1871/g1861/g1859/g1866 /g4666/g1866/g3548/g3053/g4667=/g1871/g1861/g1859/g1866 /g3435/g1844/g3051/g3052 −/g1844/g3052/g3051 /g3439 (16) 
+ 
+Any rotation can be represented by its normalized r otation axis /g2196/g3549 and the rotation angle /g2015 about that 
+axis, giving a total of three degrees of freedom. T he rotation vector /g2015/g2196/g3549 is the most efficient encoding of 
+a rotation but has no useful mathematical propertie s. The rotation quaternion and rotation matrix are,  
+therefore, used in preference. 
+The output of the gyroscope sensor (in degrees/seco nd) multiplied by the sampling interval is, however , 
+a rotation vector and is typically immediately conv erted to a rotation matrix or quaternion for orient ation 
+integration. 
+3.2 Rotation Matrix from Rotation Vector 
+Equation (1) defines the Rodrigues rotation matrix directly in terms of the rotation axis /g2196/g3549 and rotation 
+angle /g2015. These can easily be determined for the case of no n-zero rotation vector /g2015/g2196/g3549 using: 
+/g2015=/uni007≈/g2015/g2196/g3549/uni007≈ (17) 
+/g2196/g3549=/g2015/g2196/g3549
+/uni007≈/g2015/g2196/g3549/uni007≈ (18) 
+If the rotation vector is zero then the rotation ma trix is the identity matrix. 
+4 Accelerometer Tilt Orientation Matrix 
+4.1 Introduction 
+Accelerometer sensors are sensitive to both linear acceleration and gravity and are insensitive to 
+rotation about the vertical gravity axis. An accele rometer operating without other sensors can, 
+therefore, detect roll, pitch and tilt angles from horizontal, in the absence of linear acceleration . An 
+accelerometer cannot detect compass heading. 
+The mathematics below assumes that the yaw or compa ss angle is always zero degrees. One 
+consequence of this assumption is that the orientat ion undergoes a twist of 180°  at ±90°  pitch 
+(Aerospace / NED coordinate system) and at ±180°  ro ll (in Android and Windows 8 coordinate systems) 
+to ensure that the orientation remains pointing nor thward. 
+In the Aerospace / NED coordinate system, another w ay of describing the same phenomenon is to 
+apply a 180°  roll (resulting in the circuit board p ointed northward but inverted) followed by a 180°  y aw 
+rotation (which has no effect because the accelerom eter is insensitive to rotation about the vertical 
+gravity axis). The same orientation can also be rea ched by a 180°  pitch rotation. Without the 180°  
+orientation twist at 90°  pitch, the same final acce lerometer reading would lead to two different 
+orientations depending upon the path taken. 
+4.2 Aerospace / NED 
+This section documents the mathematics underlying t he function f3DOFTiltNED  in file orientation.c . 
+  
+Calculation of Orientation Matrices from Sensor Dat a, 1, 9/2015  
+ The Aerospace / NED orientation matrix for zero yaw  angle /g2032 after rotation from the horizontal by pitch 
+angle /g2016 followed by roll angle /g2038 is: 
+/g2174/g3015/g3006/g3005 /g4666/g2032=0/g4667=/g3437/g1855/g1867/g1871 /g20160−/g1871/g1861/g1866/g2016 
+/g1871/g1861/g1866/g2016/g1871/g1861/g1866/g2038 /g1855/g1867/g1871 /g2038/g1855/g1867/g1871 /g2016/g1871/g1861/g1866/g2038 
+/g1855/g1867/g1871/g2038/g1871/g1861/g1866/g2016 −/g1871/g1861/g1866/g2038 /g1855/g1867/g1871 /g2016/g1855/g1867/g1871/g2038 /g3441 (19) 
+ 
+The Aerospace / NED accelerometer reading /g2163/g3046 (where the subscript s indicates the measurement i s in 
+the rotated sensor frame) at this orientation can b e computed by multiplying the reference gravity vec tor 
+by  /g2174/g3015/g3006/g3005 /g4666/g2032=0/g4667: 
+/g4684/g1833/g3046/g3051 
+/g1833/g3046/g3052 
+/g1833/g3046/g3053 /g4685=/g3437/g1855/g1867/g1871 /g20160−/g1871/g1861/g1866/g2016 
+/g1871/g1861/g1866/g2016/g1871/g1861/g1866/g2038 /g1855/g1867/g1871 /g2038/g1855/g1867/g1871 /g2016/g1871/g1861/g1866/g2038 
+/g1855/g1867/g1871/g2038/g1871/g1861/g1866/g2016 −/g1871/g1861/g1866/g2038 /g1855/g1867/g1871 /g2016/g1855/g1867/g1871/g2038 /g3441/g34290
+0
+/uni007≈/g2163/g3046/uni007≈/g3433 (20a)  
+=/uni007≈/g2163/g3046/uni007≈/g3437−/g1871/g1861/g1866/g2016 
+/g1871/g1861/g1866/g2038/g1855/g1867/g1871/g2016 
+/g1855/g1867/g1871/g2038/g1855/g1867/g1871/g2016 /g3441=/uni007≈/g2163/g3046/uni007≈
+/g1737/g1736/g1736/g1736/g1735−/g1871/g1861/g1866/g2016 
+/g1871/g1861/g1866/g2038 /g34961−/g3436/g1833/g3046/g3051 
+/uni007≈/g2163/g3046/uni007≈/g3440/g2870
+/g1855/g1867/g1871/g2038 /g34961−/g3436/g1833/g3046/g3051 
+/uni007≈/g2163/g3046/uni007≈/g3440/g2870
+/g1740/g1739/g1739/g1739/g1738
+ (20b)  
+/g1871/g1861/g1866/g2016 =−/g1833/g3046/g3051 
+/uni007≈/g2163/g3046/uni007≈ (21) 
+/g1855/g1867/g1871/g2016 =/g34961−/g3436/g1833/g3046/g3051 
+/uni007≈/g2163/g3046/uni007≈/g3440/g2870
+ (22) 
+/g1871/g1861/g1866/g2038 =/g1833/g3046/g3052 
+/uni007≈/g2163/g3046/uni007≈/g34961−/g3436/g1833/g3046/g3051 
+/uni007≈/g2163/g3046/uni007≈/g3440/g2870 
+(23) 
+/g1855/g1867/g1871/g2038 =/g1833/g3046/g3053 
+/uni007≈/g2163/g3046/uni007≈/g34961−/g3436/g1833/g3046/g3051 
+/uni007≈/g2163/g3046/uni007≈/g3440/g2870 
+(24) 
+ 
+The positive square root for /g1855/g1867/g1871/g2016  can always be taken in equation (22) because the p itch angle /g2016 in the 
+Aerospace / NED coordinate system varies between –9 0°  and +90°  giving a nonnegative value of /g1855/g1867/g1871/g2016 . 
+Substituting back into equation (19) gives the Aero space / NED 3DOF orientation matrix directly in 
+terms of the accelerometer reading /g2163/g3046 as: 
+Accelerometer Tilt Orientation Matrix 
+8   Calculation of Orientation Matrices from Sensor Dat a, 1, 9/2015 
+ 
+Freescale Semiconductor, Inc.   /g2174/g3015/g3006/g3005 /g4666/g2032=0/g4667=
+/g1737/g1736/g1736/g1736/g1736/g1736/g1736/g1735/g3495/g1833/g3046/g3052 /g2870+/g1833/g3046/g3053 /g2870
+/uni007≈/g2163/g3046/uni007≈0/g1833/g3046/g3051 
+/uni007≈/g2163/g3046/uni007≈
+−/g1833/g3046/g3051 /g1833/g3046/g3052 
+/uni007≈/g2163/g3046/uni007≈/g3495/g1833/g3046/g3052 /g2870+/g1833/g3046/g3053 /g2870/g1833/g3046/g3053 
+/g3495/g1833/g3046/g3052/g2870+/g1833/g3046/g3053 /g2870/g1833/g3046/g3052 
+/uni007≈/g2163/g3046/uni007≈
+−/g1833/g3046/g3051 /g1833/g3046/g3053 
+/uni007≈/g2163/g3046/uni007≈/g3495/g1833/g3046/g3052 /g2870+/g1833/g3046/g3053 /g2870−/g1833/g3046/g3052 
+/g3495/g1833/g3046/g3052 /g2870+/g1833/g3046/g3053 /g2870/g1833/g3046/g3053 
+/uni007≈/g2163/g3046/uni007≈
+/g1740/g1739/g1739/g1739/g1739/g1739/g1739/g1738
+=
+/g1737/g1736/g1736/g1736/g1736/g1736/g1736/g1735/g3495/g1833/g3046/g3052 /g2870+/g1833/g3046/g3053 /g2870
+/uni007≈/g2163/g3046/uni007≈0/g1833/g3046/g3051 
+/uni007≈/g2163/g3046/uni007≈
+−/g1844/g3051/g3053 /g1844/g3052/g3053 /uni007≈/g2163/g3046/uni007≈
+/g3495/g1833/g3046/g3052 /g2870+/g1833/g3046/g3053 /g2870/g1844/g3053/g3053 /uni007≈/g2163/g3046/uni007≈
+/g3495/g1833/g3046/g3052 /g2870+/g1833/g3046/g3053 /g2870/g1833/g3046/g3052 
+/uni007≈/g2163/g3046/uni007≈
+−/g1844/g3051/g3053 /g1844/g3053/g3053 /uni007≈/g2163/g3046/uni007≈
+/g3495/g1833/g3046/g3052 /g2870+/g1833/g3046/g3053 /g2870−/g1844/g3052/g3053 /uni007≈/g2163/g3046/uni007≈
+/g3495/g1833/g3046/g3052 /g2870+/g1833/g3046/g3053 /g2870/g1833/g3046/g3053 
+/uni007≈/g2163/g3046/uni007≈
+/g1740/g1739/g1739/g1739/g1739/g1739/g1739/g1738
+ (25) 
+ 
+At the gimbal lock orientations with ±90°  pitch rot ation, where /g1833/g3046/g3052 =/g1833/g3046/g3053 =0 and /g1833/g3046/g3051 =/uni007≈/g2163/g3046/uni007≈, equations 
+(23) to (25) show that the roll angle /g2038 and the rotation matrix /g2174/g3015/g3006/g3005  are undefined. This simplest solution 
+is to set the roll angle /g2038 to zero giving: 
+/g2174/g3015/g3006/g3005 /g4666/g2038=/g2032=0/g4667=/g343700−/g1871/g1861/g1866/g2016 
+0 1 0
+/g1871/g1861/g1866/g2016 00/g3441=
+/g1737/g1736/g173500/g1833/g3046/g3051 
+/uni007≈/g2163/g3046/uni007≈
+0 1 0
+−/g1833/g3046/g3051 
+/uni007≈/g2163/g3046/uni007≈00/g1740/g1739/g1738=/g343700/g1871/g1861/g1859/g1866 /g4666/g1833/g3046/g3051 /g4667
+0 1 0
+−/g1871/g1861/g1859/g1866 /g4666/g1833/g3046/g3051 /g466700/g3441 (26) 
+ 
+4.3 Android 
+This section documents the mathematics underlying t he function f3DOFTiltAndroid  in file 
+orientation.c . 
+The Android rotation matrix for zero yaw angle /g2032 after rotation from the horizontal by roll angle /g2038 
+followed by pitch angle /g2016 is: 
+/g2174/g3002/g3041/g3031/g3045/g3042/g3036/g3031 /g4666/g2032=0/g4667=/g3437/g1855/g1867/g1871 /g20380/g1871/g1861/g1866/g2038 
+/g1871/g1861/g1866/g2038/g1871/g1861/g1866/g2016 /g1855/g1867/g1871 /g2016−/g1855/g1867/g1871 /g2038/g1871/g1861/g1866/g2016 
+−/g1855/g1867/g1871 /g2016/g1871/g1861/g1866/g2038 /g1871/g1861/g1866/g2016 /g1855/g1867/g1871 /g2038/g1855/g1867/g1871 /g2016/g3441 (27) 
+ 
+The Android accelerometer reading at this orientati on is: 
+/g4684/g1833/g3046/g3051 
+/g1833/g3046/g3052 
+/g1833/g3046/g3053 /g4685=/uni007≈/g2163/g3046/uni007≈/g3437/g1871/g1861/g1866/g2038 
+−/g1855/g1867/g1871/g2038/g1871/g1861/g1866/g2016
+/g1855/g1867/g1871/g2038/g1855/g1867/g1871/g2016/g3441=/uni007≈/g2163/g3046/uni007≈
+/g1737/g1736/g1736/g1736/g1736/g1735/g1871/g1861/g1866/g2038 
+−/g1871/g1861/g1866/g2016/g34961−/g3436/g1833/g3046/g3051 
+/uni007≈/g2163/g3046/uni007≈/g3440/g2870
+/g1855/g1867/g1871 /g2016/g34961−/g3436/g1833/g3046/g3051 
+/uni007≈/g2163/g3046/uni007≈/g3440/g2870
+/g1740/g1739/g1739/g1739/g1739/g1738
+ (28) 
+/g1871/g1861/g1866/g2038 =/g1833/g3046/g3051 
+/uni007≈/g2163/g3046/uni007≈ (29) 
+  
+Calculation of Orientation Matrices from Sensor Dat a, 1, 9/2015  
+ /g1855/g1867/g1871/g2038 =/g34961−/g3436/g1833/g3046/g3051 
+/uni007≈/g2163/g3046/uni007≈/g3440/g2870
+ (30) 
+/g1871/g1861/g1866 /g2016=−/g1833/g3046/g3052 
+/uni007≈/g2163/g3046/uni007≈/g34961−/g3436/g1833/g3046/g3051 
+/uni007≈/g2163/g3046/uni007≈/g3440/g2870 
+(31) 
+/g1855/g1867/g1871 /g2016=/g1833/g3046/g3053 
+/uni007≈/g2163/g3046/uni007≈/g34961−/g3436/g1833/g3046/g3051 
+/uni007≈/g2163/g3046/uni007≈/g3440/g2870 
+(32) 
+ 
+The positive square root for /g1855/g1867/g1871/g2038  can always be taken in equation (30) because the r oll angle /g2038 in the 
+Android coordinate system varies between –90°  and + 90°  giving a non-negative value of /g1855/g1867/g1871/g2038 . 
+Substituting into equation (27) gives the 3DOF Andr oid orientation matrix directly in terms of the 
+accelerometer reading as: 
+/g2174/g3002/g3041/g3031/g3045/g3042/g3036/g3031 /g4666/g2032=0/g4667=1
+/uni007≈/g2163/g3046/uni007≈
+/g1737/g1736/g1736/g1736/g1736/g1736/g1735/g3495/g1833/g3046/g3052 /g2870+/g1833/g3046/g3053 /g28700/g1833/g3046/g3051 
+−/g1833/g3046/g3051 /g1833/g3046/g3052 
+/g3495/g1833/g3046/g3052 /g2870+/g1833/g3046/g3053 /g2870/g1833/g3046/g3053 /uni007≈/g2163/g3046/uni007≈
+/g3495/g1833/g3046/g3052 /g2870+/g1833/g3046/g3053/g2870/g1833/g3046/g3052 
+−/g1833/g3046/g3051 /g1833/g3046/g3053 
+/g3495/g1833/g3046/g3052 /g2870+/g1833/g3046/g3053 /g2870−/g1833/g3046/g3052 /uni007≈/g2163/g3046/uni007≈
+/g3495/g1833/g3046/g3052 /g2870+/g1833/g3046/g3053 /g2870/g1833/g3046/g3053 
+/g1740/g1739/g1739/g1739/g1739/g1739/g1738
+=
+/g1737/g1736/g1736/g1736/g1736/g1736/g1736/g1735/g3495/g1833/g3046/g3052 /g2870+/g1833/g3046/g3053 /g2870
+/uni007≈/g2163/g3046/uni007≈0/g1833/g3046/g3051 
+/uni007≈/g2163/g3046/uni007≈
+−/g1844/g3051/g3053 /g1844/g3052/g3053 /uni007≈/g2163/g3046/uni007≈
+/g3495/g1833/g3046/g3052 /g2870+/g1833/g3046/g3053 /g2870/g1844/g3053/g3053 /uni007≈/g2163/g3046/uni007≈
+/g3495/g1833/g3046/g3052 /g2870+/g1833/g3046/g3053 /g2870/g1833/g3046/g3052 
+/uni007≈/g2163/g3046/uni007≈
+−/g1844/g3051/g3053 /g1844/g3053/g3053 /uni007≈/g2163/g3046/uni007≈
+/g3495/g1833/g3046/g3052 /g2870+/g1833/g3046/g3053 /g2870−/g1844/g3052/g3053 /uni007≈/g2163/g3046/uni007≈
+/g3495/g1833/g3046/g3052 /g2870+/g1833/g3046/g3053 /g2870/g1833/g3046/g3053 
+/uni007≈/g2163/g3046/uni007≈
+/g1740/g1739/g1739/g1739/g1739/g1739/g1739/g1738
+ (33) 
+ 
+In the case of gimbal lock after ±90°  roll rotation , when /g1833/g3046/g3052 =/g1833/g3046/g3053 =0, the pitch angle /g2016 is undefined and 
+can be set to zero: 
+/g2174/g3002/g3041/g3031/g3045/g3042/g3036/g3031 /g4666/g2016=/g2032=0/g4667=/g343700/g1871/g1861/g1866/g2038 
+0 1 0
+−/g1871/g1861/g1866/g2038 00/g3441=
+/g1737/g1736/g173500/g1833/g3046/g3051 
+/uni007≈/g2163/g3046/uni007≈
+0 1 0
+−/g1833/g3046/g3051 
+/uni007≈/g2163/g3046/uni007≈00/g1740/g1739/g1738=/g343700/g1871/g1861/g1859/g1866 /g4666/g1833/g3046/g3051 /g4667
+0 1 0
+−/g1871/g1861/g1859/g1866 /g4666/g1833/g3046/g3051 /g466700/g3441 (34) 
+ 
+NOTE:  These equations are identical to the equations for  the Aerospace / NED coordinate systems. 
+4.4 Windows 8 
+This section documents the mathematics underlying t he function f3DOFTiltWin8  in file orientation.c . 
+The Windows 8 rotation matrix for zero yaw angle /g2032, after rotation from the horizontal by pitch angle /g2016 
+followed by roll angle /g2038, is: 
+Accelerometer Tilt Orientation Matrix 
+10    Calculation of Orientation Matrices from Sensor Dat a, 1, 9/2015 
+ 
+Freescale Semiconductor, Inc.   /g2174/g3024/g3036/g3041/g2876/g4666/g2032=0/g4667=/g3437/g1855/g1867/g1871 /g2038/g1871/g1861/g1866/g2038/g1871/g1861/g1866/g2016 −/g1871/g1861/g1866/g2038 /g1855/g1867/g1871 /g2016
+0/g1855/g1867/g1871 /g2016/g1871/g1861/g1866/g2016 
+/g1871/g1861/g1866/g2038 −/g1855/g1867/g1871 /g2038/g1871/g1861/g1866/g2016 /g1855/g1867/g1871 /g2038/g1855/g1867/g1871 /g2016/g3441 (35) 
+ 
+The Windows 8 accelerometer reading at this orienta tion is: 
+/g4684/g1833/g3046/g3051 
+/g1833/g3046/g3052 
+/g1833/g3046/g3053 /g4685=/uni007≈/g2163/g3046/uni007≈/g3437/g1855/g1867/g1871 /g2016/g1871/g1861/g1866/g2038 
+−/g1871/g1861/g1866 /g2016
+−/g1855/g1867/g1871 /g2016/g1855/g1867/g1871/g2038 /g3441 (36) 
+/g1872/g1853/g1866/g2038 =−/g1833/g3046/g3051 
+/g1833/g3046/g3053 ⇒/g1855/g1867/g1871/g2038 =1
+/g34961+/g4672/g1833/g3046/g3051 
+/g1833/g3046/g3053 /g4673/g2870 
+(37) 
+⇒/g1871/g1861/g1866/g2038 =/g1872/g1853/g1866/g2038/g1855/g1867/g1871/g2038 =−/g1833/g3046/g3051 
+/g1833/g3046/g3053 /g34961+/g4672/g1833/g3046/g3051 
+/g1833/g3046/g3053 /g4673/g2870 
+(38) 
+/g1871/g1861/g1866 /g2016=−/g1833/g3046/g3052 
+/uni007≈/g2163/g3046/uni007≈ (39) 
+/g1855/g1867/g1871 /g2016=−/g1833/g3046/g3053 
+/uni007≈/g2163/g3046/uni007≈/g1855/g1867/g1871/g2038 =−/g1833/g3046/g3053 
+/uni007≈/g2163/g3046/uni007≈/g34961+/g3436/g1833/g3046/g3051 
+/g1833/g3046/g3053 /g3440/g2870
+ (40) 
+ 
+The positive square root for /g1855/g1867/g1871/g2038  can always be taken in equation (37) because the r oll angle /g2038 in the 
+Windows 8 coordinate system varies between –90°  and  +90°  resulting in a nonnegative value of /g1855/g1867/g1871/g2038 . 
+Substituting into equation (35) gives the Windows 8  3DOF orientation matrix directly in terms of the 
+accelerometer reading as: 
+/g2174/g3024/g3036/g3041/g2876/g4666/g2032=0/g4667=1
+/uni007≈/g2163/g3046/uni007≈
+/g1737/g1736/g1736/g1736/g1736/g1736/g1736/g1736/g1736/g1735/uni007≈/g2163/g3046/uni007≈
+/g34961+/g4672/g1833/g3046/g3051 
+/g1833/g3046/g3053 /g4673/g2870/g1833/g3046/g3051 /g1833/g3046/g3052 
+/g1833/g3046/g3053 /g34961+/g4672/g1833/g3046/g3051 
+/g1833/g3046/g3053 /g4673/g2870−/g1833/g3046/g3051 
+0 −/g1833 /g3046/g3053 /g34961+/g3436/g1833/g3046/g3051 
+/g1833/g3046/g3053 /g3440/g2870
+−/g1833/g3046/g3052 
+−/g1833/g3046/g3051 /uni007≈/g2163/g3046/uni007≈
+/g1833/g3046/g3053 /g34961+/g4672/g1833/g3046/g3051 
+/g1833/g3046/g3053 /g4673/g2870/g1833/g3046/g3052 
+/g34961+/g4672/g1833/g3046/g3051 
+/g1833/g3046/g3053 /g4673/g2870−/g1833/g3046/g3053 
+/g1740/g1739/g1739/g1739/g1739/g1739/g1739/g1739/g1739/g1738
+ (41) 
+  
+Calculation of Orientation Matrices from Sensor Dat a, 1, 9/2015  
+ =
+/g1737/g1736/g1736/g1736/g1736/g1736/g1736/g1735/g1833/g3046/g3053 
+/g1871/g1861/g1859/g1866 /g4666/g1833/g3046/g3053 /g4667/g3495/g1833/g3046/g3051 /g2870+/g1833/g3046/g3053 /g2870−/g1833/g3046/g3051 /g1844/g3052/g3053 
+/g1871/g1861/g1859/g1866 /g4666/g1833/g3046/g3053 /g4667/g3495/g1833/g3046/g3051 /g2870+/g1833/g3046/g3053 /g2870−/g1833/g3046/g3051 
+/uni007≈/g2163/g3046/uni007≈
+0−/g1871/g1861/g1859/g1866 /g4666/g1833/g3046/g3053 /g4667/g3495/g1833/g3046/g3051 /g2870+/g1833/g3046/g3053 /g2870
+/uni007≈/g2163/g3046/uni007≈−/g1833/g3046/g3052 
+/uni007≈/g2163/g3046/uni007≈
+−/g1833/g3046/g3051 
+/g1871/g1861/g1859/g1866 /g4666/g1833/g3046/g3053 /g4667/g3495/g1833/g3046/g3051 /g2870+/g1833/g3046/g3053 /g2870−/g1833/g3046/g3052 /g1844/g3053/g3053 
+/g1871/g1861/g1859/g1866 /g4666/g1833/g3046/g3053 /g4667/g3495/g1833/g3046/g3051 /g2870+/g1833/g3046/g3053 /g2870−/g1833/g3046/g3053 
+/uni007≈/g2163/g3046/uni007≈
+/g1740/g1739/g1739/g1739/g1739/g1739/g1739/g1738
+ (42) 
+=
+/g1737/g1736/g1736/g1736/g1736/g1736/g1736/g1736/g1736/g1736/g1735−/g1844/g3053/g3053 /uni007≈/g2163/g3046/uni007≈
+/g1871/g1861/g1859/g1866 /g4666/g1833/g3046/g3053 /g4667/g3495/g1833/g3046/g3051 /g2870+/g1833/g3046/g3053 /g2870/g1844/g3051/g3053 /g1844/g3052/g3053 /uni007≈/g2163/g3046/uni007≈
+/g1871/g1861/g1859/g1866 /g4666/g1833/g3046/g3053 /g4667/g3495/g1833/g3046/g3051 /g2870+/g1833/g3046/g3053 /g2870−/g1833/g3046/g3051 
+/uni007≈/g2163/g3046/uni007≈
+0−1
+/g1749/g1748/g1747/uni007≈/g2163/g3046/uni007≈
+/g1871/g1861/g1859/g1866 /g4666/g1833/g3046/g3053 /g4667/g3495/g1833/g3046/g3051 /g2870+/g1833/g3046/g3053 /g2870
+/g1753/g1752/g1751−/g1833/g3046/g3052 
+/uni007≈/g2163/g3046/uni007≈
+/g1844/g3051/g3053 /uni007≈/g2163/g3046/uni007≈
+/g1871/g1861/g1859/g1866 /g4666/g1833/g3046/g3053 /g4667/g3495/g1833/g3046/g3051 /g2870+/g1833/g3046/g3053 /g2870/g1844/g3052/g3053 /g1844/g3053/g3053 /uni007≈/g2163/g3046/uni007≈
+/g1871/g1861/g1859/g1866 /g4666/g1833/g3046/g3053 /g4667/g3495/g1833/g3046/g3051 /g2870+/g1833/g3046/g3053 /g2870−/g1833/g3046/g3053 
+/uni007≈/g2163/g3046/uni007≈
+/g1740/g1739/g1739/g1739/g1739/g1739/g1739/g1739/g1739/g1739/g1738
+ (43) 
+ 
+In the case of gimbal lock after ±90°  pitch rotatio n, when /g1833/g3046/g3051 =/g1833/g3046/g3053 =0, the roll angle /g2038 is undefined 
+and can be set to zero: 
+/g2174/g3024/g3036/g3041/g2876/g4666/g2038=/g2032=0/g4667=/g3437100
+0 0 /g1871/g1861/g1866/g2016 
+0−/g1871/g1861/g1866/g2016 0/g3441=
+/g1737/g1736/g1735100
+0 0−/g1833/g3046/g3052 
+/uni007≈/g2163/g3046/uni007≈
+0/g1833/g3046/g3052 
+/uni007≈/g2163/g3046/uni007≈0/g1740/g1739/g1738=/g468410 0
+0 0 −/g1871/g1861/g1859/g1866/g3435/g1833 /g3046/g3052 /g3439
+0/g1871/g1861/g1859/g1866 /g3435/g1833/g3046/g3052 /g34390/g4685 (44) 
+ 
+5 Magnetometer Compass Orientation Matrix 
+5.1 Introduction 
+This section documents the 2D, magnetometer-only, e Compass functions that calculate the orientation 
+matrix from calibrated magnetometer measurements wi th the assumption that the magnetometer is 
+always flat and has zero tilt away from the horizon tal. The market application for this arrangement is  an 
+automotive compass where the normal accelerometer p lus magnetometer tilt-compensated eCompass 
+functions cannot be used because of vehicle acceler ation, braking and cornering forces. 
+Use these functions with caution. In the automotive  application, the 2D eCompass will be robust agains t 
+the effects of acceleration, braking and cornering forces because the magnetometer sensor is 
+unaffected by acceleration. However, the compass he ading will change when the vehicle tilt angle, 
+Magnetometer Compass Orientation Matrix 
+12    Calculation of Orientation Matrices from Sensor Dat a, 1, 9/2015 
+ 
+Freescale Semiconductor, Inc.   whether roll or pitch, deviates from horizontal, vi olating the assumption that the magnetometer sensor  is 
+always flat. 
+5.2 Aerospace / NED 
+This section documents the mathematics underlying t he function f3DOFMagnetometerMatrixNED  in file 
+orientation.c . 
+The Aerospace / NED rotation matrix for rotation in  yaw angle /g2032 only while remaining horizontal is: 
+/g2174/g3015/g3006/g3005 /g4666/g2032/g4667=/g3437/g1855/g1867/g1871 /g2032/g1871/g1861/g1866/g2032 0
+−/g1871/g1861/g1866/g2032 /g1855/g1867/g1871 /g20320
+001/g3441 (45) 
+ 
+The Aerospace / NED calibrated magnetometer reading  at this orientation is: 
+/g4684/g1828/g3030/g3051 
+/g1828/g3030/g3052 
+/g1828/g3030/g3053 /g4685=/g3437/g1855/g1867/g1871 /g2032/g1871/g1861/g1866/g2032 0
+−/g1871/g1861/g1866/g2032 /g1855/g1867/g1871 /g20320
+001/g3441/g1828/g3437/g1855/g1867/g1871/g2012 
+0
+/g1871/g1861/g1866/g2012 /g3441=/g1828/g3437/uni0009/g1855/g1867/g1871 /g2032/g1855/g1867/g1871/g2012 
+−/g1871/g1861/g1866/g2032/g1855/g1867/g1871/g2012 
+/g1871/g1861/g1866/g2012 /g3441 (46) 
+ 
+The horizontal component of the geomagnetic field h as the value: 
+/g1828/g1855/g1867/g1871/g2012 =/g3495/g1828/g3030/g3051 /g2870+/g1828/g3030/g3052 /g2870 (47) 
+ 
+The yaw /g2032 (and compass heading angle) is given by: 
+/g1872/g1853/g1866/g2032 =/g1871/g1861/g1866/g2032 
+/g1855/g1867/g1871/g2032 =−/g1828/g3030/g3052 
+/g1828/g3030/g3051  (48) 
+/g1871/g1861/g1866/g2032 =−/g1828/g3030/g3052 
+/g3495/g1828/g3030/g3051 /g2870+/g1828/g3030/g3052 /g2870 (49) 
+/g1855/g1867/g1871/g2032 =/g1828/g3030/g3051 
+/g3495/g1828/g3030/g3051 /g2870+/g1828/g3030/g3052 /g2870 (50) 
+ 
+The orientation matrix is independent of the unknow n geomagnetic inclination angle /g2012 and has the 
+value: 
+/g2174/g3015/g3006/g3005 /g4666/g2032/g4667=1
+/g3495/g1828/g3030/g3051 /g2870+/g1828/g3030/g3052 /g2870/g3437/g1828/g3030/g3051 −/g1828/g3030/g3052 0
+/g1828/g3030/g3052 /g1828/g3030/g3051 0
+001/g3441 (51) 
+ 
+  
+Calculation of Orientation Matrices from Sensor Dat a, 1, 9/2015  
+ 5.3 Android 
+This section documents the mathematics underlying t he function f3DOFMagnetometerMatrixAndroid  
+in file orientation.c . 
+The Android rotation matrix for rotation in yaw ang le /g2032 only while remaining horizontal is: 
+/g2174/g3002/g3041/g3031/g3045/g3042/g3036/g3031 /g4666/g2032/g4667=/g3437/g1855/g1867/g1871 /g2032−/g1871/g1861/g1866/g2032 0
+/g1871/g1861/g1866/g2032 /g1855/g1867/g1871 /g20320
+001/g3441 (52) 
+ 
+The Android calibrated magnetometer reading at this  orientation is: 
+/g4684/g1828/g3030/g3051 
+/g1828/g3030/g3052 
+/g1828/g3030/g3053 /g4685=/g3437/g1855/g1867/g1871 /g2032−/g1871/g1861/g1866/g2032 0
+/g1871/g1861/g1866/g2032 /g1855/g1867/g1871 /g20320
+001/g3441/g1828/g34370
+/g1855/g1867/g1871/g2012 
+−/g1871/g1861/g1866/g2012 /g3441=/g1828/g3437−/g1871/g1861/g1866/g2032/g1855/g1867/g1871/g2012 
+/g1855/g1867/g1871/g2032/g1855/g1867/g1871/g2012 
+−/g1871/g1861/g1866/g2012 /g3441 (53) 
+ 
+The horizontal component of the geomagnetic field h as the value: 
+/g1828/g1855/g1867/g1871/g2012 =/g3495/g1828/g3030/g3051 /g2870+/g1828/g3030/g3052 /g2870 (54) 
+ 
+The yaw /g2032 and compass heading angles are given by: 
+/g1872/g1853/g1866/g2032 =/g1871/g1861/g1866/g2032 
+/g1855/g1867/g1871/g2032 =−/g1828/g3030/g3051 
+/g1828/g3030/g3052  (55) 
+/g1871/g1861/g1866/g2032 =−/g1828/g3030/g3051 
+/g3495/g1828/g3030/g3051 /g2870+/g1828/g3030/g3052 /g2870 (56) 
+/g1855/g1867/g1871/g2032 =/g1828/g3030/g3052 
+/g3495/g1828/g3030/g3051 /g2870+/g1828/g3030/g3052 /g2870 (4) 
+ 
+The orientation matrix is independent of the unknow n geomagnetic inclination angle /g2012 and has the 
+value: 
+/g2174/g3002/g3041/g3031/g3045/g3042/g3036/g3031 /g4666/g2032/g4667=1
+/g3495/g1828/g3030/g3051 /g2870+/g1828/g3030/g3052 /g2870/g3437/g1828/g3030/g3052 /g1828/g3030/g3051 0
+−/g1828/g3030/g3051 /g1828/g3030/g3052 0
+001/g3441 (58) 
+ 
+Magnetometer Compass Orientation Matrix 
+14    Calculation of Orientation Matrices from Sensor Dat a, 1, 9/2015 
+ 
+Freescale Semiconductor, Inc.   5.4 Windows 8 
+This section documents the mathematics underlying t he function f3DOFMagnetometerMatrixWin8  in 
+file orientation.c.  
+The Windows 8 rotation matrix for rotation in yaw a ngle /g2032 only while remaining horizontal is: 
+/g2174/g3024/g3036/g3041/g2876/g4666/g2032/g4667=/g3437−/g1855/g1867/g1871 /g2032/g1871/g1861/g1866/g2032 0
+/g1871/g1861/g1866/g2032 /g1855/g1867/g1871 /g20320
+001/g3441 (59) 
+ 
+The Windows 8 calibrated magnetometer reading at th is orientation is: 
+/g4684/g1828/g3030/g3051 
+/g1828/g3030/g3052 
+/g1828/g3030/g3053 /g4685=/g3437−/g1855/g1867/g1871 /g2032/g1871/g1861/g1866/g2032 0
+/g1871/g1861/g1866/g2032 /g1855/g1867/g1871 /g20320
+001/g3441/g1828/g34370
+/g1855/g1867/g1871/g2012 
+−/g1871/g1861/g1866/g2012 /g3441=/g1828/g3437/g1871/g1861/g1866/g2032/g1855/g1867/g1871/g2012 
+/g1855/g1867/g1871/g2032/g1855/g1867/g1871/g2012 
+−/g1871/g1861/g1866/g2012 /g3441 (60) 
+ 
+The horizontal component of the geomagnetic field h as the value: 
+/g2158/g2185/g2197/g2201/g2238 =/g3495/g2158/g2185/g2206 /g2779+/g2158/g2185/g2207 /g2779 (61) 
+ 
+The yaw /g2032 angle, which is equal to minus the compass heading  in the Windows 8 coordinate system, is 
+given by: 
+/g1872/g1853/g1866/g2032 =/g1871/g1861/g1866/g2032 
+/g1855/g1867/g1871/g2032 =/g1828/g3030/g3051 
+/g1828/g3030/g3052  (62) 
+/g1871/g1861/g1866/g2032 =/g1828/g3030/g3051 
+/g3495/g1828/g3030/g3051 /g2870+/g1828/g3030/g3052 /g2870 (63) 
+/g1855/g1867/g1871/g2032 =/g1828/g3030/g3052 
+/g3495/g1828/g3030/g3051 /g2870+/g1828/g3030/g3052 /g2870 (64) 
+ 
+The orientation matrix is independent of the unknow n geomagnetic inclination angle /g2012 and has the 
+value: 
+/g2174/g3024/g3036/g3041/g2876/g4666/g2032/g4667=1
+/g3495/g1828/g3030/g3051 /g2870+/g1828/g3030/g3052 /g2870/g3437/g1828/g3030/g3052 /g1828/g3030/g3051 0
+−/g1828/g3030/g3051 /g1828/g3030/g3052 0
+001/g3441 (65) 
+ 
+  
+Calculation of Orientation Matrices from Sensor Dat a, 1, 9/2015  
+ 6 Accelerometer Magnetometer Tilt eCompass Orientat ion 
+Matrix 
+6.1 Introduction 
+This section documents the calculation of the orien tation matrix from accelerometer and magnetometer 
+measurements. This is the classic tilt-compensated eCompass which provides a complete 
+determination of orientation. The assumption is tha t there is no linear acceleration so that the 
+accelerometer reading is a function of orientation in the earth's gravitational field only. 
+The orientation matrix can be calculated with an al gorithm which is most easily understood from the 
+trivial mathematical identity below: 
+/g4684/g1844/g3051/g3051 /g1844/g3051/g3052 /g1844/g3051/g3053 
+/g1844/g3052/g3051 /g1844/g3052/g3052 /g1844/g3052/g3053 
+/g1844/g3053/g3051 /g1844/g3053/g3052 /g1844/g3053/g3053 /g4685=/g4684/g1844/g3051/g3051 /g1844/g3051/g3052 /g1844/g3051/g3053 
+/g1844/g3052/g3051 /g1844/g3052/g3052 /g1844/g3052/g3053 
+/g1844/g3053/g3051 /g1844/g3053/g3052 /g1844/g3053/g3053 /g4685/g3437100
+010
+001/g3441 (66) 
+ 
+The three columns of the identity matrix on the rig ht hand side are the three unit vectors in the x, y and 
+z directions aligned with the initial orientation in  the global reference frame. The accelerometer 
+measures the gravity vector rotated into its coordi nate system and, therefore, provides the right-hand  
+column of the orientation matrix. The geomagnetic v ector in the global frame points northward and 
+downward (upward) in the northern (southern) hemisp here. The vector product between the rotated 
+gravity and rotated geomagnetic vector is, therefor e, the rotated easterly-pointing vector from the gl obal 
+frame which forms the y (Aerospace / NED coordinate system) or x (Android and Windows 8 coordinate 
+systems) column vector in the orientation matrix. B ecause the orientation matrix is orthonormal, a fin al 
+vector product between the two vectors determined s o far gives the third column vector. 
+6.2 Aerospace / NED 
+This section documents the mathematics underlying t he function feCompassNED  in file orientation.c . 
+The z axis in the initial NED orientation is aligned down wards and parallel to gravity. The z axis column 
+vector of the orientation matrix is the rotated gra vity vector which, on the assumption of zero 
+acceleration, is the normalized accelerometer measu rement /g2163/g3046: 
+/g4684/g1844/g3051/g3053 
+/g1844/g3052/g3053 
+/g1844/g3053/g3053 /g4685=/g2163/g3046
+/uni007≈/g2163/g3046/uni007≈=1
+/g3495/g1833/g3046/g3051 /g2870+/g1833/g3046/g3052 /g2870+/g1833/g3046/g3053 /g2870/g4684/g1833/g3046/g3051 
+/g1833/g3046/g3052 
+/g1833/g3046/g3053 /g4685 (67) 
+ 
+The geomagnetic vector, estimated from the calibrat ed magnetometer reading, points northwards in the 
+initial orientation (in the x direction for the NED coordinate system) and downw ard (upward) in the 
+northern (southern) hemisphere. The vector product of the rotation matrix z column vector and the 
+calibrated magnetometer vector gives a vector ortho gonal to both which is, therefore, aligned along th e 
+east pointing y axis: 
+Accelerometer Magnetometer Tilt eCompass Orientatio n Matrix 
+16    Calculation of Orientation Matrices from Sensor Dat a, 1, 9/2015 
+ 
+Freescale Semiconductor, Inc.   /g4684/g1844/g3051/g3052 
+/g1844/g3052/g3052 
+/g1844/g3053/g3052 /g4685=/g4684/g1844/g3051/g3053 
+/g1844/g3052/g3053 
+/g1844/g3053/g3053 /g4685×/g2158/g3030
+/uni007≈/g2158/g3030/uni007≈=/g4684/g1844/g3051/g3053 
+/g1844/g3052/g3053 
+/g1844/g3053/g3053 /g4685×
+/g1749/g1748/g17471
+/g3495/g1828/g3030/g3051 /g2870+/g1828/g3030/g3052 /g2870+/g1828/g3030/g3053 /g2870/g4684/g1828/g3030/g3051 
+/g1828/g3030/g3052 
+/g1828/g3030/g3053 /g4685
+/g1753/g1752/g1751
+ (68) 
+ 
+Finally, the vector product of the rotation matrix y and z axes gives the remaining x column of the 
+orientation matrix: 
+/g4684/g1844/g3051/g3051 
+/g1844/g3052/g3051 
+/g1844/g3053/g3051 /g4685=/g4684/g1844/g3051/g3052 
+/g1844/g3052/g3052 
+/g1844/g3053/g3052 /g4685×/g4684/g1844/g3051/g3053 
+/g1844/g3052/g3053 
+/g1844/g3053/g3053 /g4685 (69) 
+ 
+The geomagnetic inclination angle /g2012 is the angle by which the geomagnetic field dips b elow horizontal 
+in the global frame. Because the scalar product of two vectors is invariant under rotation, the inclin ation 
+angle is determined from the scalar product of the normalized accelerometer and calibrated magnetic 
+measurements as: 
+/g2163/g3046∙/g2158/g3030=/g34370
+0
+1/g3441∙/g1828/g3437/g1855/g1867/g1871/g2012 
+0
+/g1871/g1861/g1866/g2012 /g3441=/g1828/g1871/g1861/g1866/g2012 ⇒/g1871/g1861/g1866/g2012 =/g1833/g3046/g3051 /g1828/g3030/g3051 +/g1833/g3046/g3052 /g1828/g3030/g3052 +/g1833/g3046/g3053 /g1828/g3030/g3053 
+/uni007≈/g2163/g3046/uni007≈/uni007≈/g2158/g3030/uni007≈ (70) 
+ 
+6.3 Android 
+This section documents the mathematics underlying t he function feCompassAndroid  in file 
+orientation.c . 
+The accelerometer reading in the Android coordinate  system in the initial orientation is also parallel  to 
+the z axis because the Android coordinate system is ENU w ith the z axis upward and is acceleration, 
+not gravity, positive: 
+/g4684/g1844/g3051/g3053 
+/g1844/g3052/g3053 
+/g1844/g3053/g3053 /g4685=/g2163/g3046
+/uni007≈/g2163/g3046/uni007≈=1
+/g3495/g1833/g3046/g3051 /g2870+/g1833/g3046/g3052 /g2870+/g1833/g3046/g3053 /g2870/g4684/g1833/g3046/g3051 
+/g1833/g3046/g3052 
+/g1833/g3046/g3053 /g4685 (71) 
+ 
+The geomagnetic vector, estimated from the calibrat ed magnetometer reading, points northwards in the 
+initial orientation (in the y direction for the Android coordinate system) and d ownward (upward) in the 
+northern (southern) hemisphere. The vector product of the rotation matrix z column vector and the 
+calibrated magnetometer vector gives a vector ortho gonal to both aligned along the north pointing x 
+axis: 
+/g4684/g1844/g3051/g3051 
+/g1844/g3052/g3051 
+/g1844/g3053/g3051 /g4685=/g2158/g3030
+/uni007≈/g2158/g3030/uni007≈×/g4684/g1844/g3051/g3053 
+/g1844/g3052/g3053 
+/g1844/g3053/g3053 /g4685=
+/g1749/g1748/g17471
+/g3495/g1828/g3030/g3051/g2870+/g1828/g3030/g3052 /g2870+/g1828/g3030/g3053 /g2870/g4684/g1828/g3030/g3051 
+/g1828/g3030/g3052 
+/g1828/g3030/g3053 /g4685
+/g1753/g1752/g1751
+/uni0009×/g4684/g1844/g3051/g3053 
+/g1844/g3052/g3053 
+/g1844/g3053/g3053 /g4685 (72) 
+  
+Calculation of Orientation Matrices from Sensor Dat a, 1, 9/2015  
+  
+Finally, the vector product of the rotation matrix z and x axes gives the remaining y component of the 
+orientation matrix: 
+/g4684/g1844/g3051/g3052 
+/g1844/g3052/g3052 
+/g1844/g3053/g3052 /g4685=/g4684/g1844/g3051/g3053 
+/g1844/g3052/g3053 
+/g1844/g3053/g3053 /g4685×/g4684/g1844/g3051/g3051 
+/g1844/g3052/g3051 
+/g1844/g3053/g3051 /g4685 (73) 
+ 
+In the Android coordinate system, the inclination a ngle is related to the scalar product of the 
+accelerometer and calibrated magnetic measurements by: 
+/g2163/g3046∙/g2158/g3030=/g34370
+0
+1/g3441∙/g1828/g34370
+/g1855/g1867/g1871/g2012 
+−/g1871/g1861/g1866/g2012 /g3441=−/g1828/g1871/g1861/g1866/g2012 ⇒/g1871/g1861/g1866/g2012 =−/g3435/g1833/g3046/g3051 /g1828/g3030/g3051 +/g1833/g3046/g3052 /g1828/g3030/g3052 +/g1833/g3046/g3053 /g1828/g3030/g3053 /g3439
+/uni007≈/g2163/g3046/uni007≈/uni007≈/g2158/g3030/uni007≈ (74) 
+ 
+6.4 Windows 8 
+This section documents the mathematics underlying t he function feCompassWin8  in file orientation.c.  
+The accelerometer reading in the Windows 8 coordina te system in the initial orientation is anti-parall el 
+to the z axis because the Windows 8 coordinate system is ENU  with the z axis upward and is gravity 
+(not acceleration) positive: 
+/g4684/g1844/g3051/g3053 
+/g1844/g3052/g3053 
+/g1844/g3053/g3053 /g4685=−1
+/g3495/g1833/g3046/g3051 /g2870+/g1833/g3046/g3052 /g2870+/g1833/g3046/g3053 /g2870/g4684/g1833/g3046/g3051 
+/g1833/g3046/g3052 
+/g1833/g3046/g3053 /g4685 (75) 
+ 
+The geomagnetic vector, or the calibrated magnetome ter reading, in the default orientation points 
+northward (in the y direction for the Windows 8 coordinate system) and  downward (upward) in the 
+northern (southern) hemisphere. The vector product of the Windows 8 y and z vectors gives a vector 
+orthogonal to both aligned along the x axis: 
+/g4684/g1844/g3051/g3051 
+/g1844/g3052/g3051 
+/g1844/g3053/g3051 /g4685=
+/g1749/g1748/g17471
+/g3495/g1828/g3030/g3051 /g2870+/g1828/g3030/g3052 /g2870+/g1828/g3030/g3053 /g2870/g4684/g1828/g3030/g3051 
+/g1828/g3030/g3052 
+/g1828/g3030/g3053 /g4685
+/g1753/g1752/g1751
+/uni0009×/g4684/g1844/g3051/g3053 
+/g1844/g3052/g3053 
+/g1844/g3053/g3053 /g4685 (76) 
+ 
+Finally, the vector product of the z- and x axes gives the remaining y component of the orientation 
+matrix: 
+/g4684/g1844/g3051/g3052 
+/g1844/g3052/g3052 
+/g1844/g3053/g3052 /g4685=/g4684/g1844/g3051/g3053 
+/g1844/g3052/g3053 
+/g1844/g3053/g3053 /g4685×/g4684/g1844/g3051/g3051 
+/g1844/g3052/g3051 
+/g1844/g3053/g3051 /g4685 (77) 
+ 
+Revision History 
+18    Calculation of Orientation Matrices from Sensor Dat a, 1, 9/2015 
+ 
+Freescale Semiconductor, Inc.   In the Windows 8 coordinate system, the inclination  angle is determined from the scalar product of the  
+normalized accelerometer and calibrated magnetic me asurements as: 
+/g2163/g3046∙/g2158/g3030=/g34370
+0
+−1/g3441∙/g1828/g34370
+/g1855/g1867/g1871/g2012 
+−/g1871/g1861/g1866/g2012 /g3441=/g1828/g1871/g1861/g1866/g2012 ⇒/g1871/g1861/g1866/g2012 =/g1833/g3046/g3051 /g1828/g3030/g3051 +/g1833/g3046/g3052 /g1828/g3030/g3052 +/g1833/g3046/g3053 /g1828/g3030/g3053 
+/uni007≈/g2163/g3046/uni007≈/uni007≈/g2158/g3030/uni007≈ (78) 
+ 
+ 
+7 Revision History 
+Table 1. Revision history 
+Rev. No. Date Description 
+1 10/2015 Initial release 
+ 
+ 
+Calculation of Orientation Matrices from Sensor Dat a, 1, 9/2015  
+  
+How to Reach Us: 
+Home Page: 
+freescale.com 
+Web Support: 
+freescale.com/support Information in this document is provided solely to enable system and 
+software implementers to use Freescale products. Th ere are no 
+express or implied copyright licenses granted hereu nder to design or 
+fabricate any integrated circuits based on the info rmation in this 
+document. Freescale reserves the right to make chan ges without 
+further notice to any products herein. 
+Freescale makes no warranty, representation, or gua rantee regarding 
+the suitability of its products for any particular purpose, nor does 
+Freescale assume any liability arising out of the a pplication or use of 
+any product or circuit, and specifically disclaims any and all liability, 
+including without limitation consequential or incid ental damages. 
+“Typical” parameters that may be provided in Freesc ale data sheets 
+and/or specifications can and do vary in different applications, and 
+actual performance may vary over time. All operatin g parameters, 
+including “typicals,” must be validated for each cu stomer application 
+by customer's technical experts. Freescale does not  convey any 
+license under its patent rights nor the rights of o thers. Freescale sells 
+products pursuant to standard terms and conditions of sale, which can 
+be found at the following address: 
+freescale.com/SalesTermsandConditions. 
+Freescale and the Freescale logo, are trademarks of  Freescale 
+Semiconductor, Inc., Reg. U.S. Pat. & Tm. Off. All other product or 
+service names are the property of their respective owners. 
+© 2015 Freescale Semiconductor, Inc. 
+ 

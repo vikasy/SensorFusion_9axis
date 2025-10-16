@@ -1,0 +1,723 @@
+Matlab Sensor Fusion Implementation
+Introduction
+
+The following diagram shows the overall architecture of sensor fusion algorithm. This architecture shows sensor fusion using three sensors, accelerometer (A), gyroscope (G), and magnetometer (M), thus, referred to as 9-axis sensor fusion. The architecture for 6-axis and 3-axis sensor fusion are similar with reduced number of sensors (6-axis uses two sensors AG, GM, or AM while 3-axis used only one sensor A, G, or M). 
+
+INPUT
+INPUT
+
+Compute calibration parameter (under applicable conditions)
+Store calibration parameter in NVM
+Apply calibration to raw input data
+Compute calibration parameter (under applicable conditions)
+Store calibration parameter in NVM
+Apply calibration to raw input data
+OUTPUT
+OUTPUT
+Raw Mag data
+Raw Mag data
+MAGNETIC CALIBRATION
+	•	Hard iron removal
+	•	Soft iron removal
+MAGNETIC CALIBRATION
+	•	Hard iron removal
+	•	Soft iron removal
+
+
+Raw Accel data
+Raw Accel data
+
+FILTER PARAMETERS
+	•	Sensor noise param
+	•	Update rate
+	•	Model param
+FILTER PARAMETERS
+	•	Sensor noise param
+	•	Update rate
+	•	Model param
+ACCELEROMETER CALIBRATION
+ACCELEROMETER CALIBRATION
+
+Raw Gyro data
+Raw Gyro data
+GYROSCOPE CALIBRATION
+GYROSCOPE CALIBRATION
+
+
+Gravity
+Lin Accel
+RV
+GRV
+GeoRV
+Compass
+Orient
+Gravity
+Lin Accel
+RV
+GRV
+GeoRV
+Compass
+Orient
+POST PROCESSING
+	•	Quaternion
+	•	Orientation angles
+	•	Linear acceleration
+	•	Gyro bias/offset
+	•	Magnetic disturbance
+POST PROCESSING
+	•	Quaternion
+	•	Orientation angles
+	•	Linear acceleration
+	•	Gyro bias/offset
+	•	Magnetic disturbance
+KALMAN FILTER
+	•	Quaternion error
+	•	Gyro offset error
+	•	Linear acceleration error
+	•	Mag field error
+KALMAN FILTER
+	•	Quaternion error
+	•	Gyro offset error
+	•	Linear acceleration error
+	•	Mag field error
+PRE PROCESSING
+	•	Gyro bias correction
+	•	Mag disturbance correction
+PRE PROCESSING
+	•	Gyro bias correction
+	•	Mag disturbance correction
+
+
+
+
+Gyro bias, Mag disturbance
+Gyro bias, Mag disturbance
+
+
+The input is raw sensor data passed to algorithm module by the software module managing and sampling physical sensors.  Input sensor data is calibrated using calibration parameters which are calculated as part of the filter and stored in non-volatile memory. 
+The output of this filter is orientation angles (pitch, yaw, and roll), quaternion, gravity vector, linear acceleration, heading, tilt angle, rotation vector (including game rotation vector and geomagnetic rotation vectors).
+
+Sensor and Global Frame:
+The global coordinate system (aka global frame or world frame) is the East-North-Up (ENU) right hand orthonormal coordinate system, where X points east and is tangential to the ground, Y points north and is tangential to the ground and Z points towards the sky and is perpendicular to the ground. 
+The sensor coordinate system (aka sensor frame or device frame), for Android, is the Right-Top-Up (LTU) right hand orthonormal coordinate system, where x points along the width of the device towards the right edge, y points along the height of the device towards the top edge, and the z points upward coming out of the face of the device. In order to avoid any ambiguity, the device, when laid flat face up on ground with its top point north, it should have its sensor frame aligned with the global frame.
+The orientation of a device is defined as the amount of rotation that must be applied to global frame to get it aligned with the sensor frame. It can be defined in terms of a set of three angles called Euler angles, (Pitch angle – rotation about X axis, Roll angle – rotation about Y axis, and Yaw angle – rotation about Z axis). It can also be defined in terms of a quaternion or a rotation matrix, or a pair of rotation vector and angle.
+
+
+
+
+Matlab Software Architecture
+The following chart describes the Matlab software architecture for implementing the above mentioned sensor fusion (including various situational configurations such as 3-axis, 6-axis, 9-axis etc.) and calibration (such as magnetic calibration). The sensor data input file consists of data from accelerometer, gyroscope, and magnetometer (in txt, or csv, or xlsx format). The filter output data is also stored in an output file (in txt, or csv, or xlsx format).
+
+Matlab Software Framework
+The Matlab software for implementing sensor fusion (including various situational configurations such as 3-axis, 6-axis, 9-axis etc.) and calibration (such as magnetic calibration) consists of (1) one top level function, (2) sensor fusion module, and (3) calibration module. 
+Function list
+Input
+Output
+Notes
+SF_Main()
+sensor_data.xls
+algo_output.xls
+sensor_data would contain collected/simulated sensor measurements along with timestamp and flags to select algo
+SF_Init_State()
+sel_algo_flags
+None
+Reset state information for selected algos
+SF_Init_Orient()
+sensor_data, sel_algo_flags
+None
+Computes orientation matrix for selected algos based on sensor_data
+SF_Update_A()
+acc_data
+algo_output
+3-axis Accel only sensor fusion
+SF_Update_AM()
+acc_data, mag_data
+algo_output
+6-axis Accel+Mag sensor fusion
+SF_Update_AG()
+acc_data, gyro_data
+algo_output
+6-axis Accel+Gyro sensor fusion
+SF_Update_AGM()
+acc_data, gyro_data, mag_data
+algo_output
+9-axis Accel+Gyro+Mag sensor fusion
+Orient_Acc()
+acc_data
+Quaternion
+Computes orientation quaternion based only on acc_data
+Orient_Mag()
+mag_data
+Quaternion
+Computes orientation quaternion based only on mag_data
+Orient_AccMag()
+acc_data, mag_data
+Quaternion
+Computes orientation quaternion based only on acc_data and mag_data
+
+
+Function list
+Input
+Output
+Notes
+SF_Main()
+sensor_data.xls
+algo_output.xls
+sensor_data would contain collected/simulated sensor measurements along with timestamp and flags to select algo
+SF_Main (the SF entry point):
+The entry point to the Matlab software is the top level function called SF_Main. The input to this function is a data file (text or xlsx) containing the collected or simulated sensor measurement data along with timestamp and a set of flags to indicate various configurations for fusion algorithm. Following is an example for illustration purpose (the actual data input file might have slightly different format/ info):
+Timestamp
+acc_flag
+accX
+accY
+accZ
+mag_flag
+magX
+magY
+gyro_flag
+gyroZ
+gyroY
+gyroZ
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+The main output of this function is a data file (text or xls) containing the following output from the algorithm: 
+	•	Orientation Angle 
+	•	Quaternion 
+	•	Rotation Vector
+	•	Game Rotation Vector
+	•	Geo Rotation Vector
+	•	Linear acceleration
+	•	Gravity Vector
+	•	Compass Heading 
+
+
+Function name
+Input
+Output
+Definition
+SF_Update_AGM()
+acc_data, gyro_data, mag_data
+algo_output
+9-axis Accel+Gyro+Mag sensor fusion
+
+SF_Update_AGM (9-axis SF):
+The sensor fusion algorithm is based on the Extended Kalman Filter, which keeps track, via a real time estimation, of the following physical quantities: (1) error in orientation angles (pitch, roll, and yaw) of device; (2) error in gyro offset for each of 3 axis of gyro sensor, (3) error in 3-dimensional linear acceleration of device, and (4) error in 3-dimensional magnetic disturbance vector. The estimated error is defined as difference between estimated value and the truth value (which is the measured value filtered for measurement noise). The new estimated values can be obtained by adding the corresponding error values to the previous estimated values. 
+
+The pseudo code for SF_Update 9-axis Sensor Fusion using Kalman Filter (9-axis) is summarized in the following flow chart:
+
+
+
+
+
+
+The above pseudo code skipped the details of handling magnetic jamming scenario to avoid the control flow of algorithm from becoming complex. However, the Matlab software implementation does take care of magnetic jamming by checking if the new measurement value if greater than a specified threshold (which is four times the magnitude of estimated magnetic field).
+
+Primary inputs to this algorithm are filter state information, accelerometer, gyroscope, and magnetometer sensor data.  The filter executes one pass of the accelerometer, magnetometer and gyroscope sensor fusion per run.
+
+The algorithm runs at the rate of 25Hz (this is configurable), i.e., orientation is estimated at 25Hz based on sensor fusion of measurements from the following three sensors: accelerometer (3-axis), gyroscope (3-axis), and magnetometer (3-axis), i.e. a total of 9-axis of data for fusion.
+
+During every pass of Kalman Filter, the rotation matrix (representing rotation from global frame to sensor frame) is updated in two steps, first by “time update” and then followed by “measurement update”. Time update is based on the estimated angular velocity (from gyroscope measurement) and measurement update is based on the estimate error in orientation angle (using accelerometer and magnetometer measurement). 
+
+The Kalman Filter state information (SV) consists of the following pieces of information:
+Orientation Angles:
+   PhiPost : roll angle of orientation, filter output (deg)
+   ThetaPost : pitch angle of orientation, filter output (deg)
+   PsiPost : yaw angle of orientation, filter output (deg)
+   RhoPost : compass heading, filter output (deg)
+   ChiPost  : tilt angle from vertical down, filter output (deg)
+
+Orientation Information:
+   Omega[3] : estimated angular velocity of device with respect to earth (deg/sec)
+   RotMtxPri[3][3] : “time-updated” aka apriori rotation/orientation matrix
+   QuatPri : apriori rotation/orientation quaternion
+   RotMtxPost : “measurement-updated” aka aposteriori rotation/orientation matrix
+   QuatPost : aposterirori orientation quaternion
+   RotVecPost[3] : aposteriori rotation vector
+
+Kalman Filter state vector:
+   OrntErrPostS[3] : aposteriori error orientation angle (deg) of sensor frame wrt global 
+   BiasErrPostS[3] : aposteriori gyro zero rate offset error (deg/sec)
+   MdErrPostS[3] : aposteriori magnetic disturbance error (uT) in sensor frame
+   AccErrPostS[3] : aposteriori linear acceleration error (g) in sensor frame
+
+Measurement based Gravity and Mag Vectors:
+   GravGyrPriS[3] : apriori gravity vector gyro based (g) in sensor frame
+   GravAccPriS[3] : apriori gravity vector accel based (g) in sensor frame
+   MagGyroPriS[3] : apriori gravity vector gyro based (uT) in sensor frame
+   MagMagPriS[3] : apriori magnetic vector mag based (uT) in sensor frame
+   Cmat[6][12] : measurement input matrix
+Other Physical Quantities as side product:   
+   AccPostS[3] : linear acceleration (g) sensor frame
+   AccPostG[3] : linear acceleration (g) global frame
+   MagG[3] : magnetic vector (uT) in global frame
+   MagIncAngG : magnetic inclination angle (deg) in global frame
+   BiasPostS[3] : estimate of gyro bias (deg/sec)
+   MdErrPostG[3] : magnetic disturbance error (uT) in global frame
+
+Kalman Filter Tuning Parameters:  
+The Kalman Filter model assumes that the measurement noises and process model noise are additive, zero-mean, and has fixed variances, as follows:
+     QvA : accelerometer sensor measurement error covariance
+     QwA : linear acceleration process model error covariance
+     Cacc : linear acceleration time constant
+     QvG : gyroscope sensor measurement error covariance
+     Qwb : zero-rate gyroscope offset process model error covariance
+     QvM : magnetometer sensor measurement error covariance
+     QwM : magnetometer disturbance process model error covariance
+     Cmd : magnetometer disturbance time constant
+     P0 : Initial estimation error covariance 
+The time constants are used to model the small linear acceleration as magnetometer disturbances. The values for the above parameters need to be tuned (by Matlab simulation) appropriately to obtain satisfactory estimation error performance. Also, note that in this filter model, the linear acceleration is assumed to a random noise. Thus, if there is significant constant acceleration for longer duration, the performance can deteriorate. 
+The Kalman Filter SV is updated at a rate of 25Hz, thus, computing all necessary orientation information at every 40msec from the measured sensor input (oversampled). 
+
+
+Output Derived from Kalman Filter SV (Updated at 25Hz):  
+	•	Orientation Angle (deprecated by Android): Pitch angle (deg), Roll angle (deg), Yaw angle (deg) with respect to global frame.
+	•	Quaternion: A mathematical 4-dimensional construct which contains information about ‘angle’ (1-dimension) and ‘axis’ vector (3-dimensions), representing the rotation of sensor frame about the ‘axis’ vector by ‘angle’ amount with respect to the global frame. One to one mapping with Orientation angle.
+	•	Rotation vector (RV): As per Android guideline, it should be same as Quaternion, however, the Freescale software defines it as the ‘axis’ vector of rotation multiplied by the scalar ‘angle’ value. One to one mapping with Orientation angle and Quaternion. The same vector is renamed as Geomagnetic Rotation Vector (GeoRV) if only accelerometer and magnetometer are used for measurement inputs and as Game Rotation Vector (GameRV) if only accelerometer and gyroscope are used for measurement inputs.
+	•	Linear acceleration: Linear acceleration of device in 3-dimension in sensor and global frame (excluding gravity).
+	•	Gravity vector: The Earth’s gravity vector in sensor (device) frame.
+	•	Compass Heading: The heading of device y axis with respect to the Earth’s magnetic north.
+	•	Title Angle: The angle between sensor frame z-axis and global frame z-axis.
+
+	•	
+
+
+
+
+
+
+Matlab Sensor Fusion and Calibration Software
+The Matlab software for implementing sensor fusion (including various situational configurations such as 3-axis, 6-axis, 9-axis etc.) and calibration (such as magnetic calibration) consists of (1) one top level function, (2) sensor fusion module, and (3) calibration module. 
+The Entry point
+The entry point to the Matlab software is the top level function called SF_Main. The input to this function is a data file (text or xls) containing the collected or simulated sensor measurement data along with timestamp and a set of flags to indicate various configurations for fusion algorithm. 
+The main output of this function is a data file (text or xls) containing the following output from the algorithm: 
+	•	Orientation Angle 
+	•	Quaternion 
+	•	Rotation Vector
+	•	Game Rotation Vector
+	•	Geo Rotation Vector
+	•	Linear acceleration
+	•	Gravity Vector
+	•	Compass Heading 
+
+The following is a basic outline of this function:
+
+Sensor Fusion Module
+The sensor fusion module implements various configurations of sensor fusion algorithms along with initialization. The following is a list of functions in this module:
+Function list
+Input
+Output
+Notes
+SF_Main()
+sensor_data.xls
+algo_output.xls
+sensor_data would contain collected/simulated sensor measurements along with timestamp and flags to select algo
+SF_Update()
+sensor_data, sel_algo_flags
+algo_output, algo_flags
+
+SF_Init_State()
+sel_algo_flags
+None
+Reset state information for selected algos
+SF_Init_Orient()
+sensor_data, sel_algo_flags
+None
+Computes orientation matrix for selected algos based on sensor_data
+SF_Update_A()
+acc_data
+algo_output
+3-axis Accel only sensor fusion
+SF_Update_AM()
+acc_data, mag_data
+algo_output
+6-axis Accel+Mag sensor fusion
+SF_Update_AG()
+acc_data, gyro_data
+algo_output
+6-axis Accel+Gyro sensor fusion
+SF_Update_AGM()
+acc_data, gyro_data, mag_data
+algo_output
+9-axis Accel+Gyro+Mag sensor fusion
+Orient_Acc()
+acc_data
+Quaternion
+Computes orientation quaternion based only on acc_data
+Orient_Mag()
+mag_data
+Quaternion
+Computes orientation quaternion based only on mag_data
+Orient_AccMag()
+acc_data, mag_data
+Quaternion
+Computes orientation quaternion based only on acc_data and mag_data
+
+
+Calibration Module
+
+
+
+
+
+Matlab Software Architecture
+The following chart describes the Matlab software architecture for implementing sensor fusion (including various situational configurations such as 3-axis, 6-axis, 9-axis etc.) and calibration (such as magnetic calibration). The sensor data input file consists of data from accelerometer, gyroscope, and magnetometer. The filter output data is also stored in an output file.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Sensor Data Pre-processing
+	•	Reading Sensor Values
+Accelerometer
+An accelerometer is an electromechanical device that will measure acceleration forces. These forces may be static, like the constant force of gravity pulling at your feet, or they could be dynamic – caused by moving or vibrating the accelerometer. By measuring the amount of static acceleration due to gravity, the angle of the device is tilted at with respect to the earth could be computed. 
+
+In sensor fusion library, the 3-axis accelerometer values are stored as “int16”. Multiply by the sensor dependent scaling factor “thisAccel->fgPerCount” to convert to gravities (please refer Appendix G).
+
+float fAcc[3]; 		// accel sensor output x, y, z
+fAcc[X] = (float) thisAccel.iGp[X]*thisAccel.fgPerCount;
+fAcc[Y] = (float) thisAccel.iGp[Y]*thisAccel.fgPerCount;
+fAcc[Z] = (float) thisAccel.iGp[Z]*thisAccel.fgPerCount; 
+
+Gyroscope
+A gyroscope is a device that measures the angular velocity. The 3-axis gyroscope can measure rotational velocity in three axes: x, y, and z.  
+
+In sensor fusion library, the 3-axis gyroscope values are stored as “int16”. Multiply by the sensor dependent scaling factor “thisGyro->fDegPerSecPerCount” to convert to degrees/second (please refer Appendix G).
+
+float fAngularRate[3]; 	// averaged gyro sensor output
+fAngularRate[X] = thisGyro.iYp[X]*thisGyro.fDegPerSecPerCount;
+fAngularRate[Y] = thisGyro.iYp[Y]*thisGyro.fDegPerSecPerCount;
+fAngularRate[Z] = thisGyro.iYp[Z]*thisGyro.fDegPerSecPerCount; 
+
+Magnetometer
+Magnetometer is an instrument for measuring the strength and sometimes the direction of a magnetic field. An important use of magnetometers is in measuring the earth’s magnetic field. 
+
+In sensor fusion library, the 3-axis magnetometer values are stored as “int16”. Multiply by sensor dependent factor “thisMag->fCountsPeruT” to convert to μTs. Both raw and calibrated magnetometer outputs are available. Scaling is the same for both (please refer Appendix G).
+float fBp[3]; 	// mag - raw average over OVERSAMPLE_RATIO measurements
+float fBc[3]; // mag - iBp after calibration
+fBp[X] = thisMag.iBp[X]*thisMag.fCountsPeruT;
+fBp[Y] = thisMag.iBp[Y]*thisMag.fCountsPeruT;
+fBp[Z] = thisMag.iBp[Z]*thisMag.fCountsPeruT;
+fBc[X] = thisMag.iBc[X]*thisMag.fCountsPeruT;
+fBc[Y] = thisMag.iBc[Y]*thisMag.fCountsPeruT;
+fBc[Z] = thisMag.iBc[Z]*thisMag.fCountsPeruT;
+
+	•	Raw Sensor Data Decimation
+The current version of sensor fusion algorithm requires the sensor sampling rate for all the sensors are the same (Default = 100 Hz), in the future release, we plan to remove this constraint and support raw sensor data with different sampling rates (please refer Chap08. Future works). 
+
+The fusion algorithm typically executes at 25 Hz, which is also adjustable, and controlled by decimation constant “OVERSAMPLE_RATIO” (Default = 4, assuming 100 Hz sensor sampling and 4x oversampling).
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Overview of 9-axis Sensor Fusion Algorithm 
+	•	Sensor Fusion High Level Block Diagram
+Figure 2 describes the sensor fusion high level architecture block diagram.
+
+
+Figure 2: Sensor Fusion High Level Architecture
+
+	•	Sensor Fusion Features
+Sensor Fusion is the process where data from several different sensors are fused to complete computations that a single sensor could not handle. sensor fusion algorithm supports both sensor fusion and calibration. Table 1 lists the feature outputs that are supported by sensor fusion algorithm.
+
+
+Table 1: Sensor Fusion Feature Outputs
+Category
+Features
+Sensor Options
+Dynamic Calibration
+ Gyroscope
+	•	gyro 
+
+ Magnetometer
+	•	mag (4-element)
+	•	mag (7-element)
+	•	mag (10-element)
+
+ Accelerometer
+	•	acc 
+Sensor Fusion
+ Gravity Vector
+	•	acc + gyro
+
+ Rotation Vector
+	•	acc (*)
+	•	acc + mag + gyro
+
+ Game Rotation Vector
+	•	acc + gyro
+
+ Geomagnetic Rotation Vector   
+	•	acc + mag
+
+ Linear Acceleration 
+	•	acc + gyro (*)
+	•	acc + gyro + mag
+
+ Orientation
+	•	acc (*)
+	•	acc + gyro (*)
+	•	acc + mag (*)
+	•	acc + mag + gyro
+
+Note: Sensor options marked with (*) will be supported at low power mode for the 1st official release. (Details please refer Chapter 04; Future work).  
+
+Next, we will briefly describe each feature.
+
+Dynamic Calibration
+Gyroscope Calibration: 
+The Indirect Kalman filter based Gyroscope offset estimation and compensation is supported.
+
+Magnetic Calibration: 
+There are two types of calibration required for magnetometers: soft iron and hard iron calibration. Hard iron calibration is considered to remove constant magnetic field affecting the sensor platform. Soft iron calibration is required to eliminate the effects of electromagnetic fields, which causes the ideal sphere to become an oval shape. magnetic calibration algorithm supports the following 3 different complexity level of calibration models:
+	•	10 element
+	•	Three elements of the hard iron vector
+	•	Six elements of the soft iron matrix
+	•	Geomagnetic field strength
+	•	7 element
+	•	Three elements of the hard iron vector
+	•	Three non-zero elements on the leading diagonal 
+	•	Geomagnetic field strength
+	•	4 element
+	•	Three elements of the hard iron vector
+	•	Geomagnetic field strength
+
+Accelerometer Calibration: 
+The indirect Kalman filter based dynamic accelerometer offset estimation and compensation is supported.
+
+
+	•	Sensor Fusion Features
+Gravity Vector: 
+Gravity vector is a three dimensional vector indicating the direction and magnitude of gravity. Units are m/s^2. The coordinate system is the same as is used by the acceleration sensor. Note: when the device is at rest, the output of the gravity sensor should be identical to that of the accelerometer.
+
+Rotation Vector:
+The rotation vector represents the orientation of the device as a combination of an angle and an axis, in which the device has rotated through an angle  around an axis <x, y, z>. The three elements of the rotation vector are <x*, y*, z*>, such that the magnitude of the rotation vector is equal to , and the direction of the rotation vector is equal to the direction of the axis of rotation. 
+
+The three elements of the rotation vector are equal to the last three components of a unit quaternion <, x*, y*, z*>.
+
+Game Rotation Vector:
+Game rotation vector is similar to rotation vector except that it does not use the geomagnetic field. Therefore the Y axis does not point north, but instead to some other reference, that reference is allowed to drift by the same order of magnitude as the gyroscope drift around the Z axis.
+
+Geomagnetic Rotation Vector:
+Geomagnetic Rotation Vector is similar to (game) rotation vector, but using a magnetometer instead of using a gyroscope. Because it doesn’t use the gyroscope, this sensor uses lower power. However, it is more noisy and will work best outdoors.
+
+Linear Acceleration:
+Linear acceleration is a three dimensional vector indicating acceleration along each device axis, not including gravity. All values have unit of m/s^2. The coordinate system is the same as is used by the acceleration sensor.
+The output of the accelerometer, gravity and linear acceleration sensors must obey the following relation:
+		Acceleration = gravity + linear_acceleration
+
+Orientation:
+Compute the device’s full 3D rotation from a global frame in any of the following forms:
+	•	Rotation matrix
+	•	Rotation vector (3D axis of rotation and rotation about that axis)
+	•	Quaternion
+	•	Euler angles (roll, pitch and yaw) 
+
+	•	Sensor Fusion APIs
+Data Structures Exposed to Sensor Governor
+Inputs to SF Algorithm
+typedef struct {
+Int64_t 	timestamp;	
+Int16_t 	sensordata[3]; 
+Int16_t		accuracy;
+} struct_sensor_element;
+
+typedef struct {
+struct_sensor_element 	acc;
+struct_sensor_element 	mag;
+struct_sensor_element 	gyro;
+} struct_9axis_data; 
+
+Timestamp 
+	•	64 bit timestamp in nanoseconds taken at the time of sensors were sampled. 
+Sensordata[3] 
+	•	3-axis raw sensor element values that includes x, y, z
+	•	For each sensor, there is a dedicate sensor element.
+
+Outputs from SF Algorithm
+typedef struct {
+	int64_t  timestamp;			
+	int32_t  event_bit;		
+	void 	 *event_output[];	
+} struct_sensor_event;
+
+Timestamp 
+	•	64-bit timestamp in nanoseconds corresponding to the outputs.  
+Event_bit 
+	•	Event_bit maps to the supported SF features. Each bit represents one feature (up to 32). 
+*Event_output[]
+	•	The outputs from the corresponding SF features 
+
+Memory Allocation for Virtual Sensor(s)
+Memory allocation for virtual sensors data, i.e, SF algorithm feature outputs, is required before calling any SF algorithm. The size of the allocated memory is decided according to the supported SF features, i.e., event_bits, Pointer array *event_output[] is pointed to the allocated memory, and will be one of the parameters passing to the algorithm.
+Note: Event bits [2:0] do not have outputs, and are dedicated to operational mode of MEMS.
+
+Figure 3: Memory Allocation to Algorithm Based on Event_bits
+ Sensor Fusion Algorithm Options
+
+Table 2 describes the mapping between sensor fusion algorithm options and event bits for SF pre-release. Low power version features will be added later for the 1st SF official release. Event bits [2:0] are dedicated to the operational mode of MEMS: 0: Acc, 1: Gyro, 2: Mag. 
+	
+
+Table 2: Mappings between Supported SF Features Options and Event bit 
+
+Event bit
+Feature
+Outputs
+Option Bits[0:2]
+Bit – 0:2
+Availability of Sensor [A, G, M]
+NA
+NA
+Bit – 3
+Gravity Vector
+[X,Y,Z]
+110
+111
+Bit – 4
+Rotation Vector
+Quaternion
+[Q0,Q1,Q2,Q3]
+100
+111
+Bit – 5
+Game Rotation Vector
+Quaternion
+[Q0,Q1,Q2,Q3]
+110
+Bit – 6
+Geomagnetic Rotation Vector (A,M)
+[X,Y,Z]
+101
+Bit – 7
+Linear Acceleration
+[X,Y,Z]
+111
+110
+Bit – 8
+Orientation 
+Euler Angles
+[P,Y,R]
+100
+111
+110
+Bit - 9
+Angular Rate
+[W0,W1,W2]
+110
+111
+Bit – 9 ~ 31
+Reserved
+
+
+
+Note: 
+	•	If more than one feature is required, then all the corresponding bits need to be set.
+	•	The orientation output listed here is Euler angles, but we also support for Rotation matrix/Rotation vector/Quaternion as outputs.
+
+
+Sensor Fusion Algorithm APIs
+
+APIs
+Function Description
+void 
+sf_Fusion_Init(void)
+Function that initializes:
+	•	sensor parameters (including sensor sensitivity scaling factors and data structure
+	•	sensor fusion algorithm parameter and data structure
+	•	Magnetic calibration parameter and data structure
+int
+sf_Data_PreProc(
+struct_sensor_element *acc,
+struct_sensor_element *gyr,
+struct_sensor_element *mag)
+	•	Sensor data preprocessing for fusion algorithms. 
+	•	The raw sensor data should be ready in global sensor data structure when this function is called.
+Return Parameter:
+	•	0:  sf_Fusion_Run() will be bypassed
+	•	1:  sf_Fusion_Run() will be called
+int 
+sf_Fusion_Run(
+  int    event_bit, 
+float	 *event_output_ptr[])
+
+Sensor fusion algorithm main functions
+Return Parameter:
+	•	event_bit. This event_bit should be the same as the event_bit from input parameter. 
+	•	*event_output_ptr[] is the pointer array for the memories allocated for SF outputs. The memory should be allocated by SW team who is responsible for integration
+void 
+sf_MagCal_Wrap( 
+  int event_bit)
+Magnetometer Calibration Wrap function, will call sf_MagCal_Run() for event_bit: {4, 6, 7, 8} 
+void 
+sf_Fusion_Stop(void)
+Sensor fusion algorithm and calibration exit
+
+

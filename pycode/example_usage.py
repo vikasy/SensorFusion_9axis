@@ -6,8 +6,8 @@ Date: 2025-10-12
 """
 
 import numpy as np
-from sensor_fusion_6axis import SensorFusion6Axis, SensorID
-from sensor_fusion_9axis import SensorFusion9Axis
+from test.sensor_fusion_6axis import SensorFusion6Axis, SensorID
+from test.sensor_fusion_9axis import SensorFusion9Axis
 
 # ============================================================================
 # Example 1: 6-Axis Sensor Fusion (Accelerometer + Gyroscope)

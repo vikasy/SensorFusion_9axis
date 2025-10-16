@@ -1,0 +1,1063 @@
+ 
+Contents 
+1 Introduction ...................................... ................................................... ............................................ 3  
+1.1 Summary ....................................... ................................................... .......................................... 3 
+1.2 Terminology ................................... ................................................... ......................................... 3 
+1.3 Software Functions ............................ ................................................... ..................................... 4 
+2 Quaternion Algebra ................................ ................................................... ...................................... 5  
+2.1 Introduction .................................. ................................................... ........................................... 5 
+2.2 Equality of Two Quaternions ................... ................................................... ................................ 5 
+2.3 Addition of Two Quaternions ................... ................................................... ................................ 6 
+2.4 Product of Two Quaternions .................... ................................................... ................................ 6 
+2.5 Product of Quaternion and Scalar .............. ................................................... ............................. 7 
+2.6 Product of a Quaternion with a Vector ......... ................................................... ............................ 7 
+2.7 Quaternion Conjugate .......................... ................................................... ................................... 8 
+2.8 Quaternion Norm ............................... ................................................... ...................................... 9 
+2.9 Quaternion Inverse and Division ............... ................................................... ............................ 10 
+2.10 Vector Representation of Quaternion Product .. ................................................... ..................... 10 
+3 Rotation Quaternion ............................... ................................................... .................................... 11  
+3.1 Definition in Terms of Rotation Vector ........ ................................................... ........................... 11 
+3.2 Equivalence of Rotation Quaternion and Rotation  Matrix ........................................... .............. 11 
+3.3 Inverse Rotation Quaternion ................... ................................................... ............................... 12 
+3.4 Product of Rotation Quaternions ............... ................................................... ............................ 12 
+3.5 Negation of Rotation Axis and Angle ........... ................................................... .......................... 12 
+3.6 Coordinate Frame Rotation Standard ............ ................................................... ........................ 13 
+4 Converting between Quaternion and Rotation Matrix.. ................................................... ............ 13  
+4.1 Rotation Matrix from Quaternion................ ................................................... ............................ 13 
+4.2 Quaternion from Rotation Matrix................ ................................................... ............................ 14 
+5 Converting between Quaternion and Rotation Vector . ................................................... ............ 16  
+5.1 Rotation Vector From Quaternion ............... ................................................... ........................... 16 
+5.2 Quaternion From Rotation Vector ............... ................................................... ........................... 16 
+6 Low-pass Filtering Orientation Quaternions ........ ................................................... .................... 17  
+6.1 Introduction .................................. ................................................... ......................................... 17 
+6.2 Exponential Time Domain Low Pass Filter ....... ................................................... ..................... 17 
+6.3 Exponential Quaternion Low-pass Filter ........ ................................................... ........................ 18 
+7 Quaternion Derivative ............................. ................................................... ................................... 19  
+7.1 Definition .................................... ................................................... ........................................... 19 
+7.2 Derivation for Rotation Quaternions ........... ................................................... ........................... 19 
+ Freescale Semiconductor  Document Number: AN5022 
+APPLICATION NOTE  Rev. 1.0, 9/201 5
+Quaternion Algebra and Rotations 
+Mark Pedley and Michael Stanley 
+ 
+ 
+ 
+  
+Document Number: 
+ Document Number: AN5022  
+Revision 1.0, 9/2015 
+ 
+1 Introduction 
+1.1 Summary 
+Quaternions are hyper-complex numbers of rank 4 tha t were invented by William Rowan Hamilton in 
+1843.    They are commonly used to simplify computa tion of 3-dimensional rotations. 
+This application note contains an introduction to q uaternion algebra and its use to represent rotation s. It 
+documents the specific quaternion functions used in  the Freescale Sensor Fusion Library  within the file 
+orientation.c . 
+The four components of a quaternion provide a more efficient means, both in storage and computation, 
+to represent orientations as compared to the nine c omponents of a rotation matrix. Quaternions are 
+therefore used extensively in computer gaming and h ave, in consequence, also been adopted as a 
+standard for representing orientation in sensor fus ion applications. 
+Rotation matrices and rotation quaternions share th e very important characteristic of being well 
+behaved mathematically compared to the Euler angles  (roll, pitch and yaw). The phenomenon of gimbal 
+lock instability in strapdown sensor systems occurs  in the Euler angle representation of orientation, 
+typically at ±90 o pitch, but is entirely absent in rotation matrix o r rotation quaternion representations 
+which are stable and continuous. Euler angles are t herefore only used in the Freescale Sensor Fusion 
+Library  as an output representation of calculation perform ed using rotation matrices and rotation 
+quaternions. 
+1.2 Terminology 
+Symbol Definition 
+⇒g1803=⇒g1803⇒g2868+⇒g1803⇒g2869⇒g2191+⇒g1803⇒g2870⇒g2192+⇒g1803⇒g2871⇒g2193 Components of quaternion ⇒g1803 
+⇒g1803∗=⇒g1803⇒g2868−⇒g1803⇒g2869⇒g2191−⇒g1803⇒g2870⇒g2192−⇒g1803⇒g2871⇒g2193 Quaternion conjugate of ⇒g1803 
+⇒g1803=⇒g≠668⇒g1803⇒g2868,⇒g2183⇒g≠669 Representation of quaternion ⇒g1803 in scalar ⇒g1803⇒g2868 and vector 
+⇒g2183 components 
+⇒g1803⇒g2879⇒g2869=⇒g1803∗
+⇒g18≠0⇒g≠666⇒g1803⇒g≠667⇒g2870 Inverse or reciprocal of quaternion ⇒g1803 
+⇒g1803⇒g2868 Scalar component of quaternion ⇒g1803 
+⇒g2183=⇒g1803⇒g2869⇒g2191+⇒g1803⇒g2870⇒g2192+⇒g1803⇒g2871⇒g2193 Vector component of quaternion ⇒g1803i 
+⇒g2183∙⇒g218≠ Scalar product of vectors ⇒g2183 and ⇒g218≠ 
+⇒g2183×⇒g218≠ Vector product of vectors ⇒g2183 and ⇒g218≠ 
+⇒g2196⇒g30≠9 Unit vector representing rotation axis 
+⇒g18≠0⇒g≠666⇒g1803⇒g≠667=⇒g3≠93⇒g1803⇒g2868⇒g2870+⇒g1803⇒g2869⇒g2870+⇒g1803⇒g2870⇒g2870+⇒g1803⇒g2871⇒g2870 Norm or magnitude of quaternion ⇒g1803 
+⇒g1869⇒g3001,⇒g1869⇒g3002,⇒g1869⇒g3003 Rotation quaternions about the x, y and z axes 
+⇒g217≠⇒g3001,⇒g217≠⇒g3002,⇒g217≠⇒g3003 Rotation matrices around x, y and z axes 
+⇒g1870 Real number 
+⇒g1878 Complex number 
+⇒g2010 General rotation angle 
+⇒g2038 Roll angle 
+⇒g2016 Pitch angle 
+⇒g2032 Yaw angle 
+ 
+Symbol 
+⇒g2020 
+ 
+A unit quaternion is one in which the norm of the q uaternion is of magnitude 1.  Unit quaternions are 
+commonly used to model rotations.  
+1.3 Software F unctions 
+Table 1 
+Function 
+void fqAeq1(struct fquaternion * 
+void qAeqBxC 
+(struct fquaternion *pqA, const struct 
+fquaternion *pqB , const struct 
+fquaternion *pqC); 
+void qAeqAxB(struct fquaternion *pqA, 
+const struct fquaternion *pqB); 
+struct fquaternion qconjgAxB 
+(const struct fquaternion *pqA, const 
+struct fquaternion *pqB); 
+void fqAeqNormqA 
+(struct fquaternion *pqA); 
+void fRotationMatrixFromQuaternion 
+(float R[][3], const struct fquaternion 
+*pq); 
+void fQuaternionFromRotationMatrix 
+(float R[][3], struct fquaternion *pq); 
+void fRotationVectorDegFromQuaternion 
+(struct fquaternion *pq, float 
+rvecdeg[]); 
+Document Number: Definition 
+Compass heading angle 
+A unit quaternion is one in which the norm of the q uaternion is of magnitude 1.  Unit quaternions are 
+commonly used to model rotations.   
+unctions  
+Table 1 . Sensor Fusion software functions 
+Description 
+void fqAeq1(struct fquaternion * pqA); Function sets the quaternion A to the 
+unit or identity quaternion. 
+(struct fquaternion *pqA, const struct 
+, const struct Function sets the quaternion A to the 
+quaternion product BC. 
+ 
+void qAeqAxB(struct fquaternion *pqA, 
+const struct fquaternion *pqB);  Function sets the quaternion A to the 
+quaternion product AB. 
+ 
+(const struct fquaternion *pqA, const Function returns the quaternion 
+product A*B where A* is the conjugate 
+of A. 
+ 
+Function normalizes the quaternion A. 
+ 
+void fRotationMatrixFromQuaternion  
+(float R[][3], const struct fquaternion Function computes a rotation matrix 
+from a rotation quaternion.  
+void fQuaternionFromRotationMatrix  
+(float R[][3], struct fquaternion *pq);  Function computes a rotation 
+quaternion from a rotation matrix. 
+void fRotationVectorDegFromQuaternion  
+(struct fquaternion *pq, float Computes the rotation vector from a 
+rotation quaternion. 
+ 
+ Document Number: AN5022  
+Revision 1.0, 9/2015 A unit quaternion is one in which the norm of the q uaternion is of magnitude 1.  Unit quaternions are 
+Section 
+Function sets the quaternion A to the 2.1 
+to the 2.4 
+Function sets the quaternion A to the 2.4 
+product A*B where A* is the conjugate 2.7 
+Function normalizes the quaternion A.  2.8 
+Function computes a rotation matrix 4.1 
+4.2 
+Computes the rotation vector from a 5.1 
+ 
+Function Description Section 
+void fQuaternionFromRotationVectorDeg 
+(struct fquaternion *pq, const float 
+rvecdeg[], float fscaling); Computes the rotation quaternion from 
+a rotation vector with scaling. 
+ 5.2 
+void fLPFOrientationQuaternion 
+(struct fquaternion *pq, struct 
+fquaternion *pLPq, float flpf, float 
+fdeltat, float fOmega[]) Function low-pass filters the 
+orientations represented by a 
+sequence of quaternions. 6.2 
+2 Quaternion Algebra 
+2.1 Introduction 
+Quaternions form a class of four-component hyper-co mplex numbers. 
+Whereas a complex number ⇒g1878 has two components, one real and the other imagina ry: 
+⇒g1878=⇒g1803+⇒g180≠⇒g1861 (1) 
+ 
+a quaternion ⇒g1803 has four components: 
+⇒g1803=⇒g1803⇒g2868+⇒g1803⇒g2869⇒g2191+⇒g1803⇒g2870⇒g2192+⇒g1803⇒g2871⇒g2193=⇒g≠668⇒g1803⇒g2868,⇒g1803⇒g2869,⇒g1803⇒g2870,⇒g1803⇒g2871⇒g≠669 (2) 
+ 
+where ⇒g1803⇒g2868, ⇒g1803⇒g2869, ⇒g1803⇒g2870 and ⇒g1803⇒g2871 are real numbers. The values ⇒g2191, ⇒g2192 and  ⇒g2193 are simply tags identifying the three 
+vector components of the quaternion. 
+⇒g1803⇒g2868 is termed the scalar component and ⇒g2183=⇒g1803⇒g2869⇒g2191+⇒g1803⇒g2870⇒g2192+⇒g1803⇒g2871⇒g2193 is termed the vector component of the 
+quaternion. 
+Equivalent representations of the quaternion in its  scalar and vector components are: 
+⇒g1803=⇒g1803⇒g2868+⇒g2183=⇒g≠668⇒g1803⇒g2868,⇒g2183⇒g≠669=⇒g3≠21⇒g1803⇒g2868,⇒g3≠37⇒g1803⇒g2869
+⇒g1803⇒g2870
+⇒g1803⇒g2871⇒g3≠≠1⇒g3≠20=⇒g3≠21⇒g1803⇒g2868,⇒g3≠37⇒g1803⇒g3001
+⇒g1803⇒g3002
+⇒g1803⇒g3003⇒g3≠≠1⇒g3≠20 (3) 
+ 
+If the scalar component ⇒g1803⇒g2868 is zero, the quaternion is termed a pure quaternio n or vector. If the vector 
+component ⇒g2183 is zero, then the quaternion is a real number. The  quaternion with scalar component 
+equal to one and vector component equal to zero is termed the identity quaternion. 
+2.2 Equality of Two Quaternions 
+Two quaternions ⇒g1803 and ⇒g180≠ are equal if and only if all their components are equal: 
+⇒g1803=⇒g180≠⇒uni0009⇒⇒uni0009⇒g1803⇒g2868=⇒g180≠⇒g2868⇒uni0009⇒g1803⇒g1866⇒g1806 ⇒uni0009⇒g1803⇒g2869=⇒g180≠⇒g2869⇒uni0009⇒g1803⇒g1866⇒g1806 ⇒uni0009⇒g1803⇒g2870=⇒g180≠⇒g2870⇒uni0009⇒g1803⇒g1866⇒g1806 ⇒uni0009⇒g1803⇒g2871=⇒g180≠⇒g2871 (4) 
+ 
+ 
+2.3 Addition of Two Q uaternions 
+The addition of quaternions is defined as the addition of the 
+⇒g1803+⇒g180≠=⇒g≠666⇒g1803⇒g2868+⇒g180≠⇒g2868
+ 
+A consequence of this definition is that quaternion  addition is commutative and associative 
+addition of real numbers is commutative and associa tive: 
+⇒g≠666
+ 
+2.4 Product of Two Q uaternions 
+The product of two quaternions is defined to be the distributive product of the co mponents: 
+⇒g1800=⇒g1803⇒g180≠ =⇒g≠666⇒g1803⇒g2868
+=⇒g1803⇒g2868⇒g≠666⇒g180≠⇒g2868+⇒g180≠⇒g2869⇒g2191+⇒g180≠⇒g2870⇒g2192+⇒g180≠⇒g2871⇒g2193⇒g≠667+
++⇒g1803⇒g2871⇒g2193⇒g≠666⇒g180≠⇒g2868+⇒g180≠⇒g2869
+=⇒g≠666⇒g1803⇒g2868⇒g180≠⇒g2868+⇒g1803⇒g2868⇒g180≠⇒g2869⇒g2191+⇒g1803⇒g2868⇒g180≠⇒g2870⇒g2192+⇒g1803⇒g2868⇒g180≠⇒g2871⇒g2193⇒g≠667
++⇒g≠666⇒g1803⇒g2870⇒g180≠⇒g2868⇒g2192+⇒g1803⇒g2870⇒g180≠⇒g2869⇒g2192⇒g2191 +
+ 
+The products of components of a qua 
+ 
+Document Number: uaternions  
+quaternions is defined as the addition of the ir four components: 
+⇒g2868⇒g≠667+⇒g≠666⇒g1803⇒g2869+⇒g180≠⇒g2869⇒g≠667⇒g2191+⇒g≠666⇒g1803⇒g2870+⇒g180≠⇒g2870⇒g≠667⇒g2192+⇒g≠666⇒g1803⇒g2871+⇒g180≠⇒g2871⇒g≠667⇒g2193 
+A consequence of this definition is that quaternion  addition is commutative and associative 
+addition of real numbers is commutative and associa tive:  
+⇒g1803+⇒g180≠=⇒g180≠+⇒g1803 
+⇒g≠666⇒g1803+⇒g180≠⇒g≠667+⇒g1800=⇒g1803+⇒g≠666⇒g180≠+⇒g1800⇒g≠667 
+uaternions  
+is defined to be the distributive product of the co mponents: 
+⇒g≠666+⇒g1803⇒g2869⇒g2191+⇒g1803⇒g2870⇒g2192+⇒g1803⇒g2871⇒g2193⇒g≠667⇒g≠666⇒g180≠⇒g2868+⇒g180≠⇒g2869⇒g2191+⇒g180≠⇒g2870⇒g2192+⇒g180≠⇒g2871⇒g2193⇒g≠667 
+⇒g≠667⇒g1803⇒g2869⇒g2191⇒g≠666⇒g180≠⇒g2868+⇒g180≠⇒g2869⇒g2191+⇒g180≠⇒g2870⇒g2192+⇒g180≠⇒g2871⇒g2193⇒g≠667+⇒g1803⇒g2870⇒g2192⇒g≠666⇒g180≠⇒g2868+⇒g180≠⇒g2869⇒g2191+⇒g180≠⇒g2870⇒g2192+
+⇒g2191+⇒g180≠⇒g2870⇒g2192+⇒g180≠⇒g2871⇒g2193⇒g≠667 
+⇒g≠667+⇒g≠666⇒g1803⇒g2869⇒g180≠⇒g2868⇒g2191+⇒g1803⇒g2869⇒g180≠⇒g2869⇒g2191⇒g2191 +⇒g1803⇒g2869⇒g180≠⇒g2870⇒g2191⇒g2192 +⇒g1803⇒g2869⇒g180≠⇒g2871⇒g2191⇒g2193 ⇒g≠667
++⇒g1803⇒g2870⇒g180≠⇒g2870⇒g2192⇒g2192 +⇒g1803⇒g2870⇒g180≠⇒g2871⇒g2192⇒g2193 ⇒g≠667+⇒g≠666⇒g1803⇒g2871⇒g180≠⇒g2868⇒g2193+⇒g1803⇒g2871⇒g180≠⇒g2869⇒g2193⇒g2191 +⇒g1803⇒g2871⇒g180≠⇒g2870⇒g2193⇒g2192 
+The products of components of a qua ternion are defined to satisfy, where ⇒g1870 is any real number 
+⇒g1870⇒g2191=⇒g2191⇒g1870 
+⇒g1870⇒g2192=⇒g2192⇒g1870 
+⇒g1870⇒g2193=⇒g2193⇒g1870 
+⇒g2191⇒g2191 =⇒g2192⇒g2192 =⇒g2193⇒g2193 =−⇒uni0031 
+⇒g2191⇒g2192 =−⇒g2192⇒g2191 =⇒g2193 
+⇒g2192⇒g2193 =−⇒g2193⇒g2192 =⇒g2191 
+⇒g2193⇒g2191 =−⇒g2191⇒g2193 =⇒g2192 
+ Document Number: AN5022  
+Revision 1.0, 9/2015 (5) 
+A consequence of this definition is that quaternion  addition is commutative and associative because the 
+(6) 
+(7) 
+is defined to be the distributive product of the co mponents:  
+(8) 
++⇒g180≠⇒g2871⇒g2193⇒g≠667
+(9) 
++⇒g1803⇒g2871⇒g180≠⇒g2871⇒g2193⇒g2193 ⇒g≠667 (9) 
+is any real number : 
+(10) 
+(11) 
+(12) 
+(13) 
+(14) 
+(15) 
+(16) 
+ 
+A consequence of equations (13) to (16) is that: 
+⇒g≠666⇒g2191⇒g2192 ⇒g≠667⇒g2193=⇒g2191⇒g≠666⇒g2192⇒g2193 ⇒g≠667=−⇒uni0031 (17) 
+ 
+Substitution of equations (10)  to (17) into equati on (9) simplifies the quaternion product to: 
+⇒g1800=⇒g1803⇒g180≠ =⇒g≠666⇒g1803⇒g2868⇒g180≠⇒g2868−⇒g1803⇒g2869⇒g180≠⇒g2869−⇒g1803⇒g2870⇒g180≠⇒g2870−⇒g1803⇒g2871⇒g180≠⇒g2871⇒g≠667+⇒g≠666⇒g1803⇒g2868⇒g180≠⇒g2869+⇒g1803⇒g2869⇒g180≠⇒g2868+⇒g1803⇒g2870⇒g180≠⇒g2871−⇒g1803⇒g2871⇒g180≠⇒g2870⇒g≠667⇒g2191
++⇒g≠666⇒g1803⇒g2868⇒g180≠⇒g2870−⇒g1803⇒g2869⇒g180≠⇒g2871+⇒g1803⇒g2870⇒g180≠⇒g2868+⇒g1803⇒g2871⇒g180≠⇒g2869⇒g≠667⇒g2192+⇒g≠666⇒g1803⇒g2868⇒g180≠⇒g2871+⇒g1803⇒g2869⇒g180≠⇒g2870−⇒g1803⇒g2870⇒g180≠⇒g2869+⇒g1803⇒g2871⇒g180≠⇒g2868⇒g≠667⇒g2193 (19) 
+The four components of the product quaternion ⇒g1800 are, therefore: 
+⇒g1800⇒g2868=⇒g1803⇒g2868⇒g180≠⇒g2868−⇒g1803⇒g2869⇒g180≠⇒g2869−⇒g1803⇒g2870⇒g180≠⇒g2870−⇒g1803⇒g2871⇒g180≠⇒g2871 (18) 
+⇒g1800⇒g2869=⇒g1803⇒g2868⇒g180≠⇒g2869+⇒g1803⇒g2869⇒g180≠⇒g2868+⇒g1803⇒g2870⇒g180≠⇒g2871−⇒g1803⇒g2871⇒g180≠⇒g2870 (19) 
+⇒g1800⇒g2870=⇒g1803⇒g2868⇒g180≠⇒g2870−⇒g1803⇒g2869⇒g180≠⇒g2871+⇒g1803⇒g2870⇒g180≠⇒g2868+⇒g1803⇒g2871⇒g180≠⇒g2869 (20) 
+⇒g1800⇒g2871=⇒g1803⇒g2868⇒g180≠⇒g2871+⇒g1803⇒g2869⇒g180≠⇒g2870−⇒g1803⇒g2870⇒g180≠⇒g2869+⇒g1803⇒g2871⇒g180≠⇒g2868 (21) 
+ 
+Examination of equations (18) to (21) shows that qu aternion multiplication does not commute: 
+⇒g1803⇒g180≠ ≠⇒g180≠⇒g1803  (22) 
+Brute force evaluation proves that quaternion multi plication is associative: 
+⇒g≠666⇒g1803⇒g180≠ ⇒g≠667⇒g1800−⇒g1803⇒g≠666⇒g180≠⇒g1800 ⇒g≠667=⇒g≠668⇒g≠666⇒g1803⇒g2868+⇒g1803⇒g2869⇒g2191+⇒g1803⇒g2870⇒g2192+⇒g1803⇒g2871⇒g2193⇒g≠667⇒g≠666⇒g180≠⇒g2868+⇒g180≠⇒g2869⇒g2191+⇒g180≠⇒g2870⇒g2192+⇒g180≠⇒g2871⇒g2193⇒g≠667⇒g≠669⇒g≠666⇒g1800⇒g2868+⇒g1800⇒g2869⇒g2191+⇒g1800⇒g2870⇒g2192+⇒g1800⇒g2871⇒g2193⇒g≠667
+−⇒g≠666⇒g1803⇒g2868+⇒g1803⇒g2869⇒g2191+⇒g1803⇒g2870⇒g2192+⇒g1803⇒g2871⇒g2193⇒g≠667⇒g≠668⇒g≠666⇒g180≠⇒g2868+⇒g180≠⇒g2869⇒g2191+⇒g180≠⇒g2870⇒g2192+⇒g180≠⇒g2871⇒g2193⇒g≠667⇒g≠666⇒g1800⇒g2868+⇒g1800⇒g2869⇒g2191+⇒g1800⇒g2870⇒g2192+⇒g1800⇒g2871⇒g2193⇒g≠667⇒g≠669=0 (26) 
+⇒⇒g≠666⇒g1803⇒g180≠ ⇒g≠667⇒g1800=⇒g1803⇒g≠666⇒g180≠⇒g1800 ⇒g≠667 (23) 
+ 
+2.5 Product of Quaternion and Scalar 
+A special case of the quaternion product occurs whe n one of the quaternions has zero vector 
+components and is a scalar. In this case the multip lication does commute. 
+If ⇒g1803 is a scalar so that ⇒g1803=⇒g1803⇒g2868 then: 
+⇒g1803⇒g180≠ =⇒g1803⇒g2868⇒g180≠⇒g2868+⇒g1803⇒g2868⇒g180≠⇒g2869⇒g2191+⇒g1803⇒g2868⇒g180≠⇒g2870⇒g2192+⇒g1803⇒g2868⇒g180≠⇒g2871⇒g2193 (24) 
+⇒g180≠⇒g1803 =⇒g180≠⇒g2868⇒g1803⇒g2868+⇒g180≠⇒g2869⇒g1803⇒g2868⇒g2191+⇒g180≠⇒g2870⇒g1803⇒g2868⇒g2192+⇒g180≠⇒g2871⇒g1803⇒g2868⇒g2193=⇒g1803⇒g2868⇒g180≠⇒g2868+⇒g1803⇒g2868⇒g180≠⇒g2869⇒g2191+⇒g1803⇒g2868⇒g180≠⇒g2870⇒g2192+⇒g1803⇒g2868⇒g180≠⇒g2871⇒g2193=⇒g1803⇒g180≠  (25) 
+⇒⇒g1803⇒g180≠ =⇒g180≠⇒g1803 ⇒uni0009⇒g1861⇒g1808⇒g1808 ⇒uni0009⇒g1803⇒uni0009⇒g1861⇒g1871 ⇒uni0009⇒g1803⇒uni0009⇒g1871⇒g1800⇒g1803⇒g186≠⇒g1803⇒g1870  (26) 
+2.6 Product of a Quaternion with a Vector 
+The product of a quaternion ⇒g1803 with a vector quaternion ⇒g218≠ has non-zero scalar component and is 
+therefore a general quaternion and not another vect or quaternion: 
+ 
+⇒g1803⇒g218≠=⇒g≠666−⇒g1803⇒g2869⇒g180≠⇒g2869−⇒g1803⇒g2870⇒g180≠⇒g2870−⇒g1803⇒g2871⇒g180≠⇒g2871⇒g≠667+⇒g≠666⇒g1803⇒g2868⇒g180≠⇒g2869+
+⇒g218≠⇒g1803=⇒g≠666−⇒g180≠⇒g2869⇒g1803⇒g2869−⇒g180≠⇒g2870⇒g1803⇒g2870−⇒g180≠⇒g2871⇒g1803⇒g2871⇒g≠667+⇒g≠666⇒g180≠⇒g2869⇒g1803⇒g2868+
+ 
+Inspection of equations (27) and ( 28 
+commute: 
+ 
+2.7 Quaternion C onjugate 
+The quaternion conjugate ⇒g1803∗ is defined as: 
+⇒g1803
+From the definition of the quaternion product 
+⇒g≠666⇒g1803⇒g180≠ ⇒g≠667∗=⇒g≠666⇒g1803⇒g2868⇒g180≠⇒g2868−⇒g1803⇒g2869⇒g180≠⇒g2869−⇒g1803⇒g2870⇒g180≠
+−⇒g≠666⇒g1803⇒g2868⇒g180≠⇒g2870−⇒g1803⇒g2869
+The product ⇒g180≠∗⇒g1803∗ evaluates to: 
+⇒g180≠∗⇒g1803∗=⇒g≠666⇒g180≠⇒g2868−⇒g180≠
+=⇒g180≠⇒g2868⇒g1803⇒g2868−⇒g180≠⇒g2868⇒g1803⇒g2869⇒g2191−⇒g180≠⇒g2868⇒g1803⇒g2870⇒g2192−⇒g180≠⇒g2868⇒g1803⇒g2871⇒g2193−⇒g180≠
++⇒g180≠⇒g2870⇒g2192⇒g1803⇒g2871⇒g2193−⇒g180≠⇒g2871⇒g2193⇒g1803⇒g2868+⇒g180≠
+ 
+=⇒g180≠⇒g2868⇒g1803⇒g2868−⇒g180≠⇒g2868⇒g1803⇒g2869⇒g2191−⇒g180≠⇒g2868⇒g1803⇒g2870⇒g2192−⇒g180≠⇒g2868⇒g1803⇒g2871⇒g2193
++⇒g180≠⇒g2870⇒g1803⇒g2871⇒g2191−⇒g180≠⇒g2871⇒g1803⇒g2868⇒g2193+
+=⇒g≠666⇒g180≠⇒g2868⇒g1803⇒g2868−⇒g180≠⇒g2869⇒g1803⇒g2869−⇒g180≠⇒g2870⇒g1803⇒g2870−⇒g180≠⇒g2871⇒g1803⇒g2871⇒g≠667−⇒g≠666⇒g180≠
+−⇒g≠666⇒uni0009⇒g180≠⇒g2871⇒g1803⇒g2868+⇒g180≠⇒g2870⇒g1803⇒g2869−⇒g180≠⇒g2869
+ 
+Simple extension to higher order products 
+⇒g≠666⇒g1803⇒g180≠⇒g1800 ⇒uni2026
+ 
+The sum of the quaternion ⇒g1803 and its conjugate 
+Document Number: +⇒g1803⇒g2870⇒g180≠⇒g2871−⇒g1803⇒g2871⇒g180≠⇒g2870⇒g≠667⇒g2191+⇒g≠666⇒g1803⇒g2868⇒g180≠⇒g2870−⇒g1803⇒g2869⇒g180≠⇒g2871+⇒g1803⇒g2871⇒g180≠⇒g2869⇒g≠667⇒g2192+⇒g≠666⇒g1803⇒g2868⇒g180≠⇒g2871+⇒g1803⇒g2869
++⇒g180≠⇒g2870⇒g1803⇒g2871−⇒g180≠⇒g2871⇒g1803⇒g2870⇒g≠667⇒g2191+⇒g≠666−⇒g180≠⇒g2869⇒g1803⇒g2871+⇒g180≠⇒g2870⇒g1803⇒g2868+⇒g180≠⇒g2871⇒g1803⇒g2869⇒g≠667⇒g2192+⇒g≠666⇒g180≠⇒g2869⇒g1803⇒g2870−⇒g180≠
+28 ) shows that the product of the quaternion ⇒g1803 and vector 
+⇒g1803⇒g218≠≠⇒g218≠⇒g1803 
+onjugate  
+is defined as:  
+⇒g1803∗=⇒g1803⇒g2868−⇒g1803⇒g2869⇒g2191−⇒g1803⇒g2870⇒g2192−⇒g1803⇒g2871⇒g2193 
+From the definition of the quaternion product ⇒g1803⇒g180≠ , it can be shown that ⇒g≠666⇒g1803⇒g180≠ ⇒g≠667∗=⇒g180≠∗⇒g1803∗:
+⇒g180≠⇒g2870−⇒g1803⇒g2871⇒g180≠⇒g2871⇒g≠667−⇒g≠666⇒g1803⇒g2868⇒g180≠⇒g2869+⇒g1803⇒g2869⇒g180≠⇒g2868+⇒g1803⇒g2870⇒g180≠⇒g2871−⇒g1803⇒g2871⇒g180≠⇒g2870⇒g≠667⇒g2191
+⇒g2869⇒g180≠⇒g2871+⇒g1803⇒g2870⇒g180≠⇒g2868+⇒g1803⇒g2871⇒g180≠⇒g2869⇒g≠667⇒g2192−⇒g≠666⇒g1803⇒g2868⇒g180≠⇒g2871+⇒g1803⇒g2869⇒g180≠⇒g2870−⇒g1803⇒g2870⇒g180≠⇒g2869+⇒g1803⇒g2871⇒g180≠
+⇒g180≠⇒g2869⇒g2191−⇒g180≠⇒g2870⇒g1862−⇒g180≠⇒g2871⇒g2193⇒g≠667⇒g≠666⇒g1803⇒g2868−⇒g1803⇒g2869⇒g2191−⇒g1803⇒g2870⇒g2192−⇒g1803⇒g2871⇒g2193⇒g≠667 
+⇒g180≠⇒g2869⇒g2191⇒g1803⇒g2868+⇒g180≠⇒g2869⇒g2191⇒g1803⇒g2869⇒g2191+⇒g180≠⇒g2869⇒g2191⇒g1803⇒g2870⇒g2192+⇒g180≠⇒g2869⇒g2191⇒g1803⇒g2871⇒g2193−⇒uni0009⇒g180≠⇒g2870⇒g2192⇒g1803⇒g2868+⇒g180≠⇒g2870⇒g2192⇒g1803
+⇒g180≠⇒g2871⇒g2193⇒g1803⇒g2869⇒g2191+⇒g180≠⇒g2871⇒g2193⇒g1803⇒g2870⇒g2192+⇒g180≠⇒g2871⇒g2193⇒g1803⇒g2871⇒g2193⇒uni0009
+⇒g2193−⇒g180≠⇒g2869⇒g1803⇒g2868⇒g2191−⇒g180≠⇒g2869⇒g1803⇒g2869+⇒g180≠⇒g2869⇒g1803⇒g2870⇒g2193−⇒g180≠⇒g2869⇒g1803⇒g2871⇒g2192−⇒g180≠⇒g2870⇒g1803⇒g2868⇒g2192−⇒g180≠⇒g2870⇒g1803⇒g2869
++⇒g180≠⇒g2871⇒g1803⇒g2869⇒g1862−⇒g180≠⇒g2871⇒g1803⇒g2870⇒g2191−⇒g180≠⇒g2871⇒g1803⇒g2871 
+⇒g≠666⇒g180≠⇒g2869⇒g1803⇒g2868+⇒g180≠⇒g2868⇒g1803⇒g2869+⇒g180≠⇒g2871⇒g1803⇒g2870−⇒g180≠⇒g2870⇒g1803⇒g2871⇒g≠667⇒g2191⇒uni0009−⇒g≠666⇒g180≠⇒g2870⇒g1803⇒g2868−⇒g180≠⇒g2871⇒g1803⇒g2869+⇒g180≠⇒g2868
+⇒g2869⇒g1803⇒g2870+⇒g180≠⇒g2868⇒g1803⇒g2871⇒g≠667⇒g2193 
+⇒⇒g≠666⇒g1803⇒g180≠ ⇒g≠667∗=⇒g180≠∗⇒g1803∗ 
+Simple extension to higher order products results in: 
+⇒g1878⇒g≠667∗=⇒g1878∗⇒g≠666⇒g1803⇒g180≠⇒g1800 ⇒uni2026⇒g≠667∗=⇒g1878∗⇒uni2026⇒g1800∗⇒g180≠∗⇒g1803∗ 
+and its conjugate ⇒g1803∗ is the scalar ⇒uni0032⇒g1803⇒g2868: 
+ Document Number: AN5022  
+Revision 1.0, 9/2015 ⇒g2869⇒g180≠⇒g2870−⇒g1803⇒g2870⇒g180≠⇒g2869⇒g≠667⇒g2193 (27) 
+⇒g180≠⇒g2870⇒g1803⇒g2869+⇒g180≠⇒g2871⇒g1803⇒g2868⇒g≠667⇒g2193 (28) 
+and vector ⇒g218≠ does not 
+(29) 
+(30) 
+ 
+⇒g180≠⇒g2868⇒g≠667⇒g2193 (31) 
+(32) 
+⇒g1803⇒g2869⇒g2191+⇒g180≠⇒g2870⇒g2192⇒g1803⇒g2870⇒g2192
+(33) 
+⇒g2193−⇒g180≠⇒g2870⇒g1803⇒g2870(34) 
+⇒g2868⇒g1803⇒g2870+⇒g180≠⇒g2869⇒g1803⇒g2871⇒g≠667⇒g2192(35) 
+(36) 
+(37) 
+ 
+⇒g1803+⇒g1803∗=⇒g≠666⇒g1803⇒g2868+⇒g1803⇒g2869⇒g2191+⇒g1803⇒g2870⇒g2192+⇒g1803⇒g2871⇒g2193⇒g≠667+⇒g≠666⇒g1803⇒g2868−⇒g1803⇒g2869⇒g2191−⇒g1803⇒g2870⇒g2192−⇒g1803⇒g2871⇒g2193⇒g≠667=⇒uni0032⇒g1803⇒g2868 (38) 
+ 
+2.8 Quaternion Norm 
+The quaternion norm or magnitude ⇒g18≠0⇒g≠666⇒g1803⇒g≠667 is defined as: 
+⇒g18≠0⇒g≠666⇒g1803⇒g≠667=⇒g3≠93⇒g1803⇒g2868⇒g2870+⇒g1803⇒g2869⇒g2870+⇒g1803⇒g2870⇒g2870+⇒g1803⇒g2871⇒g2870 (39) 
+ 
+The two products ⇒g1803∗⇒g1803 and ⇒g1803⇒g1803 ∗ of a quaternion ⇒g1803 with its conjugate ⇒g1803∗ evaluate to the square of the 
+norm: 
+⇒g1803∗⇒g1803=⇒g≠666⇒g1803⇒g2868−⇒g1803⇒g2869⇒g2191−⇒g1803⇒g2870⇒g2192−⇒g1803⇒g2871⇒g2193⇒g≠667⇒g≠666⇒g1803⇒g2868+⇒g1803⇒g2869⇒g2191+⇒g1803⇒g2870⇒g2192+⇒g1803⇒g2871⇒g2193⇒g≠667 (42) 
+=⇒g1803⇒g2868⇒g1803⇒g2868+⇒g1803⇒g2868⇒g1803⇒g2869⇒g2191+⇒g1803⇒g2868⇒g1803⇒g2870⇒g2192+⇒g1803⇒g2868⇒g1803⇒g2871⇒g2193−⇒g1803⇒g2869⇒g1803⇒g2868⇒g2191+⇒g1803⇒g2869⇒g1803⇒g2869−⇒g1803⇒g2869⇒g1803⇒g2870⇒g2193+⇒g1803⇒g2869⇒g1803⇒g2871⇒g2192−⇒g1803⇒g2870⇒g1803⇒g2868⇒g2192+⇒g1803⇒g2870⇒g1803⇒g2869⇒g2193+⇒g1803⇒g2870⇒g1803⇒g2870
+−⇒g1803⇒g2870⇒g1803⇒g2871⇒g2191−⇒g1803⇒g2871⇒g1803⇒g2868⇒g2193−⇒g1803⇒g2871⇒g1803⇒g2869⇒g2192+⇒g1803⇒g2871⇒g1803⇒g2870⇒g2191+⇒g1803⇒g2871⇒g1803⇒g2871 (40) 
+=⇒g1803⇒g2868⇒g2870+⇒g1803⇒g2869⇒g2870+⇒g1803⇒g2870⇒g2870+⇒g1803⇒g2871⇒g2870=⇒g18≠0⇒g≠666⇒g1803⇒g≠667⇒g2870 (41) 
+⇒g1803⇒g1803 ∗=⇒g≠666⇒g1803⇒g2868+⇒g1803⇒g2869⇒g2191+⇒g1803⇒g2870⇒g2192+⇒g1803⇒g2871⇒g2193⇒g≠667⇒g≠666⇒g1803⇒g2868−⇒g1803⇒g2869⇒g2191−⇒g1803⇒g2870⇒g2192−⇒g1803⇒g2871⇒g2193⇒g≠667 (42) 
+=⇒g1803⇒g2868⇒g1803⇒g2868−⇒g1803⇒g2868⇒g1803⇒g2869⇒g2191−⇒g1803⇒g2868⇒g1803⇒g2870⇒g2192−⇒g1803⇒g2868⇒g1803⇒g2871⇒g2193+⇒g1803⇒g2869⇒g1803⇒g2868⇒g2191+⇒g1803⇒g2869⇒g1803⇒g2869−⇒g1803⇒g2869⇒g1803⇒g2870⇒g2193+⇒g1803⇒g2869⇒g1803⇒g2871⇒g2192+⇒g1803⇒g2870⇒g1803⇒g2868⇒g2192+⇒g1803⇒g2870⇒g1803⇒g2869⇒g2193+⇒g1803⇒g2870⇒g1803⇒g2870
+−⇒g1803⇒g2870⇒g1803⇒g2871⇒g2191+⇒g1803⇒g2871⇒g1803⇒g2868⇒g2193−⇒g1803⇒g2871⇒g1803⇒g2869⇒g2192+⇒g1803⇒g2871⇒g1803⇒g2870⇒g2191+⇒g1803⇒g2871⇒g1803⇒g2871 (43) 
+=⇒g1803⇒g2868⇒g2870+⇒g1803⇒g2869⇒g2870+⇒g1803⇒g2870⇒g2870+⇒g1803⇒g2871⇒g2870=⇒g18≠0⇒g≠666⇒g1803⇒g≠667⇒g2870 (44) 
+⇒⇒g18≠0⇒g≠666⇒g1803⇒g≠667=⇒g3≠93⇒g1803⇒g2868⇒g2870+⇒g1803⇒g2869⇒g2870+⇒g1803⇒g2870⇒g2870+⇒g1803⇒g2871⇒g2870=⇒uni221A⇒g1803∗⇒g1803=⇒uni221A⇒g1803⇒g1803∗ (45) 
+ 
+The norm of a quaternion conjugate equals the norm of the quaternion: 
+⇒g18≠0⇒g≠666⇒g1803∗⇒g≠667=⇒g3≠93⇒g1803⇒g2868⇒g2870+⇒g≠666−⇒g1803⇒g2869⇒g≠667⇒g2870+⇒g≠666−⇒g1803⇒g2870⇒g≠667⇒g2870+⇒g≠666−⇒g1803⇒g2871⇒g≠667⇒g2870=⇒g3≠93⇒g1803⇒g2868⇒g2870+⇒g1803⇒g2869⇒g2870+⇒g1803⇒g2870⇒g2870+⇒g1803⇒g2871⇒g2870=⇒g18≠0⇒g≠666⇒g1803⇒g≠667 (46) 
+ 
+The norm of the product of two quaternions is the p roduct of the individual quaternion norms: 
+⇒g18≠0⇒g≠666⇒g1803⇒g180≠ ⇒g≠667=⇒g3≠96⇒g≠666⇒g1803⇒g2868⇒g180≠⇒g2868−⇒g1803⇒g2869⇒g180≠⇒g2869−⇒g1803⇒g2870⇒g180≠⇒g2870−⇒g1803⇒g2871⇒g180≠⇒g2871⇒g≠667⇒g2870+⇒g≠666⇒g1803⇒g2868⇒g180≠⇒g2869+⇒g1803⇒g2869⇒g180≠⇒g2868+⇒g1803⇒g2870⇒g180≠⇒g2871−⇒g1803⇒g2871⇒g180≠⇒g2870⇒g≠667⇒g2870
++⇒g≠666⇒g1803⇒g2868⇒g180≠⇒g2870−⇒g1803⇒g2869⇒g180≠⇒g2871+⇒g1803⇒g2870⇒g180≠⇒g2868+⇒g1803⇒g2871⇒g180≠⇒g2869⇒g≠667⇒g2870+⇒g≠666⇒g1803⇒g2868⇒g180≠⇒g2871+⇒g1803⇒g2869⇒g180≠⇒g2870−⇒g1803⇒g2870⇒g180≠⇒g2869+⇒g1803⇒g2871⇒g180≠⇒g2868⇒g≠667⇒g2870 (47) 
+=⇒g3≠90⇒g≠666⇒g1803⇒g2868⇒g2870+⇒g1803⇒g2869⇒g2870+⇒g1803⇒g2870⇒g2870+⇒g1803⇒g2871⇒g2870⇒g≠667⇒g3≠30⇒g180≠⇒g2868⇒g2870+⇒g180≠⇒g2869⇒g2870+⇒g180≠⇒g2870⇒g2870+⇒g180≠⇒g2871⇒g2870⇒g3≠39=⇒g18≠0⇒g≠666⇒g1803⇒g≠667⇒g18≠0⇒g≠666⇒g180≠⇒g≠667 (48) 
+ 
+ 
+2.9 Quaternion I nverse and 
+The quaternion inverse ⇒g1803⇒g2879⇒g2869 is defined to be the quaternion which satisfies: 
+ 
+Pre- and post-multiplication of the quaternion 
+⇒uni0031
+⇒g18≠0⇒g≠666⇒g1803⇒g≠667⇒g2870⇒g≠666⇒g1803⇒g2868−⇒g1803⇒g2869⇒g2191−⇒g1803⇒g2870⇒g2192−⇒g1803⇒g2871⇒g2193⇒g≠667
+⇒g≠666⇒g1803⇒g2868+⇒g1803⇒g2869⇒g2191+⇒g1803⇒g2870⇒g2192+⇒g1803⇒g2871⇒g2193⇒g≠667⇒uni0031
+⇒g18≠0⇒g≠666⇒g1803⇒g≠667⇒g2870
+ 
+The quaternion inverse ⇒g1803⇒g2879⇒g2869 is, therefore 
+⇒g1803⇒g2879⇒g2869=⇒g1803∗
+⇒g18≠0⇒g≠666⇒g1803⇒g≠667⇒g2870=⇒g3≠36⇒g18≠0
+ 
+The norm of a quaternion inverse equals the 
+reciprocation operations, therefore, commute: 
+⇒g18≠0⇒g≠666⇒g1803⇒g2879⇒g2869⇒g≠667=⇒g18≠0⇒g3≠36⇒g1803∗
+⇒g18≠0⇒g≠666⇒g1803⇒g≠667
+2.10 Vector R epresentation of 
+The scalar and vector products between 
+⇒g2183
+ 
+The product between two quaternions 
+and vector products on their vector components. Dir ection expansion of the scalar and vector 
+expression below and comparison with equation 
+Document Number: nverse and Division 
+is defined to be the quaternion which satisfies:  
+⇒g1803⇒g1803 ⇒g2879⇒g2869=⇒g1803⇒g2879⇒g2869⇒g1803=⇒uni0031 
+the quaternion  ⇒g1803 by ⇒g3028∗
+⇒g3010⇒g≠666⇒g3028⇒g≠667⇒g3118 evaluates to: 
+⇒g≠667⇒g≠666⇒g1803⇒g2868+⇒g1803⇒g2869⇒g2191+⇒g1803⇒g2870⇒g2192+⇒g1803⇒g2871⇒g2193⇒g≠667=⇒g≠666⇒g1803⇒g2868⇒g2870+⇒g1803⇒g2869⇒g2870+⇒g1803⇒g2870⇒g2870+⇒g1803⇒g2871⇒g2870
+⇒g18≠0⇒g≠666⇒g1803⇒g≠667⇒g2870
+⇒g≠666⇒g≠667⇒g≠666⇒g1803⇒g2868−⇒g1803⇒g2869⇒g2191−⇒g1803⇒g2870⇒g2192−⇒g1803⇒g2871⇒g2193⇒g≠667=⇒g≠666⇒g1803⇒g2868⇒g2870+⇒g1803⇒g2869⇒g2870+⇒g1803⇒g2870⇒g2870+⇒g1803⇒g2871⇒g2870
+⇒g18≠0⇒g≠666⇒g1803⇒g≠667⇒g2870
+therefore , for all quaternions with nonzero norm: 
+⇒g3≠36⇒g1803⇒g2868
+⇒g18≠0⇒g≠666⇒g1803⇒g≠667⇒g2870⇒g3≠≠0−⇒g3≠36⇒g1803⇒g2869
+⇒g18≠0⇒g≠666⇒g1803⇒g≠667⇒g2870⇒g3≠≠0⇒g2191−⇒g3≠36⇒g1803⇒g2870
+⇒g18≠0⇒g≠666⇒g1803⇒g≠667⇒g2870⇒g3≠≠0⇒g2192−⇒g3≠36⇒g1803⇒g2871
+⇒g18≠0⇒g≠666⇒g1803⇒g≠667⇒g2870⇒g3≠≠0⇒g2193 
+The norm of a quaternion inverse equals the reciprocal of the quaternion norm. The norm and 
+commute:  
+⇒g3≠36⇒g≠666⇒g≠667⇒g2870⇒g3≠≠0=⇒g3≠36⇒uni0031
+⇒g18≠0⇒g≠666⇒g1803⇒g≠667⇒g2870⇒g3≠≠0⇒g18≠0⇒g≠666⇒g1803∗⇒g≠667=⇒g≠678⇒g18≠0⇒g≠666⇒g1803⇒g≠667
+⇒g18≠0⇒g≠666⇒g1803⇒g≠667⇒g2870⇒g≠679=⇒g3≠36⇒uni0031
+⇒g18≠0⇒g≠666⇒g1803⇒g≠667⇒g3≠≠0 
+epresentation of Quaternion Product 
+The scalar and vector products between the two vectors ⇒g2183=⇒g3≠37⇒g1803⇒g2869
+⇒g1803⇒g2870
+⇒g1803⇒g2871⇒g3≠≠1 and ⇒g218≠=⇒g3≠37⇒g180≠⇒g2869
+⇒g180≠⇒g2870
+⇒g180≠⇒g2871⇒g3≠≠1 are defined as: 
+⇒g2183⇒uni002E⇒g218≠=⇒g1803⇒g2869⇒g180≠⇒g2869+⇒g1803⇒g2870⇒g180≠⇒g2870+⇒g1803⇒g2871⇒g180≠⇒g2871 
+⇒g2183×⇒g218≠=⇒g3≠37⇒g1803⇒g2870⇒g180≠⇒g2871−⇒g1803⇒g2871⇒g180≠⇒g2870
+⇒g1803⇒g2871⇒g180≠⇒g2869−⇒g1803⇒g2869⇒g180≠⇒g2871
+⇒g1803⇒g2869⇒g180≠⇒g2870−⇒g1803⇒g2870⇒g180≠⇒g2869⇒g3≠≠1 
+The product between two quaternions ⇒g1803=⇒g≠666⇒g1803⇒g2868,⇒g2183⇒g≠667 and ⇒g180≠=⇒g≠666⇒g180≠⇒g2868,⇒g218≠⇒g≠667 can be written in terms of the 
+and vector products on their vector components. Dir ection expansion of the scalar and vector 
+and comparison with equation (9) shows it equals the quaternion product 
+ Document Number: AN5022  
+Revision 1.0, 9/2015 (49) 
+⇒g2870⇒g≠667=⇒uni0031 (50) 
+⇒g2870⇒g≠667=⇒uni0031 (51) 
+(52) 
+reciprocal of the quaternion norm. The norm and 
+⇒g3≠≠0 (53) 
+⇒g3≠≠1are defined as:  
+(54) 
+(55) 
+terms of the scalar 
+and vector products on their vector components. Dir ection expansion of the scalar and vector 
+shows it equals the quaternion product ⇒g1803⇒g180≠ : 
+ 
+⇒g≠668⇒g1803⇒g2868⇒g180≠⇒g2868−⇒g2183⇒uni002E⇒g218≠,⇒uni0009⇒g1803⇒g2868⇒g218≠+⇒g180≠⇒g2868⇒g2183+⇒g2183×⇒g218≠⇒g≠669=⇒g3≠21⇒g1803⇒g2868⇒g180≠⇒g2868−⇒g1803⇒g2869⇒g180≠⇒g2869+⇒g1803⇒g2870⇒g180≠⇒g2870+⇒g1803⇒g2871⇒g180≠⇒g2871,⇒g1803⇒g2868⇒g3≠37⇒g180≠⇒g2869
+⇒g180≠⇒g2870
+⇒g180≠⇒g2871⇒g3≠≠1+⇒g180≠⇒g2868⇒g3≠37⇒g1803⇒g2869
+⇒g1803⇒g2870
+⇒g1803⇒g2871⇒g3≠≠1+⇒g3≠37⇒g1803⇒g2870⇒g180≠⇒g2871−⇒g1803⇒g2871⇒g180≠⇒g2870
+⇒g1803⇒g2871⇒g180≠⇒g2869−⇒g1803⇒g2869⇒g180≠⇒g2871
+⇒g1803⇒g2869⇒g180≠⇒g2870−⇒g1803⇒g2870⇒g180≠⇒g2869⇒g3≠≠1⇒g3≠20 (56) 
+=⇒g3≠21⇒g1803⇒g2868⇒g180≠⇒g2868−⇒g1803⇒g2869⇒g180≠⇒g2869+⇒g1803⇒g2870⇒g180≠⇒g2870+⇒g1803⇒g2871⇒g180≠⇒g2871,⇒g3≠37⇒g1803⇒g2868⇒g180≠⇒g2869+⇒g1803⇒g2869⇒g180≠⇒g2868+⇒g1803⇒g2870⇒g180≠⇒g2871−⇒g1803⇒g2871⇒g180≠⇒g2870
+⇒g1803⇒g2868⇒g180≠⇒g2870−⇒g1803⇒g2869⇒g180≠⇒g2871+⇒g1803⇒g2870⇒g180≠⇒g2868+⇒g1803⇒g2871⇒g180≠⇒g2869
+⇒g1803⇒g2868⇒g180≠⇒g2871+⇒g1803⇒g2869⇒g180≠⇒g2870−⇒g1803⇒g2870⇒g180≠⇒g2869+⇒g1803⇒g2871⇒g180≠⇒g2868⇒g3≠≠1⇒g3≠20=⇒g1803⇒g180≠  (57) 
+3 Rotation Quaternion 
+3.1 Definition in Terms of Rotation Vector 
+The rotation quaternion ⇒g1869 for a rotation of the coordinate system about norm alized rotation axis ⇒g2196⇒g30≠9 and 
+by angle ⇒g2010 is defined to be: 
+⇒g1869=⇒g1800⇒g1867⇒g1871 ⇒g≠672⇒g2010
+⇒uni0032⇒g≠673+⇒g2196⇒g30≠9⇒g1871⇒g1861⇒g1866 ⇒g≠672⇒g2010
+⇒uni0032⇒g≠673 (58) 
+⇒g1869 is a unit quaternion because its norm equals 1: 
+⇒g18≠0⇒g≠666⇒g1869⇒g≠667=⇒g1800⇒g1867⇒g1871 ⇒g2870⇒g≠672⇒g2010
+⇒uni0032⇒g≠673+⇒g1871⇒g1861⇒g1866 ⇒g2870⇒g≠672⇒g2010
+⇒uni0032⇒g≠673⇒g3≠30⇒g1866⇒g30≠8⇒g3001⇒g2870+⇒g1866⇒g30≠8⇒g3002⇒g2870+⇒g1866⇒g30≠8⇒g3003⇒g2870⇒g3≠39=⇒uni0031 (59) 
+The value of this definition of the rotation quater nion is shown in the next section which proves that  
+post- and pre-multiplication of a vector ⇒g220≠ by the quaternion ⇒g1869 and its conjugate ⇒g1869∗ is equivalent to 
+multiplication of the vector by the corresponding r otation matrix ⇒g217≠: 
+⇒g217≠⇒g220≠ =⇒g1869∗⇒g220≠⇒g1869 (60) 
+3.2 Equivalence of Rotation Quaternion and Rotation  Matrix 
+The general rotation matrix ⇒g217≠, which transforms a vector as a result of a rotatio n of the coordinate 
+system around the axis ⇒g2196⇒g30≠9 by angle ⇒g2010, is termed the Rodrigues rotation matrix and has f orm: 
+⇒g217≠=⇒g≠68≠⇒g18≠≠⇒g3001⇒g3001 ⇒g18≠≠⇒g3001⇒g3002 ⇒g18≠≠⇒g3001⇒g3003 
+⇒g18≠≠⇒g3002⇒g3001 ⇒g18≠≠⇒g3002⇒g3002 ⇒g18≠≠⇒g3002⇒g3003 
+⇒g18≠≠⇒g3003⇒g3001 ⇒g18≠≠⇒g3003⇒g3002 ⇒g18≠≠⇒g3003⇒g3003 ⇒g≠680=⇒g3≠38⇒g1866⇒g30≠8⇒g3001⇒g2870+⇒g3≠30⇒uni0031−⇒g1866⇒g30≠8⇒g3001⇒g2870⇒g3≠39⇒g1800⇒g1867⇒g1871⇒g2010 ⇒g1866⇒g30≠8⇒g3001⇒g1866⇒g30≠8⇒g3002⇒g≠666⇒uni0031−⇒g1800⇒g1867⇒g1871⇒g2010 ⇒g≠667+⇒g1866⇒g30≠8⇒g3003⇒g1871⇒g1861⇒g1866⇒g2010 ⇒g1866⇒g30≠8⇒g3001⇒g1866⇒g30≠8⇒g3003⇒g≠666⇒uni0031−⇒g1800⇒g1867 ⇒g1871⇒g2010 ⇒g≠667−⇒g1866⇒g30≠8⇒g3002⇒g1871⇒g1861⇒g1866⇒g2010 
+⇒g1866 ⇒g30≠8⇒g3001⇒g1866 ⇒g30≠8⇒g3002⇒g≠666⇒uni0031−⇒g1800⇒g1867⇒g1871⇒g2010 ⇒g≠667−⇒g1866 ⇒g30≠8⇒g3003⇒g1871⇒g1861⇒g1866⇒g2010 ⇒g1866 ⇒g30≠8 ⇒g3002⇒g2870+⇒g3≠30⇒uni0031−⇒g1866 ⇒g30≠8 ⇒g3002⇒g2870⇒g3≠39⇒g1800⇒g1867⇒g1871⇒g2010 ⇒g1866 ⇒g30≠8 ⇒g3002⇒g1866 ⇒g30≠8⇒g3003⇒g≠666⇒uni0031−⇒g1800⇒g1867⇒g1871⇒g2010 ⇒g≠667+⇒g1866 ⇒g30≠8⇒g3001⇒g1871⇒g1861⇒g1866⇒g2010 
+⇒g1866⇒g30≠8⇒g3001⇒g1866⇒g30≠8⇒g3003⇒g≠666⇒uni0031−⇒g1800⇒g1867⇒g1871⇒g2010 ⇒g≠667+⇒g1866⇒g30≠8⇒g3002⇒g1871⇒g1861⇒g1866⇒g2010 ⇒g1866⇒g30≠8⇒g3002⇒g1866⇒g30≠8⇒g3003⇒g≠666⇒uni0031−⇒g1800⇒g1867⇒g1871⇒g2010 ⇒g≠667−⇒g1866⇒g30≠8⇒g3001⇒g1871⇒g1861⇒g1866⇒g2010 ⇒g1866⇒g30≠8⇒g3003⇒g2870+⇒g3≠30⇒uni0031−⇒g1866⇒g30≠8⇒g3003⇒g2870⇒g3≠39⇒g1800⇒g1867⇒g1871⇒g2010 ⇒g3≠≠2 (66) 
+For any vector ⇒g220≠, the left side of equation (60) evaluates to: 
+⇒g217≠⇒g220≠=⇒g3≠38⇒g1866⇒g30≠8⇒g3001⇒g2870+⇒g3≠30⇒uni0031−⇒g1866⇒g30≠8⇒g3001⇒g2870⇒g3≠39⇒g1800⇒g1867⇒g1871⇒g2010 ⇒g1866⇒g30≠8⇒g3001⇒g1866⇒g30≠8⇒g3002⇒g≠666⇒uni0031−⇒g1800⇒g1867⇒g1871⇒g2010 ⇒g≠667+⇒g1866⇒g30≠8⇒g3003⇒g1871⇒g1861⇒g1866⇒g2010 ⇒g1866⇒g30≠8⇒g3001⇒g1866⇒g30≠8⇒g3003⇒g≠666⇒uni0031−⇒g1800⇒g1867⇒g1871⇒g2010 ⇒g≠667−⇒g1866⇒g30≠8⇒g3002⇒g1871⇒g1861⇒g1866⇒g2010 
+⇒g1866 ⇒g30≠8⇒g3001⇒g1866 ⇒g30≠8⇒g3002⇒g≠666⇒uni0031−⇒g1800⇒g1867⇒g1871⇒g2010 ⇒g≠667−⇒g1866 ⇒g30≠8⇒g3003⇒g1871⇒g1861⇒g1866⇒g2010 ⇒g1866 ⇒g30≠8 ⇒g3002⇒g2870+⇒g3≠30⇒uni0031−⇒g1866 ⇒g30≠8⇒g3002⇒g2870⇒g3≠39⇒g1800⇒g1867⇒g1871⇒g2010 ⇒g1866 ⇒g30≠8 ⇒g3002⇒g1866 ⇒g30≠8⇒g3003⇒g≠666⇒uni0031−⇒g1800⇒g1867⇒g1871⇒g2010 ⇒g≠667+⇒g1866 ⇒g30≠8⇒g3001⇒g1871⇒g1861⇒g1866⇒g2010 
+⇒g1866⇒g30≠8⇒g3001⇒g1866⇒g30≠8⇒g3003⇒g≠666⇒uni0031−⇒g1800⇒g1867⇒g1871⇒g2010 ⇒g≠667+⇒g1866⇒g30≠8⇒g3002⇒g1871⇒g1861⇒g1866⇒g2010 ⇒g1866⇒g30≠8⇒g3002⇒g1866⇒g30≠8⇒g3003⇒g≠666⇒uni0031−⇒g1800⇒g1867⇒g1871⇒g2010 ⇒g≠667−⇒g1866⇒g30≠8⇒g3001⇒g1871⇒g1861⇒g1866⇒g2010 ⇒g1866⇒g30≠8⇒g3003⇒g2870+⇒g3≠30⇒uni0031−⇒g1866⇒g30≠8⇒g3003⇒g2870⇒g3≠39⇒g1800⇒g1867⇒g1871⇒g2010 ⇒g3≠≠2⇒g3≠37⇒g187≠⇒g3001
+⇒g187≠⇒g3002
+⇒g187≠⇒g3003⇒g3≠≠1 (67) 
+=⇒g3≠38⇒g3≠19⇒g1866⇒g30≠8⇒g3001⇒g2870+⇒g3≠30⇒uni0031−⇒g1866⇒g30≠8⇒g3001⇒g2870⇒g3≠39⇒g1800⇒g1867⇒g1871⇒g2010 ⇒g3≠23⇒g187≠⇒g3001+⇒g3≠19⇒g1866⇒g30≠8⇒g3001⇒g1866⇒g30≠8⇒g3002⇒g≠666⇒uni0031−⇒g1800⇒g1867⇒g1871⇒g2010 ⇒g≠667+⇒g1866⇒g30≠8⇒g3003⇒g1871⇒g1861⇒g1866⇒g2010 ⇒g3≠23⇒g187≠⇒g3002+⇒g3≠19⇒g1866⇒g30≠8⇒g3001⇒g1866⇒g30≠8⇒g3003⇒g≠666⇒uni0031−⇒g1800⇒g1867⇒g1871⇒g2010 ⇒g≠667−⇒g1866⇒g30≠8⇒g3002⇒g1871⇒g1861⇒g1866⇒g2010 ⇒g3≠23⇒g187≠⇒g3003
+⇒g3≠19⇒g1866 ⇒g30≠8⇒g3001⇒g1866 ⇒g30≠8⇒g3002⇒g≠666⇒uni0031−⇒g1800⇒g1867⇒g1871⇒g2010 ⇒g≠667−⇒g1866 ⇒g30≠8⇒g3003⇒g1871⇒g1861⇒g1866⇒g2010 ⇒g3≠23⇒g187≠⇒g3001+⇒g3≠19⇒g1866 ⇒g30≠8⇒g3002⇒g2870+⇒g3≠30⇒uni0031−⇒g1866 ⇒g30≠8⇒g3002⇒g2870⇒g3≠39⇒g1800⇒g1867⇒g1871⇒g2010 ⇒g3≠23⇒g187≠⇒g3002+⇒g3≠19⇒g1866 ⇒g30≠8⇒g3002⇒g1866 ⇒g30≠8⇒g3003⇒g≠666⇒uni0031−⇒g1800⇒g1867⇒g1871⇒g2010 ⇒g≠667+⇒g1866 ⇒g30≠8⇒g3001⇒g1871⇒g1861⇒g1866⇒g2010 ⇒g3≠23⇒g187≠⇒g3003
+⇒g3≠19⇒g1866⇒g30≠8⇒g3001⇒g1866⇒g30≠8⇒g3003⇒g≠666⇒uni0031−⇒g1800⇒g1867⇒g1871⇒g2010 ⇒g≠667+⇒g1866⇒g30≠8⇒g3002⇒g1871⇒g1861⇒g1866⇒g2010 ⇒g3≠23⇒g187≠⇒g3001+⇒g3≠19⇒g1866⇒g30≠8⇒g3002⇒g1866⇒g30≠8⇒g3003⇒g≠666⇒uni0031−⇒g1800⇒g1867⇒g1871⇒g2010 ⇒g≠667−⇒g1866⇒g30≠8⇒g3001⇒g1871⇒g1861⇒g1866⇒g2010 ⇒g3≠23⇒g187≠⇒g3002+⇒g3≠19⇒g1866⇒g30≠8⇒g3003⇒g2870+⇒g3≠30⇒uni0031−⇒g1866⇒g30≠8⇒g3003⇒g2870⇒g3≠39⇒g1800⇒g1867⇒g1871⇒g2010 ⇒g3≠23⇒g187≠⇒g3003⇒g3≠≠2 (68) 
+The right side of equation (60) evaluates to: 
+ 
+⇒g1869∗⇒g220≠⇒g1869=⇒g≠678⇒g1800⇒g1867⇒g1871 ⇒g≠672
+=⇒g≠672⇒g1800⇒g1867⇒g1871 ⇒g≠672⇒g2010
+⇒uni0032⇒g≠673−⇒g1866⇒g30≠8⇒g3001⇒g1871⇒g1861⇒g1866 ⇒g≠672⇒g2010
+⇒uni0032⇒g≠673⇒g2191−⇒g1866⇒g30≠8⇒g3002⇒g1871⇒g1861⇒g1866 ⇒g≠672
++⇒g1866⇒g30≠8⇒g3002⇒g1871⇒g1861⇒g1866 ⇒g≠672⇒g2010
+⇒uni0032⇒g≠673⇒g2192+⇒g1866⇒g30≠8⇒g3003⇒g1871⇒g1861⇒g1866 
+=⇒g3≠38⇒g3≠19⇒g1866⇒g30≠8⇒g3001⇒g2870+⇒g3≠30⇒uni0031−⇒g1866⇒g30≠8⇒g3001⇒g2870⇒g3≠39⇒g1800⇒g1867⇒g1871⇒g2010 ⇒g3≠23⇒g187≠⇒g3001+⇒g3≠19⇒g1866⇒g30≠8⇒g3001
+⇒g3≠19⇒g1866 ⇒g30≠8⇒g3001⇒g1866 ⇒g30≠8⇒g3002⇒g≠666⇒uni0031−⇒g1800⇒g1867⇒g1871⇒g2010 ⇒g≠667−⇒g1866⇒g30≠8⇒g3003⇒g1871⇒g1861⇒g1866⇒g2010 ⇒g3≠23⇒g187≠⇒g3001+
+⇒g3≠19⇒g1866⇒g30≠8⇒g3001⇒g1866⇒g30≠8⇒g3003⇒g≠666⇒uni0031−⇒g1800⇒g1867⇒g1871⇒g2010 ⇒g≠667+⇒g1866⇒g30≠8⇒g3002⇒g1871⇒g1861⇒g1866⇒g2010 ⇒g3≠23⇒g187≠⇒g3001+
+Equations (68) and (71) match, proving the identity in equation 
+ 
+3.3 Inverse Rotation Q uaternion 
+From the definition of ⇒g1869∗, it follows that 
+−⇒g2010 and is, therefore, the inverse of the rotation quaternion 
+⇒g1869∗=⇒g1800⇒g1867⇒g1871 ⇒g≠672⇒g2010
+⇒uni0032⇒g≠673
+The inverse nature of the operators 
+⇒g1869⇒g≠666⇒g1869
+⇒g1869∗⇒g≠666
+3.4 Product of R otation 
+The result of successively applying rotation quater nions 
+⇒g1869⇒g3010∗⇒uni2026⇒g≠666⇒g1869⇒g2870∗⇒g≠666⇒g1869⇒g2869∗⇒g220≠⇒g1869⇒g2869
+ 
+The rotation quaternion ⇒g1869, equivalent to the 
+⇒g1869⇒g3010, is therefore:  
+ 
+3.5 Negation of R otation 
+Both a rotation matrix ⇒g217≠ and quaternion 
+Document Number: ⇒g≠672⇒g2010
+⇒uni0032⇒g≠673−⇒g2196⇒g30≠9⇒g1871⇒g1861⇒g1866 ⇒g≠672⇒g2010
+⇒uni0032⇒g≠673⇒g≠679⇒g220≠⇒g≠678⇒g1800⇒g1867⇒g1871 ⇒g≠672⇒g2010
+⇒uni0032⇒g≠673+⇒g2196⇒g30≠9⇒g1871⇒g1861⇒g1866 ⇒g≠672⇒g2010
+⇒uni0032⇒g≠673⇒g≠679 
+⇒g≠672⇒g2010
+⇒uni0032⇒g≠673⇒g2192−⇒g1866⇒g30≠8⇒g3003⇒g1871⇒g1861⇒g1866 ⇒g≠672⇒g2010
+⇒uni0032⇒g≠673⇒g2193⇒g≠673⇒g3≠30⇒g187≠⇒g3001⇒g2191+⇒g187≠⇒g3002⇒g2192+⇒g187≠⇒g3003⇒g2193⇒g3≠39⇒g≠672⇒g1800⇒g1867⇒g1871 ⇒g≠672⇒g2010
+⇒uni0032⇒g≠673+
+⇒g30≠8⇒g1871⇒g1861⇒g1866 ⇒g≠672⇒g2010
+⇒uni0032⇒g≠673⇒g2193⇒g≠673 
+⇒g30≠8⇒g3001⇒g1866⇒g30≠8⇒g3002⇒g≠666⇒uni0031−⇒g1800⇒g1867⇒g1871⇒g2010 ⇒g≠667+⇒g1866⇒g30≠8⇒g3003⇒g1871⇒g1861⇒g1866⇒g2010 ⇒g3≠23⇒g187≠⇒g3002+⇒g3≠19⇒g1866⇒g30≠8⇒g3001⇒g1866⇒g30≠8⇒g3003⇒g≠666⇒uni0031−⇒g1800⇒g1867⇒g1871⇒g2010 ⇒g≠667−⇒g1866
++⇒g3≠19⇒g1866 ⇒g30≠8⇒g3002⇒g2870+⇒g3≠30⇒uni0031−⇒g1866 ⇒g30≠8⇒g3002⇒g2870⇒g3≠39⇒g1800⇒g1867⇒g1871⇒g2010 ⇒g3≠23⇒g187≠⇒g3002+⇒g3≠19⇒g1866 ⇒g30≠8⇒g3002⇒g1866 ⇒g30≠8⇒g3003⇒g≠666⇒uni0031−⇒g1800⇒g1867⇒g1871⇒g2010 ⇒g≠667+⇒g1866
++⇒g3≠19⇒g1866⇒g30≠8⇒g3002⇒g1866⇒g30≠8⇒g3003⇒g≠666⇒uni0031−⇒g1800⇒g1867⇒g1871⇒g2010 ⇒g≠667−⇒g1866⇒g30≠8⇒g3001⇒g1871⇒g1861⇒g1866⇒g2010 ⇒g3≠23⇒g187≠⇒g3002+⇒g3≠19⇒g1866⇒g30≠8⇒g3003⇒g2870+⇒g3≠30⇒uni0031−⇒g1866⇒g30≠8⇒g3003⇒g2870
+proving the identity in equation (60). 
+uaternion  
+it follows that ⇒g1869∗ is the rotation operator about the same axis 
+the inverse of the rotation quaternion ⇒g1869: 
+⇒g≠672⇒g≠673−⇒g2196⇒g30≠9⇒g1871⇒g1861⇒g1866 ⇒g≠672⇒g2010
+⇒uni0032⇒g≠673=⇒g1800⇒g1867⇒g1871 ⇒g≠672−⇒g2010
+⇒uni0032⇒g≠673+⇒g2196⇒g30≠9⇒g1871⇒g1861⇒g1866 ⇒g≠672−⇒g2010
+⇒uni0032⇒g≠673 
+The inverse nature of the operators ⇒g1869 and ⇒g1869∗ can also be shown by direct evaluation: 
+⇒g≠666⇒g1869∗⇒g220≠⇒g1869⇒g≠667⇒g1869∗=⇒g≠666⇒g1869⇒g1869∗⇒g≠667⇒g220≠⇒g≠666⇒g1869⇒g1869∗⇒g≠667=⇒g220≠ 
+⇒g≠666⇒g1869⇒g220≠⇒g1869∗⇒g≠667⇒g1869=⇒g≠666⇒g1869∗⇒g1869⇒g≠667⇒g220≠⇒g≠666⇒g1869∗⇒g1869⇒g≠667=⇒g220≠ 
+otation Quaternions 
+The result of successively applying rotation quater nions ⇒g1869⇒g2869 followed by ⇒g1869⇒g2870 through ⇒g1869
+⇒g2869⇒g≠667⇒g1869⇒g2870⇒g≠667⇒uni2026⇒g1869⇒g3010=⇒g≠666⇒g1869⇒g3010∗⇒uni2026⇒g1869⇒g2870∗⇒g1869⇒g2869∗⇒g≠667⇒g220≠⇒g≠666⇒g1869⇒g2869⇒g1869⇒g2870⇒uni2026⇒uni2026⇒g1869⇒g3010⇒g≠667 
+equivalent to the ⇒g18≠0 successive rotations represented by quaternions 
+⇒g1869=⇒g1869⇒g2869⇒g1869⇒g2869⇒g1869⇒g2869⇒uni2026⇒g1869⇒g3010 
+otation Axis and Angle 
+and quaternion ⇒g1869 are unchanged if both the rotation angle and axis a re 
+ Document Number: AN5022  
+Revision 1.0, 9/2015 (69) 
+⇒g≠673⇒g1866⇒g30≠8⇒g3001⇒g1871⇒g1861⇒g1866 ⇒g≠672⇒g2010
+⇒uni0032⇒g≠673⇒g2191
+(70) 
+⇒g≠667⇒g1866⇒g30≠8⇒g3002⇒g1871⇒g1861⇒g1866⇒g2010 ⇒g3≠23⇒g187≠⇒g3003
+⇒g≠667⇒g1866⇒g30≠8⇒g3001⇒g1871⇒g1861⇒g1866⇒g2010 ⇒g3≠23⇒g187≠⇒g3003
+⇒g30≠8⇒g2870⇒g3≠39⇒g1800⇒g1867⇒g1871⇒g2010 ⇒g3≠23⇒g187≠⇒g3003⇒g3≠≠2 (71) 
+is the rotation operator about the same axis ⇒g2196⇒g30≠9 but by angle 
+(72) 
+direct evaluation:  
+(73) 
+(74) 
+⇒g1869⇒g3010 to vector ⇒g220≠ is: 
+(75) 
+successive rotations represented by quaternions ⇒g1869⇒g2869 to 
+(76) 
+are unchanged if both the rotation angle and axis a re 
+ 
+simultaneously inverted: 
+⇒g217≠⇒g≠666−⇒g2196 ⇒g30≠9,−⇒g2010⇒g≠667=⇒g3≠38⇒g1866⇒g30≠8⇒g3001⇒g2870+⇒g3≠30⇒uni0031−⇒g1866⇒g30≠8⇒g3001⇒g2870⇒g3≠39⇒g1800⇒g1867⇒g1871 ⇒g≠666−⇒g2010⇒g≠667⇒g1866⇒g30≠8⇒g3001⇒g1866⇒g30≠8⇒g3002⇒g3≠30⇒uni0031−⇒g1800⇒g1867⇒g1871 ⇒g≠666−⇒g2010⇒g≠667⇒g3≠39−⇒g1866⇒g30≠8⇒g3003⇒g1871⇒g1861⇒g1866 ⇒g≠666−⇒g2010⇒g≠667⇒g1866⇒g30≠8⇒g3001⇒g1866⇒g30≠8⇒g3003⇒g3≠30⇒uni0031−⇒g1800⇒g1867⇒g1871 ⇒g≠666−⇒g2010⇒g≠667⇒g3≠39+⇒g1866⇒g30≠8⇒g3002⇒g1871⇒g1861⇒g1866 ⇒g≠666−⇒g2010⇒g≠667
+⇒g1866 ⇒g30≠8⇒g3001⇒g1866 ⇒g30≠8⇒g3002⇒g3≠30⇒uni0031−⇒g1800⇒g1867⇒g1871 ⇒g≠666−⇒g2010⇒g≠667⇒g3≠39+⇒g1866 ⇒g30≠8⇒g3003⇒g1871⇒g1861⇒g1866 ⇒g≠666−⇒g2010⇒g≠667⇒g1866 ⇒g30≠8⇒g3002⇒g2870+⇒g3≠30⇒uni0031−⇒g1866 ⇒g30≠8⇒g3002⇒g2870⇒g3≠39⇒g1800⇒g1867⇒g1871 ⇒g≠666−⇒g2010⇒g≠667⇒g1866 ⇒g30≠8⇒g3002⇒g1866 ⇒g30≠8⇒g3003⇒g3≠30⇒uni0031−⇒g1800⇒g1867⇒g1871 ⇒g≠666−⇒g2010⇒g≠667⇒g3≠39−⇒g1866 ⇒g30≠8⇒g3001⇒g1871⇒g1861⇒g1866 ⇒g≠666−⇒g2010⇒g≠667
+⇒g1866⇒g30≠8⇒g3001⇒g1866⇒g30≠8⇒g3003⇒g3≠30⇒uni0031−⇒g1800⇒g1867⇒g1871 ⇒g≠666−⇒g2010⇒g≠667⇒g3≠39−⇒g1866⇒g30≠8⇒g3002⇒g1871⇒g1861⇒g1866 ⇒g≠666−⇒g2010⇒g≠667⇒g1866⇒g30≠8⇒g3002⇒g1866⇒g30≠8⇒g3003⇒g3≠30⇒uni0031−⇒g1800⇒g1867⇒g1871 ⇒g≠666−⇒g2010⇒g≠667⇒g3≠39+⇒g1866⇒g30≠8⇒g3001⇒g1871⇒g1861⇒g1866 ⇒g≠666−⇒g2010⇒g≠667⇒g1866⇒g30≠8⇒g3003⇒g2870+⇒g3≠30⇒uni0031−⇒g1866⇒g30≠8⇒g3003⇒g2870⇒g3≠39⇒g1800⇒g1867⇒g1871 ⇒g≠666−⇒g2010⇒g≠667⇒g3≠≠2 (61) 
+ 
+=⇒g3≠38⇒g1866⇒g30≠8⇒g3001⇒g2870+⇒g3≠30⇒uni0031−⇒g1866⇒g30≠8⇒g3001⇒g2870⇒g3≠39⇒g1800⇒g1867⇒g1871⇒g2010 ⇒g1866⇒g30≠8⇒g3001⇒g1866⇒g30≠8⇒g3002⇒g≠666⇒uni0031−⇒g1800⇒g1867⇒g1871⇒g2010 ⇒g≠667+⇒g1866⇒g30≠8⇒g3003⇒g1871⇒g1861⇒g1866⇒g2010 ⇒g1866⇒g30≠8⇒g3001⇒g1866⇒g30≠8⇒g3003⇒g≠666⇒uni0031−⇒g1800⇒g1867⇒g1871⇒g2010 ⇒g≠667−⇒g1866⇒g30≠8⇒g3002⇒g1871⇒g1861⇒g1866⇒g2010 
+⇒g1866⇒g30≠8⇒g3001⇒g1866⇒g30≠8⇒g3002⇒g≠666⇒uni0031−⇒g1800⇒g1867⇒g1871⇒g2010 ⇒g≠667−⇒g1866⇒g30≠8⇒g3003⇒g1871⇒g1861⇒g1866⇒g2010 ⇒g1866⇒g30≠8⇒g3002⇒g2870+⇒g3≠30⇒uni0031−⇒g1866⇒g30≠8⇒g3002⇒g2870⇒g3≠39⇒g1800⇒g1867⇒g1871⇒g2010 ⇒g1866⇒g30≠8⇒g3002⇒g1866⇒g30≠8⇒g3003⇒g≠666⇒uni0031−⇒g1800⇒g1867⇒g1871⇒g2010 ⇒g≠667+⇒g1866⇒g30≠8⇒g3001⇒g1871⇒g1861⇒g1866⇒g2010 
+⇒g1866 ⇒g30≠8⇒g3001⇒g1866 ⇒g30≠8⇒g3003⇒g≠666⇒uni0031−⇒g1800⇒g1867⇒g1871⇒g2010 ⇒g≠667+⇒g1866 ⇒g30≠8⇒g3002⇒g1871⇒g1861⇒g1866⇒g2010 ⇒g1866 ⇒g30≠8⇒g3002⇒g1866 ⇒g30≠8⇒g3003⇒g≠666⇒uni0031−⇒g1800⇒g1867⇒g1871⇒g2010 ⇒g≠667−⇒g1866 ⇒g30≠8⇒g3001⇒g1871⇒g1861⇒g1866⇒g2010 ⇒g1866 ⇒g30≠8 ⇒g3003⇒g2870+⇒g3≠30⇒uni0031−⇒g1866 ⇒g30≠8 ⇒g3003⇒g2870⇒g3≠39⇒g1800⇒g1867⇒g1871⇒g2010 ⇒g3≠≠2=⇒g217≠⇒g≠666⇒g2196⇒g30≠9,⇒g2010⇒g≠667 
+ (62) 
+⇒g1869⇒g≠666−⇒g2196⇒g30≠9,−⇒g2010⇒g≠667=⇒g1800⇒g1867⇒g1871 ⇒g≠672−⇒g2010
+⇒uni0032⇒g≠673−⇒g2196⇒g30≠9⇒g1871⇒g1861⇒g1866 ⇒g≠672−⇒g2010
+⇒uni0032⇒g≠673=⇒g1800⇒g1867⇒g1871 ⇒g≠672⇒g2010
+⇒uni0032⇒g≠673+⇒g2196⇒g30≠9⇒g1871⇒g1861⇒g1866 ⇒g≠672⇒g2010
+⇒uni0032⇒g≠673=⇒g1869⇒g≠666⇒g2196⇒g30≠9,⇒g2010⇒g≠667 (63) 
+ 
+Equations (61) and (63) state mathematically the re sult that a rotation about a given axis is equivale nt 
+to the negative rotation about the negated axis. 
+It is, therefore, conventional to constrain the sca lar component ⇒g1869⇒g2868 of a rotation quaternion ⇒g1869 to be non-
+negative. If a negative scalar component is detecte d then the entire quaternion, both scalar and vecto r 
+components, can be safely negated. 
+3.6 Coordinate Frame Rotation Standard 
+Some texts define the quaternion rotation operator on vector ⇒g220≠ to be ⇒g1869⇒g220≠⇒g1869∗ instead of ⇒g1869∗⇒g220≠⇒g1869. The 
+explanation is that the operator ⇒g1869∗⇒g220≠⇒g1869 transforms the vector ⇒g220≠ as a result of rotation of the coordinate 
+system by angle ⇒g2010, whereas the operator ⇒g1869⇒g220≠⇒g1869∗ rotates the vector ⇒g220≠, by angle ⇒g2010 in a fixed coordinate 
+system. The standard used in this document and all Freescale Sensor Fusion Library software is that it  
+is the coordinate system that is rotating, normally  as a result of the device orientation changing, wh ile 
+the vector ⇒g220≠, which is typically the earth's gravitational or g eomagnetic field, remains fixed in its frame. 
+4 Converting between Quaternion and Rotation Matrix  
+4.1 Rotation Matrix from Quaternion 
+Expanding equation (60) into its components gives t he identity: 
+⇒g≠68≠⇒g18≠≠⇒g3001⇒g3001 ⇒g18≠≠⇒g3001⇒g3002 ⇒g18≠≠⇒g3001⇒g3003 
+⇒g18≠≠⇒g3002⇒g3001 ⇒g18≠≠⇒g3002⇒g3002 ⇒g18≠≠⇒g3002⇒g3003 
+⇒g18≠≠⇒g3003⇒g3001 ⇒g18≠≠⇒g3003⇒g3002 ⇒g18≠≠⇒g3003⇒g3003 ⇒g≠680⇒g3≠37⇒g187≠⇒g3001
+⇒g187≠⇒g3002
+⇒g187≠⇒g3003⇒g3≠≠1=⇒g≠666⇒g1869⇒g2868−⇒g1869⇒g2869⇒g2191−⇒g1869⇒g2870⇒g2192−⇒g1869⇒g2871⇒g2193⇒g≠667⇒g3≠30⇒g187≠⇒g3001⇒g2191+⇒g187≠⇒g3002⇒g2192+⇒g187≠⇒g3003⇒g2193⇒g3≠39⇒g≠666⇒g1869⇒g2868+⇒g1869⇒g2869⇒g2191+⇒g1869⇒g2870⇒g2192+⇒g1869⇒g2871⇒g2193⇒g≠667 (72) 
+ 
+Expanding the right hand side and re-arranging give s: 
+⇒g≠68≠⇒g18≠≠⇒g3001⇒g3001 ⇒g18≠≠⇒g3001⇒g3002 ⇒g18≠≠⇒g3001⇒g3003 
+⇒g18≠≠⇒g3002⇒g3001 ⇒g18≠≠⇒g3002⇒g3002 ⇒g18≠≠⇒g3002⇒g3003 
+⇒g18≠≠⇒g3003⇒g3001 ⇒g18≠≠⇒g3003⇒g3002 ⇒g18≠≠⇒g3003⇒g3003 ⇒g≠680⇒g3≠37⇒g187≠⇒g3001
+⇒g187≠⇒g3002
+⇒g187≠⇒g3003⇒g3≠≠1=⇒g≠68≠⇒g1869⇒g2868⇒g2870+⇒g1869⇒g2869⇒g2870−⇒g1869⇒g2870⇒g2870−⇒g1869⇒g2871⇒g2870⇒uni0032⇒g1869⇒g2869⇒g1869⇒g2870+⇒uni0032⇒g1869⇒g2868⇒g1869⇒g2871⇒uni0032⇒g1869⇒g2869⇒g1869⇒g2871−⇒uni0032⇒g1869⇒g2868⇒g1869⇒g2870
+⇒uni0032⇒g1869⇒g2869⇒g1869⇒g2870−⇒uni0032⇒g1869⇒g2868⇒g1869⇒g2871⇒g1869⇒g2868⇒g2870−⇒g1869⇒g2869⇒g2870+⇒g1869⇒g2870⇒g2870−⇒g1869⇒g2871⇒g2870⇒uni0032⇒g1869⇒g2870⇒g1869⇒g2871+⇒uni0032⇒g1869⇒g2868⇒g1869⇒g2869
+⇒uni0032⇒g1869⇒g2869⇒g1869⇒g2871+⇒uni0032⇒g1869⇒g2868⇒g1869⇒g2870⇒uni0032⇒g1869⇒g2870⇒g1869⇒g2871−⇒uni0032⇒g1869⇒g2868⇒g1869⇒g2869⇒g1869⇒g2868⇒g2870−⇒g1869⇒g2869⇒g2870−⇒g1869⇒g2870⇒g2870+⇒g1869⇒g2871⇒g2870⇒g≠680⇒g3≠37⇒g187≠⇒g3001
+⇒g187≠⇒g3002
+⇒g187≠⇒g3003⇒g3≠≠1 (73) 
+ 
+Because equation (73) holds for all vectors ⇒g220≠, it follows that: 
+ 
+⇒g≠68≠⇒g18≠≠⇒g3001⇒g3001 ⇒g18≠≠⇒g3001⇒g3002 ⇒g18≠≠⇒g3001⇒g3003 
+⇒g18≠≠⇒g3002⇒g3001 ⇒g18≠≠⇒g3002⇒g3002 ⇒g18≠≠⇒g3002⇒g3003 
+⇒g18≠≠⇒g3003⇒g3001 ⇒g18≠≠⇒g3003⇒g3002 ⇒g18≠≠⇒g3003⇒g3003 ⇒g≠680=⇒g≠68≠⇒g1869⇒g2868⇒g2870+⇒g1869⇒g2869⇒g2870−
+⇒uni0032⇒g1869⇒g2869⇒g1869⇒g2870−
+⇒uni0032⇒g1869⇒g2869⇒g1869⇒g2871+
+ 
+The normalization constraint for a rotation quatern ion is: 
+⇒g1869
+ 
+Substituting equation (75) into equation 
+quaternion to a rotation matrix: 
+⇒g≠68≠⇒g18≠≠⇒g3001⇒g3001 ⇒g18≠≠⇒g3001⇒g3002 ⇒g18≠≠⇒g3001⇒g3003 
+⇒g18≠≠⇒g3002⇒g3001 ⇒g18≠≠⇒g3002⇒g3002 ⇒g18≠≠⇒g3002⇒g3003 
+⇒g18≠≠⇒g3003⇒g3001 ⇒g18≠≠⇒g3003⇒g3002 ⇒g18≠≠⇒g3003⇒g3003 ⇒g≠680=⇒g≠68≠⇒uni0032⇒g≠666⇒g1869⇒g2868
+⇒uni0032⇒g≠666⇒g1869
+⇒uni0032⇒g≠666⇒g1869
+4.2 Quaternion from Rotation Matrix 
+Equation (65) can also be used to determine the rotation quaterni on from the rotation matrix. The 
+procedure is straightforward exc ept for rotations close to 180° 
+avoid numerical rounding errors. 
+The sum of 1 plus the trace of the rotation matrix evaluates to: 
+⇒uni0031+⇒g1872⇒g1870 ⇒g≠666⇒g217≠⇒g≠667=⇒uni0031+⇒uni0032⇒g≠666⇒g1869⇒g2868⇒g2870+
+⇒uni0031+⇒g1872⇒g1870 ⇒g≠666⇒g217≠⇒g≠667=⇒uni0032⇒g1869⇒g2868⇒g2870+
+⇒uni0031+⇒g1872⇒g1870 ⇒g≠666⇒g217≠⇒g≠667=⇒g3≠30⇒uni0032⇒g1869⇒g2868⇒g2870+
+ 
+Using the result that the quaternion has unit norm gives: 
+ 
+⇒g1869⇒g2868 is always nonnegative because negative 
+greater than 180°  which is equivalent to a negated rotation of less than 180°  about the negated rotati on 
+axis. 
+The positive square root of equation 
+⇒g1869⇒g2868=⇒g3≠93⇒uni0031
+Differencing elements across the diagonal gives the  valid solution for all remaining elements of the 
+Document Number: −⇒g1869⇒g2870⇒g2870−⇒g1869⇒g2871⇒g2870⇒uni0032⇒g1869⇒g2869⇒g1869⇒g2870+⇒uni0032⇒g1869⇒g2868⇒g1869⇒g2871⇒uni0032⇒g1869⇒g2869⇒g1869⇒g2871−
+−⇒uni0032⇒g1869⇒g2868⇒g1869⇒g2871⇒g1869⇒g2868⇒g2870−⇒g1869⇒g2869⇒g2870+⇒g1869⇒g2870⇒g2870−⇒g1869⇒g2871⇒g2870⇒uni0032⇒g1869⇒g2870⇒g1869⇒g2871+
++⇒uni0032⇒g1869⇒g2868⇒g1869⇒g2870⇒uni0032⇒g1869⇒g2870⇒g1869⇒g2871−⇒uni0032⇒g1869⇒g2868⇒g1869⇒g2869⇒g1869⇒g2868⇒g2870−⇒g1869⇒g2869⇒g2870−
+The normalization constraint for a rotation quatern ion is:  
+⇒g1869⇒g2868⇒g2870+⇒g1869⇒g2869⇒g2870+⇒g1869⇒g2870⇒g2870+⇒g1869⇒g2871⇒g2870=⇒uni0031 
+into equation (64) gives a slightly simpler expression for converting a rota tion 
+⇒g≠666⇒g2868⇒g2870+⇒g1869⇒g2869⇒g2870⇒g≠667−⇒uni0031⇒uni0032⇒g≠666⇒g1869⇒g2869⇒g1869⇒g2870+⇒g1869⇒g2868⇒g1869⇒g2871⇒g≠667⇒uni0032⇒g≠666⇒g1869⇒g2869⇒g1869⇒g2871−⇒g1869⇒g2868⇒g1869⇒g2870
+⇒g≠666⇒g1869⇒g2869⇒g1869⇒g2870−⇒g1869⇒g2868⇒g1869⇒g2871⇒g≠667⇒uni0032⇒g≠666⇒g1869⇒g2868⇒g2870+⇒g1869⇒g2870⇒g2870⇒g≠667−⇒uni0031⇒uni0032⇒g≠666⇒g1869⇒g2870⇒g1869⇒g2871+⇒g1869⇒g2868⇒g1869⇒g2869
+⇒g≠666⇒g1869⇒g2869⇒g1869⇒g2871+⇒g1869⇒g2868⇒g1869⇒g2870⇒g≠667⇒uni0032⇒g≠666⇒g1869⇒g2870⇒g1869⇒g2871−⇒g1869⇒g2868⇒g1869⇒g2869⇒g≠667⇒uni0032⇒g≠666⇒g1869⇒g2868⇒g2870+⇒g1869⇒g2871⇒g2870⇒g≠667−
+Quaternion from Rotation Matrix  
+can also be used to determine the rotation quaterni on from the rotation matrix. The 
+ept for rotations close to 180°  where a fallback algorithm is needed to 
+The sum of 1 plus the trace of the rotation matrix evaluates to:  
++⇒g1869⇒g2869⇒g2870⇒g≠667−⇒uni0031+⇒uni0032⇒g≠666⇒g1869⇒g2868⇒g2870+⇒g1869⇒g2870⇒g2870⇒g≠667−⇒uni0031+⇒uni0032⇒g≠666⇒g1869⇒g2868⇒g2870+⇒g1869⇒g2871⇒g2870⇒g≠667−⇒uni0031
++⇒uni0032⇒g1869⇒g2869⇒g2870+⇒uni0032⇒g1869⇒g2868⇒g2870+⇒uni0032⇒g1869⇒g2870⇒g2870−⇒uni0031+⇒uni0032⇒g1869⇒g2868⇒g2870+⇒uni0032⇒g1869⇒g2871⇒g2870−⇒uni0031 
++⇒uni0032⇒g1869⇒g2869⇒g2870+⇒uni0032⇒g1869⇒g2870⇒g2870+⇒uni0032⇒g1869⇒g2871⇒g2870⇒g3≠39+⇒uni0032⇒g1869⇒g2868⇒g2870−⇒uni0031+⇒uni0032⇒g1869⇒g2868⇒g2870−⇒uni0031 
+Using the result that the quaternion has unit norm gives:  
+⇒uni0031+⇒g1872⇒g1870 ⇒g≠666⇒g217≠⇒g≠667=⇒uni003≠⇒g1869⇒g2868⇒g2870 
+is always nonnegative because negative ⇒g1869⇒g2868 in a rotation quaternion corresponds to a rotation angle 
+greater than 180°  which is equivalent to a negated rotation of less than 180°  about the negated rotati on 
+The positive square root of equation (80) can, therefore, always be taken, giving: 
+⇒g3≠93⇒uni0031+⇒g1872⇒g1870 ⇒g≠666⇒g217≠⇒g≠667
+⇒uni0032=⇒g3≠93⇒uni0031+⇒g18≠≠⇒g3001⇒g3001 +⇒g18≠≠⇒g3002⇒g3002 +⇒g18≠≠⇒g3003⇒g3003 
+⇒uni0032 
+Differencing elements across the diagonal gives the  valid solution for all remaining elements of the 
+ Document Number: AN5022  
+Revision 1.0, 9/2015 ⇒uni0032⇒g1869⇒g2868⇒g1869⇒g2870
+⇒uni0032⇒g1869⇒g2868⇒g1869⇒g2869
+⇒g1869⇒g2870⇒g2870+⇒g1869⇒g2871⇒g2870⇒g≠680 (64) 
+(75) 
+a slightly simpler expression for converting a rota tion 
+⇒g2870⇒g≠667
+⇒g2869⇒g≠667
+⇒g≠667−⇒uni0031⇒g≠680 (65) 
+can also be used to determine the rotation quaterni on from the rotation matrix. The 
+a fallback algorithm is needed to 
+⇒uni0031 (77) 
+(66) 
+(67) 
+(80) 
+in a rotation quaternion corresponds to a rotation angle 
+greater than 180°  which is equivalent to a negated rotation of less than 180°  about the negated rotati on 
+(81) 
+Differencing elements across the diagonal gives the  valid solution for all remaining elements of the 
+ 
+rotation quaternion except when ⇒g1869⇒g2868=0 at a 180°  rotation: 
+ 
+⇒g18≠≠⇒g3002⇒g3003 −⇒g18≠≠⇒g3003⇒g3002 =⇒uni003≠⇒g1869⇒g2868⇒g1869⇒g2869⇒⇒g1869⇒g2869=⇒g3≠30⇒g18≠≠⇒g3002⇒g3003 −⇒g18≠≠⇒g3003⇒g3002 ⇒g3≠39
+⇒uni003≠⇒g1869⇒g2868 (68) 
+ 
+⇒g18≠≠⇒g3003⇒g3001 −⇒g18≠≠⇒g3001⇒g3003 =⇒uni003≠⇒g1869⇒g2868⇒g1869⇒g2870⇒⇒g1869⇒g2870=⇒g≠666⇒g18≠≠⇒g3003⇒g3001 −⇒g18≠≠⇒g3001⇒g3003 ⇒g≠667
+⇒uni003≠⇒g1869⇒g2868 (83) 
+ 
+⇒g18≠≠⇒g3001⇒g3002 −⇒g18≠≠⇒g3002⇒g3001 =⇒uni003≠⇒g1869⇒g2868⇒g1869⇒g2871⇒⇒g1869⇒g2871=⇒g3≠30⇒g18≠≠⇒g3001⇒g3002 −⇒g18≠≠⇒g3002⇒g3001 ⇒g3≠39
+⇒uni003≠⇒g1869⇒g2868 (69) 
+ 
+Equations (68)   to (69) fail near 180°  rotation about any axis beca use the rotation matrix becomes 
+symmetric (giving a near-zero numerator) and the sc alar quaternion component ⇒g1869⇒g2868 approaches zero 
+(giving a near-zero denominator). The fallback algo rithm in this case uses the elements on the leading  
+diagonal to give: 
+⇒g18≠≠⇒g3001⇒g3001 =⇒uni0032⇒g≠666⇒g1869⇒g2868⇒g2870+⇒g1869⇒g2869⇒g2870⇒g≠667−⇒uni0031⇒⇒g1869⇒g2869=±⇒g3≠96⇒uni0031+⇒g18≠≠⇒g3001⇒g3001 
+⇒uni0032−⇒g1869⇒g2868⇒g2870 (70) 
+⇒g18≠≠⇒g3002⇒g3002 =⇒uni0032⇒g≠666⇒g1869⇒g2868⇒g2870+⇒g1869⇒g2870⇒g2870⇒g≠667−⇒uni0031⇒⇒g1869⇒g2870=±⇒g3≠96⇒uni0031+⇒g18≠≠⇒g3002⇒g3002 
+⇒uni0032−⇒g1869⇒g2868⇒g2870 (86) 
+⇒g18≠≠⇒g3003⇒g3003 =⇒uni0032⇒g≠666⇒g1869⇒g2868⇒g2870+⇒g1869⇒g2871⇒g2870⇒g≠667−⇒uni0031⇒⇒g1869⇒g2871=±⇒g3≠96⇒uni0031+⇒g18≠≠⇒g3003⇒g3003 
+⇒uni0032−⇒g1869⇒g2868⇒g2870 (71) 
+The unknown signs in equations (70) to (71) can be resolved by taking the signs of equations (68) to 
+Error! Reference source not found. and using the fa ct that ⇒g1869⇒g2868 is always nonnegative: 
+⇒g1871⇒g1861⇒g1809⇒g1866 ⇒g≠666⇒g1869⇒g2869⇒g≠667=⇒g1871⇒g1861⇒g1809⇒g1866 ⇒g3≠30⇒g18≠≠⇒g3002⇒g3003 −⇒g18≠≠⇒g3003⇒g3002 ⇒g3≠39 (88) 
+⇒g1871⇒g1861⇒g1809⇒g1866 ⇒g≠666⇒g1869⇒g2870⇒g≠667=⇒g1871⇒g1861⇒g1809⇒g1866 ⇒g≠666⇒g18≠≠⇒g3003⇒g3001 −⇒g18≠≠⇒g3001⇒g3003 ⇒g≠667 (89) 
+⇒g1871⇒g1861⇒g1809⇒g1866 ⇒g≠666⇒g1869⇒g2871⇒g≠667=⇒g1871⇒g1861⇒g1809⇒g1866 ⇒g3≠30⇒g18≠≠⇒g3001⇒g3002 −⇒g18≠≠⇒g3002⇒g3001 ⇒g3≠39 (90) 
+ 
+ 
+5 Converting between Quaternion and Rotation Vector 
+5.1 Rotation Vector From 
+The definition of the rotation quaternion 
+equivalent rotation vector ⇒g2196⇒g30≠9⇒g2010 defined as the product 
+⇒g2010. Inverting the process to recover the rotation vec tor from the quaternion is straightforward. 
+⇒g1869=⇒g1869⇒g2868+⇒g1869⇒g2869
+ 
+Equating the scalar components results in 
+⇒g1869⇒g2868=
+Because ⇒g1869⇒g2868 varies between 0 and 1 , the rotation angle 
+found.  has the required range 0°  to 
+Equating the remaining three components of the quat ernion 
+non-zero: 
+⇒g1869⇒g2869=
+⇒g1869⇒g2870=
+⇒g1869⇒g2871=
+ 
+For the case where ⇒g1871⇒g1861⇒g1866⇒g≠672⇒g3086
+⇒g2870⇒g≠673=0 , the rotation angle 
+The rotation vector ⇒g2196⇒g30≠9⇒g2010 is then zero even though the rotation axis 
+ 
+5.2 Quaternion From Rotation Vector 
+Equation (58) defines the rotation quaternion explicitly in terms of the rotation vector axis 
+angle ⇒g2010. 
+ 
+Document Number: Converting between Quaternion and Rotation Vector 
+Rotation Vector From  Quaternion 
+The definition of the rotation quaternion  ⇒g1869 in equation (58) shows that it is closely linked to the 
+defined as the product  of normalized rotation axis ⇒g2196⇒g30≠9 and the rotation angle 
+. Inverting the process to recover the rotation vec tor from the quaternion is straightforward. 
+⇒g2869⇒g2191+⇒g1869⇒g2870⇒g2192+⇒g1869⇒g2871⇒g2193=⇒g1800⇒g1867⇒g1871 ⇒g≠672⇒g2010
+⇒uni0032⇒g≠673+⇒g2196⇒g30≠9⇒g1871⇒g1861⇒g1866 ⇒g≠672⇒g2010
+⇒uni0032⇒g≠673 
+results in : 
+=⇒g1800⇒g1867⇒g1871 ⇒g≠672⇒g2010
+⇒uni0032⇒g≠673⇒⇒g2010=⇒uni0032⇒g1800⇒g1867⇒g1871 ⇒g2879⇒g2869⇒g≠666⇒g1869⇒g2868⇒g≠667 
+, the rotation angle ⇒g2010 in equation (92) Error! Reference source not 
+to 180° . 
+Equating the remaining three components of the quat ernion gives for the general case where 
+=⇒g1871⇒g1861⇒g1866 ⇒g≠672⇒g2010
+⇒uni0032⇒g≠673⇒g1866⇒g3001⇒⇒g1866⇒g3001=⇒g1869⇒g2869
+⇒g1871⇒g1861⇒g1866 ⇒g≠672⇒g2010
+⇒uni0032⇒g≠673 
+=⇒g1871⇒g1861⇒g1866 ⇒g≠672⇒g2010
+⇒uni0032⇒g≠673⇒g1866⇒g3002⇒⇒g1866⇒g3002=⇒g1869⇒g2870
+⇒g1871⇒g1861⇒g1866 ⇒g≠672⇒g2010
+⇒uni0032⇒g≠673 
+=⇒g1871⇒g1861⇒g1866 ⇒g≠672⇒g2010
+⇒uni0032⇒g≠673⇒g1866⇒g3003⇒⇒g1866⇒g3003=⇒g1869⇒g2871
+⇒g1871⇒g1861⇒g1866 ⇒g≠672⇒g2010
+⇒uni0032⇒g≠673 
+the rotation angle  ⇒g2010 must be zero since  ⇒g2010 is in the range 0 
+even though the rotation axis ⇒g2196⇒g30≠9 is undefined. 
+Quaternion From Rotation Vector  
+the rotation quaternion explicitly in terms of the rotation vector axis 
+⇒g1869=⇒g1800⇒g1867⇒g1871 ⇒g≠672⇒g2010
+⇒uni0032⇒g≠673+⇒g2196⇒g30≠9⇒g1871⇒g1861⇒g1866 ⇒g≠672⇒g2010
+⇒uni0032⇒g≠673 
+ Document Number: AN5022  
+Revision 1.0, 9/2015 Converting between Quaternion and Rotation Vector  
+shows that it is closely linked to the 
+⇒g30≠9and the rotation angle 
+. Inverting the process to recover the rotation vec tor from the quaternion is straightforward.  
+(91) 
+(92) 
+Error! Reference source not 
+for the general case where ⇒g1871⇒g1861⇒g1866⇒g≠672⇒g3086
+⇒g2870⇒g≠673 is 
+(93) 
+(94) 
+(95) 
+is in the range 0 o to 180 o. 
+the rotation quaternion explicitly in terms of the rotation vector axis ⇒g2196⇒g30≠9 and rotation 
+(72) 
+ 
+6 Low-pass Filtering Orientation Quaternions 
+6.1 Introduction 
+The Kalman filter algorithms directly compute an op timal Kalman filter estimate of the orientation. Th e 
+simpler accelerometer and magnetometer eCompass alg orithms, however, require the explicit low-pass 
+filtering of the stream of noisy orientation estima tes whether in quaternion or rotation matrix forms.  Low 
+pass filtering of orientation quaternions is perfor med in the function fLPFOrientationQuaternion  
+in file orientation.c . 
+The individual elements of orientation matrices and  orientation quaternions should not be low pass 
+filtered since the resulting low pass filtered matr ix or quaternion is no longer a valid rotation matr ix (with 
+orthonormal row and column vectors) or valid rotati on quaternion (with unit norm). Any low pass filter ing 
+on individual elements must therefore be followed b y explicit re-normalizing of the rotation matrix or  
+rotation quaternion. The results are never terribly  satisfactory and the low pass filtered trajectorie s can 
+be counter-intuitive.  The preferred method is to u se exponential filtering of quaternions as shown in  the 
+following subsections. 
+ 
+6.2 Exponential Time Domain Low Pass Filter 
+The difference equation for the single-pole low-pas s filter in the time domain is: 
+⇒g1877⇒g≠670⇒g1866⇒g≠671=⇒g≠666⇒uni0031−⇒g2009⇒g≠667⇒g1877⇒g≠670⇒g1866−⇒uni0031⇒g≠671+⇒g2009⇒g1876 ⇒g≠670⇒g1866⇒g≠671 (96) 
+ 
+where: 
+0<⇒g2009≤⇒uni0031 (97) 
+ 
+The transfer function ⇒g183≠⇒g≠666⇒g1878⇒g≠667 is: 
+⇒g183≠⇒g≠666⇒g1878⇒g≠667=⇒g2009
+⇒uni0031−⇒g≠666⇒uni0031−⇒g2009⇒g≠667⇒g1878⇒g2879⇒g2869 (98) 
+with a single pole at ⇒g1878=⇒g≠666⇒uni0031−⇒g2009⇒g≠667 . 
+In the general case, an impulse at time zero ⇒g1876⇒g≠6700⇒g≠671=⇒uni0031 gives the exponentially decaying output: 
+⇒g1877⇒g≠670⇒g1866⇒g≠671=⇒g≠666⇒uni0031−⇒g2009⇒g≠667⇒g30≠1 (99) 
+ 
+The ⇒g2869
+⇒g3032 time constant ⇒g18≠0 is then given by: 
+⇒uni0031
+⇒g1807=⇒g≠666⇒uni0031−⇒g2009⇒g≠667⇒g3010⇒⇒g18≠0=−⇒uni0031
+⇒g186≠⇒g1866 ⇒g≠666⇒uni0031−⇒g2009⇒g≠667 (100)  
+ 
+For small ⇒g2009: 
+⇒g18≠0=⇒uni0031
+⇒g2009 (101)  
+ 
+ 
+The time constant in samples is therefore 
+and the case ⇒g2009=⇒uni0031  corresponds to an all pass filter. 
+In C code, equation (96) is written as: 
+⇒uni0079⇒uni006E 
+An example of this filter is the line below taken from 
+filter the geomagnetic inclination angle 
+ 
+// low pass filter the geomagnetic inclination angl e with a simple exponential filter 
+pthisSV-> fLPDelta  += pthisSV-> flpf 
+ 
+Equation (102) makes it clear that the 
+between the current input ⇒uni0078⇒uni006E ⇒uni0009and t he previous 
+is therefore exponen tially steered towards the 
+principle of exponential convergence to a 
+orientation quaternions. 
+ 
+6.3 Exponential Quaternion 
+The orientation space quaternion low pass filter used i n the function 
+is analogous to the time domain exponential filter of the previo us section in that it 
+the current low-pass filtered orientation qu 
+orientation quaternion. 
+The incremental rotation quaternion 
+pass filtered quaternion ⇒g1869⇒g3013⇒g3017 ⇒g≠670⇒g1866−⇒uni0031⇒g≠671 onto the instantaneous noisy 
+⇒g1869⇒g≠670⇒g1866⇒g≠671=⇒g1869⇒g3013⇒g3017 ⇒g≠670⇒g1866
+The scalar and vector components of 
+and instantaneous orientation estimates 
+⇒uni039≠
+Applying the incremental quaternion unchanged results  in 
+⇒g1869⇒g3013⇒g3017 ⇒g≠670⇒g1866⇒g≠671=⇒g1869⇒g≠670⇒g1866⇒g≠671: 
+⇒g1869⇒g3013⇒g3017 ⇒g≠670⇒g1866⇒g≠671=⇒g1869⇒g3013⇒g3017 ⇒g≠670⇒g1866−⇒uni0031
+Scaling the vector component by a constant factor 
+⇒uni039≠⇒g1869⇒uni2032⇒g≠670⇒g1866⇒g≠671 which exponentially steers the low pass filtered or ientation quaternion onto the insta 
+quaternion with a time constant approximately equal to the rec iprocal of the filter coefficient 
+Document Number: therefore approximately equal to the reciprocal of the filter coefficient 
+corresponds to an all pass filter.  
+written as:  
+⇒uni0079⇒uni006E ⇒uni0009+=⇒uni0061⇒uni006C⇒uni0070 ⇒uni0068⇒uni0061∗⇒g≠666⇒uni0078⇒uni006E −⇒uni0009⇒uni0079⇒uni006E ⇒g≠667⇒uni003B 
+the line below taken from the function fRun_6DOF_GB_BASIC 
+geomagnetic inclination angle : 
+// low pass filter the geomagnetic inclination angl e with a simple exponential filter 
+flpf  * (pthisSV-> fDelta  - pthisSV-> fLPDelta ); 
+makes it clear that the low-pass estimate ⇒uni0079⇒uni006E⇒uni0009is updated by ⇒g2009 times the 
+he previous low-pass filtered estimate ⇒uni0079⇒uni006E . The low 
+tially steered towards the input sequence ⇒uni0078⇒uni006E . The next section describes how the 
+principle of exponential convergence to a noisy time varying input orientation can be applied to 
+Quaternion Low-pass Filter 
+orientation space quaternion low pass filter used i n the function fLPFOrientationQuaternion 
+to the time domain exponential filter of the previo us section in that it  exponentially rotate 
+filtered orientation qu ater nion towards the instantaneous, and 
+The incremental rotation quaternion ⇒uni039≠⇒g1869⇒g≠670⇒g1866⇒g≠671 required at iteration ⇒g1866 to completely rotate 
+⇒g≠671onto the instantaneous noisy  quaternion ⇒g1869⇒g≠670⇒g1866⇒g≠671 is given by 
+⇒g≠670−⇒uni0031⇒g≠671⇒uni039≠⇒g1869⇒g≠670⇒g1866⇒g≠671⇒⇒uni039≠⇒g1869⇒g≠670⇒g1866⇒g≠671=⇒g1869⇒g3013⇒g3017 ∗⇒g≠670⇒g1866−⇒uni0031⇒g≠671⇒g1869⇒g≠670⇒g1866⇒g≠671 
+The scalar and vector components of ⇒uni039≠⇒g1869⇒g≠670⇒g1866⇒g≠671 are related to the angle ⇒g2010 and axis ⇒g2196⇒g30≠9 between the low pass 
+estimates at time ⇒g≠670⇒g1866⇒g≠671 by: 
+⇒uni039≠⇒g1869⇒g≠670⇒g1866⇒g≠671=⇒g1800⇒g1867⇒g1871 ⇒g≠672⇒g2010
+⇒uni0032⇒g≠673+⇒g2196⇒g30≠9⇒g1871⇒g1861⇒g1866 ⇒g≠672⇒g2010
+⇒uni0032⇒g≠673 
+plying the incremental quaternion unchanged results  in the special case of the all 
+⇒uni0031⇒g≠671⇒uni039≠⇒g1869⇒g≠670⇒g1866⇒g≠671=⇒g1869⇒g3013⇒g3017 ⇒g≠670⇒g1866−⇒uni0031⇒g≠671⇒g1869⇒g3013⇒g3017 ∗⇒g≠670⇒g1866−⇒uni0031⇒g≠671⇒g1869⇒g≠670⇒g1866⇒g≠671=⇒g1869⇒g≠670⇒g1866⇒g≠671 
+a constant factor  ⇒g2009 results in an incremental quaternion 
+which exponentially steers the low pass filtered or ientation quaternion onto the insta 
+with a time constant approximately equal to the rec iprocal of the filter coefficient 
+ Document Number: AN5022  
+Revision 1.0, 9/2015 the filter coefficient  ⇒g2009 
+(102)  
+fRun_6DOF_GB_BASIC  and used to 
+// low pass filter the geomagnetic inclination angl e with a simple exponential filter  
+);  
+times the difference 
+low -pass estimate ⇒uni0079⇒uni006E  
+The next section describes how the 
+can be applied to 
+fLPFOrientationQuaternion  
+exponentially rotate s 
+nion towards the instantaneous, and therefore noisy, 
+rotate the previous low 
+⇒g≠671is given by : 
+(103)  
+⇒g30≠9between the low pass 
+(104)  
+all -pass filter where 
+(105)  
+quaternion  correction 
+which exponentially steers the low pass filtered or ientation quaternion onto the insta ntaneous 
+with a time constant approximately equal to the rec iprocal of the filter coefficient ⇒g2009: 
+ 
+⇒uni039≠⇒g1869⇒uni2032⇒g≠670⇒g1866⇒g≠671=⇒uni039≠⇒g1869⇒g2868⇒uni2032⇒g≠670⇒g1866⇒g≠671+⇒g2009⇒g2196⇒g30≠9⇒g1871⇒g1861⇒g1866 ⇒g≠672⇒g2010
+⇒uni0032⇒g≠673 (106)  
+The scalar component ⇒uni039≠⇒g1869⇒g2868⇒uni2032⇒g≠670⇒g1866⇒g≠671 is determined by the constraint that the norm of ⇒uni039≠⇒g1869⇒uni2032⇒g≠670⇒g1866⇒g≠671 equals 1. 
+This low pass filter can be improved by making the filter coefficient ⇒g2009 dependent on the relative angle ⇒g2010. 
+⇒g2009 should be small when ⇒g2010 is small in order to give a long time constant and  a high degree of noise 
+rejection but ⇒g2009 should increase as ⇒g2010 increases in order to give faster tracking of aggr essive motion at 
+the expense of less averaging. 
+The expression used in the function fLPFOrientationQuaternion is: 
+⇒g2009⇒g≠093=⇒g2009+⇒g≠666⇒uni0031−⇒g2009⇒g≠667⇒g≠666⇒uni0031−⇒uni039≠⇒g1869⇒g2868⇒g≠670⇒g1866⇒g≠671⇒g≠667=⇒g2009+⇒g≠666⇒uni0031−⇒g2009⇒g≠667⇒g≠678⇒uni0031−⇒g1800⇒g1867⇒g1871 ⇒g≠672⇒g2010
+⇒uni0032⇒g≠673⇒g≠679 (107)  
+where ⇒g2009 is the nominal filter coefficient and ⇒g2009⇒uni2032 the actual filter coefficient used . 
+Using a second order Taylor expansion equation give s the variation of filter coefficient ⇒g2009⇒g≠093 for small 
+relatives angles ⇒g2010 and small ⇒g2009 as: 
+⇒g2009⇒g≠093≈⇒g2009+⇒g≠666⇒uni0031−⇒g2009⇒g≠667⇒g2010⇒g2870
+8≈⇒g2009+⇒g2010⇒g2870
+8⇒uni0009⇒g1808⇒g1867⇒g1870 ⇒uni0009⇒g2010⇒uni0009⇒g1861⇒g1866 ⇒uni0009⇒g1870⇒g1803⇒g1806⇒g1861⇒g1803⇒g1866⇒g1871  (108)  
+⇒g2009⇒g≠093 therefore equals ⇒g2009 in the limit of small angles ⇒g2010 but increases quadratically as the divergence 
+between the low pass and instantaneous orientation estimates increases resulting in a decreasing time 
+constant and more rapid convergence as the platform  dynamics become more aggressive. 
+As the discrepancy between the low pass and instant aneous orientation estimates reaches the 
+maximum of 180 o, ⇒uni039≠⇒g1869⇒g2868⇒g≠670⇒g1866⇒g≠671 tends to zero and the filter coefficient ⇒g2009⇒g≠093 asymptotes to the all pass case 
+bringing the low pass filtered estimate back into i mmediate synchronization with the instantaneous 
+orientation estimate. 
+⇒g2009⇒g≠093=⇒uni0031 (109)  
+7 Quaternion Derivative 
+7.1 Definition 
+The quaternion derivative is defined in the convent ional manner as the limit: 
+⇒g1806⇒g1869 ⇒g≠666⇒g1872⇒g≠667
+⇒g1806⇒g1872 =⇒g1869⇒g≠662⇒g≠666⇒g1872⇒g≠667=⇒uni006Cim ⇒g3083⇒g30≠7 →⇒g2868⇒uni0009⇒g≠682⇒g1869⇒g≠666⇒g1872+⇒g2012⇒g1872 ⇒g≠667−⇒g1869⇒g≠666⇒g1872⇒g≠667
+⇒g2012⇒g1872 ⇒g≠683 (110)  
+ 
+⇒⇒g1869⇒g≠666⇒g1872+⇒g1806⇒g1872 ⇒g≠667=⇒g1869⇒g≠666⇒g1872⇒g≠667+⇒g1806⇒g1872 ⇒g1869⇒g≠662⇒g≠666⇒g1872⇒g≠667 (111)  
+ 
+7.2 Derivation for Rotation Quaternions 
+An orientation quaternion can also be propagated fo rward in time by computing the product of the 
+current rotation quaternion ⇒g1869⇒g≠666⇒g1872⇒g≠667 and the incremental rotation quaternion ⇒g2012⇒g1869⇒g≠666⇒g1872⇒g≠667 : 
+ 
+ 
+With the assumption that incremental change in orientati on results from a constant angular velocity 
+over the time interval ⇒g2012⇒g1872  then from the definition of the rotation quaternion in t erms of rotation angle 
+⇒g2012⇒g1869 =⇒g≠668⇒g1869⇒g2868,⇒g2012⇒g1869⇒g2869,⇒g2012⇒g1869⇒g2870,⇒g2012⇒g1869
+ 
+⇒g1869⇒g2868 is determined by the requireme nt that the rotation quaternion 
+In the limit of the interval ⇒g2012⇒g1872  becoming the infinitesimal 
+⇒g1806⇒g1869 =⇒g≠668⇒g1869⇒g2868,⇒g1806⇒g1869⇒g2869,⇒g1806
+ 
+and: 
+⇒g1869⇒g≠666⇒g1872+⇒g1806⇒g1872 ⇒g≠667=⇒g1869⇒g≠666⇒g1872
+ 
+Combining equations (111) and (1 15 
+⇒g1869⇒g≠666⇒g1872⇒g≠667+⇒g1806⇒g1872 ⇒g1869⇒g≠662⇒g≠666⇒g1872⇒g≠667
+Using the result that quaternion multiplication is distributive gives the expression for the quaternio n 
+derivative in terms of angular velocity as: 
+⇒g1869⇒g≠666⇒g1872⇒g≠667+⇒g1806⇒g1872 ⇒g1869⇒g≠662⇒g≠666
+where ⇒g2209⇒g≠666⇒g1872⇒g≠667 is the vector quaternion 
+ 
+Document Number: ⇒g1869⇒g≠666⇒g1872+⇒g2012⇒g1872 ⇒g≠667=⇒g1869⇒g≠666⇒g1872⇒g≠667⇒g2012⇒g1869 ⇒g≠666⇒g1872⇒g≠667 
+the assumption that incremental change in orientati on results from a constant angular velocity 
+from the definition of the rotation quaternion in t erms of rotation angle 
+⇒g1869⇒g2871⇒g≠669=⇒g≠682⇒g1869⇒g2868,⇒g1871⇒g1861⇒g1866 ⇒g3≠36⇒g2033⇒g3001⇒g2012⇒g1872 
+⇒uni0032⇒g3≠≠0,⇒g1871⇒g1861⇒g1866 ⇒g≠678⇒g2033⇒g3002⇒g2012⇒g1872 
+⇒uni0032⇒g≠679,⇒g1871⇒g1861⇒g1866 ⇒g3≠36⇒g2033⇒g3003⇒g2012⇒g1872 
+⇒uni0032⇒g3≠≠0⇒g≠683 
+nt that the rotation quaternion  ⇒g2012⇒g1869  be normalized.  
+becoming the infinitesimal ⇒g1806⇒g1872 : 
+⇒g1806⇒g1869⇒g2870,⇒g1806⇒g1869⇒g2871⇒g≠669=⇒g≠682⇒uni0031,⇒g3≠36⇒g2033⇒g3001⇒g1806⇒g1872 
+⇒uni0032⇒g3≠≠0,⇒g≠678⇒g2033⇒g3002⇒g1806⇒g1872 
+⇒uni0032⇒g≠679,⇒g3≠36⇒g2033⇒g3003⇒g1806⇒g1872 
+⇒uni0032⇒g3≠≠0⇒g≠683 
+⇒g≠666⇒g≠667⇒g1806⇒g1869 =⇒g1869⇒g≠666⇒g1872⇒g≠667⇒g≠682⇒uni0031,⇒g3≠36⇒g2033⇒g3001⇒g1806⇒g1872 
+⇒uni0032⇒g3≠≠0,⇒g≠678⇒g2033⇒g3002⇒g1806⇒g1872 
+⇒uni0032⇒g≠679,⇒g3≠36⇒g2033⇒g3003⇒g1806⇒g1872 
+⇒uni0032⇒g3≠≠0⇒g≠683 
+15 ) gives: 
+⇒g≠662⇒g≠667=⇒g1869⇒g≠666⇒g1872⇒g≠667⇒g≠682⇒uni0031,⇒g3≠36⇒g2033⇒g3001⇒g1806⇒g1872 
+⇒uni0032⇒g3≠≠0,⇒g≠678⇒g2033⇒g3002⇒g1806⇒g1872 
+⇒uni0032⇒g≠679,⇒g3≠36⇒g2033⇒g3003⇒g1806⇒g1872 
+⇒uni0032⇒g3≠≠0⇒g≠683 
+Using the result that quaternion multiplication is distributive gives the expression for the quaternio n 
+derivative in terms of angular velocity as:  
+⇒g≠662⇒g≠666⇒g1872⇒g≠667=⇒g1869⇒g≠666⇒g1872⇒g≠667+⇒g3≠36⇒g1806⇒g1872 
+⇒uni0032⇒g3≠≠0⇒g1869⇒g≠666⇒g1872⇒g≠667⇒g3≠190,⇒g2033⇒g3001,⇒g2033⇒g3002,⇒g2033⇒g3003⇒g3≠23 
+⇒⇒g1869⇒g≠662⇒g≠666⇒g1872⇒g≠667=⇒g3≠36⇒uni0031
+⇒uni0032⇒g3≠≠0⇒g1869⇒g≠666⇒g1872⇒g≠667⇒g2209⇒g≠666⇒g1872⇒g≠667 
+is the vector quaternion ⇒g3≠190,⇒g2033⇒g3001⇒g≠666⇒g1872⇒g≠667,⇒g2033⇒g3002⇒g≠666⇒g1872⇒g≠667,⇒g2033⇒g3003⇒g≠666⇒g1872⇒g≠667⇒g3≠23. 
+ Document Number: AN5022  
+Revision 1.0, 9/2015 (112)  
+the assumption that incremental change in orientati on results from a constant angular velocity ⇒g2209 
+from the definition of the rotation quaternion in t erms of rotation angle : 
+⇒g3≠≠0⇒g≠683 (113)  
+ 
+(114)  
+(115)  
+(116)  
+Using the result that quaternion multiplication is distributive gives the expression for the quaternio n 
+(117)  
+(118)  
+ 
+How to Reach Us: 
+Home Page: 
+freescale.com 
+Web Support: 
+freescale.com/support Information in this document is provided solely to enable system and 
+software implementers to use Freescale products. Th ere are no 
+express or implied copyright licenses granted hereu nder to design or 
+fabricate any integrated circuits based on the info rmation in this 
+document. Freescale reserves the right to make chan ges without 
+further notice to any products herein. 
+Freescale makes no warranty, representation, or gua rantee regarding 
+the suitability of its products for any particular purpose, nor does 
+Freescale assume any liability arising out of the a pplication or use of 
+any product or circuit, and specifically disclaims any and all liability, 
+including without limitation consequential or incid ental damages. 
+“Typical” parameters that may be provided in Freesc ale data sheets 
+and/or specifications can and do vary in different applications, and 
+actual performance may vary over time. All operatin g parameters, 
+including “typicals,” must be validated for each cu stomer application 
+by customer's technical experts. Freescale does not  convey any 
+license under its patent rights nor the rights of o thers. Freescale sells 
+products pursuant to standard terms and conditions of sale, which can 
+be found at the following address: 
+freescale.com/SalesTermsandConditions. 
+Freescale and the Freescale logo, are trademarks of  Freescale 
+Semiconductor, Inc., Reg. U.S. Pat. & Tm. Off. All other product or 
+service names are the property of their respective owners. 
+© 2015 Freescale Semiconductor, Inc. 
+ 
+                                                
+i Some texts use the first three components of the q uaternion (a 0, a 1 and a 2) as the vector component, and the last 
+as the scalar component.  Make sure you know which notation is being used when comparing texts. 

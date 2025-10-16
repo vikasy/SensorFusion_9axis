@@ -1,0 +1,1565 @@
+© 2015 Freescale Semiconductor, Inc.  
+ 
+  
+1 Introduction ................................ 
+2 Functional Overview ................................ 
+2.1 Introduction ................................ 
+2.2 Accelerometer Only ................................ 
+2.3 Accelerometer Plus Magnetometer 
+2.4 Accelerometer Plus Gyroscope 
+2.5 Accelerometer Plus Magnetometer Plus Gyroscope 
+3 Additional Support ................................ 
+3.1 Freescale Sensor Fusion Toolbox for Android 
+3.2 Freescale Sensor Fusion Toolbox for Windows 
+3.3 Terms and Acronyms ................................ 
+3.4 References ................................ 
+4 Mechanical and Electrical Specifications 
+4.1 General Considerations ................................ 
+4.2 Hardware Platforms Used to Measure Performance 
+4.3 Simulation Environments ................................ 
+4.4 Frame of Reference ................................ 
+4.5 Electrical Specifications ................................ 
+4.6 Computation Metrics ................................ 
+4.6.1  Statistics from Build #5.00 of the Sensor Fusion Li brary 
+4.7 Magnetic Calibration Metrics 
+4.7.1  Background ................................ 
+4.7.2  The Magnetic Buffer ................................ 
+4.7.3  Magnetic Calibration Performance Metrics 
+4.8 Fusion Model Performance Metrics 
+4.8.1  Background ................................ 
+4.8.2  Gyro Offset Step Response 
+4.8.3  Error in Computed Linear Acceleration 
+4.8.4  Limitations Imposed via Sensor Choice/Configuration
+4.8.5  9-Axis Parametrics ................................ 
+4.8.6  6-axis Accelerometer + Magnetometer Parametrics Freescale Semiconductor  
+DATA SHEET: PRODUCT PREVIEW 
+Freescale Sensor Fusion 
+Updated for Freescale Sensor Fusion Release 5.00 
+ 
+ 
+Contents 
+................................ ................................................... ............. ................................ 
+................................ ................................ ................................ 
+................................ ................................................... ............. ............................... 
+................................ ................................ ................................ 
+Accelerometer Plus Magnetometer  ................................ ................................ 
+Accelerometer Plus Gyroscope  .................................................. .............. ................................ 
+Accelerometer Plus Magnetometer Plus Gyroscope  ................................ ................................ 
+................................ ................................ ................................ 
+Freescale Sensor Fusion Toolbox for Android  ................................ ................................ 
+Freescale Sensor Fusion Toolbox for Windows  ................................ ................................ 
+................................ ................................ ................................ 
+................................ ................................................... ............. ............................. 
+Mechanical and Electrical Specifications  ................................ ................................ 
+................................ ................................ ................................ 
+Hardware Platforms Used to Measure Performance  ................................ ............................... 
+................................ ................................ ................................ 
+................................ ................................ ................................ 
+................................ ................................ ................................ 
+................................ ................................ ................................ 
+Statistics from Build #5.00 of the Sensor Fusion Li brary  ................................ ................................ 
+Magnetic Calibration Metrics  .................................................. .............. ................................ 
+................................ ................................................... ............. ................................ 
+................................ ................................ ................................ 
+Magnetic Calibration Performance Metrics  ................................ ................................ 
+Fusion Model Performance Metrics ................................ ................................ 
+................................ ................................................... ............. ................................ 
+Gyro Offset Step Response  .................................................. .............. ................................ 
+Error in Computed Linear Acceleration ................................ ................................ 
+Limitations Imposed via Sensor Choice/Configuration  ................................ ................................ 
+................................ ................................ ................................ 
+axis Accelerometer + Magnetometer Parametrics  ................................ ................................ Document Number: 
+DATA SHEET: PRODUCT PREVIEW  
+Freescale Sensor Fusion Library for Kinetis 
+Sensor Fusion Release 5.00  
+................................ .... 3 
+................................ ...................... 6  
+...............................  6 
+................................ .................. 6 
+................................ ........................... 7 
+................................ . 7 
+................................ . 7 
+................................ ......................... 8  
+................................ .......... 9 
+................................ ........ 9 
+................................ .............. 11 
+.............................  12 
+................................ ................... 12  
+................................ .......... 12 
+...............................  13 
+................................ ........ 16 
+................................ ................ 18 
+................................ .......... 18 
+................................ ............... 19 
+................................ .. 19  
+................................ ... 20 
+................................ ....... 20  
+................................ .......................... 21  
+................................ ....................... 22  
+................................ ......................... 22 
+................................ ....... 22  
+................................ .............. 23  
+................................ ............................. 24  
+................................ ..... 25  
+................................ ............................ 26  
+................................ ........ 27  Document Number: FSFLK_DS 
+Rev. 0.7, 9/2015
+Library for Kinetis  MCUs 
+2   Freescale  Sensor Fusion Library for Kinetis  MCUs , Rev. 0.7, 9/2015 
+  Freescale Semiconductor, Inc. 4.8.7  6-axis Accelerometer + Gyro Parametrics ........... ................................................... .......................... 27  
+4.8.8  3-axis Accelerometer Only Parametrics ............. ................................................... ........................... 28  
+5 Test Descriptions ................................. ................................................... ..................................... 28  
+5.1 MCU Current ................................... ................................................... .................................... 28 
+5.1.1  Intent ............................................ ................................................... .................................................. 28  
+5.1.2  Procedure ......................................... ................................................... ............................................. 28  
+5.2 Flash and RAM Required ........................ ................................................... ............................. 29 
+5.2.1  Intent ............................................ ................................................... .................................................. 29  
+5.2.2  Procedure ......................................... ................................................... ............................................. 29  
+5.3 Fusion Loop Execution Time..................... ................................................... ........................... 29 
+5.4 Compass Heading Linearity and Accuracy ........ ................................................... ................... 29 
+5.4.1  Intent ............................................ ................................................... .................................................. 29  
+5.4.2  Procedure ......................................... ................................................... ............................................. 30  
+5.5 Orientation Static Drift ...................... ................................................... .................................... 31 
+5.5.1  Intent ............................................ ................................................... .................................................. 31  
+5.5.2  Procedure ......................................... ................................................... ............................................. 31  
+5.6 Orientation Static Noise ...................... ................................................... ................................. 32 
+5.6.1  Intent ............................................ ................................................... .................................................. 32  
+5.6.2  Procedure ......................................... ................................................... ............................................. 32  
+5.7 Orientation Dynamic Drift ..................... ................................................... ................................ 32 
+5.7.1  Intent ............................................ ................................................... .................................................. 32  
+5.7.2  Procedure ......................................... ................................................... ............................................. 32  
+5.8 Maximum Angular Rate .......................... ................................................... ............................. 32 
+5.8.1  Intent ............................................ ................................................... .................................................. 32  
+5.8.2  Procedure ......................................... ................................................... ............................................. 32  
+5.9 Orientation Response Delay .................... ................................................... ............................ 33 
+5.9.1  Waveform Definitions .............................. ................................................... ....................................... 33  
+5.9.2  Intent ............................................ ................................................... .................................................. 33  
+5.9.3  Procedure ......................................... ................................................... ............................................. 33  
+5.10 Orientation Magnetic Immunity (Static Device). ................................................... .................... 34 
+5.10.1  Intent ............................................ ................................................... .................................................. 34  
+5.10.2  Procedure ......................................... ................................................... ............................................. 34  
+5.11 Orientation Magnetic Immunity (Moving Device) ................................................... .................. 34 
+5.11.1  Intent ............................................ ................................................... .................................................. 34  
+5.11.2  Procedure ......................................... ................................................... ............................................. 34  
+5.12 Error in Computed Gyro Bias .................. ................................................... ............................. 34 
+5.12.1  Intent ............................................ ................................................... .................................................. 34  
+5.12.2  Procedure ......................................... ................................................... ............................................. 34  
+5.13 Gyro Offset Step Response .................... ................................................... ............................. 35 
+5.13.1  Intent ............................................ ................................................... .................................................. 35  
+5.13.2  Procedure ......................................... ................................................... ............................................. 35  
+5.14 Error in Computed Linear Acceleration ........ ................................................... ........................ 35 
+5.14.1  Intent ............................................ ................................................... .................................................. 35  
+5.14.2  Procedure ......................................... ................................................... ............................................. 35  
+6 Revision history for XSFLK_DS ..................... ................................................... .......................... 36  
+ 
+ 
+  
+ 
+Freescale Sensor Fusion Library for Kinetis MCUs, R ev. 0.7, 9/2015  
+Freescale Semiconductor, Inc. 1 Introduction 
+Sensor Fusion is the process where data from severa l different sensors are fused to complete 
+computations that a single sensor could not handle.  An example of sensor fusion is computing the 
+orientation of a device in 3-dimensional space usin g an accelerometer and magnetometer. That data 
+might then be used to alter the perspective present ed by a 3D GUI or game. 
+The Freescale Sensor Fusion Library for Kinetis MCU s provides advanced functions for computation of 
+device orientation, linear acceleration, gyroscope offset and magnetic interference based upon the 
+outputs of Freescale inertial and magnetic sensors.  
+Features 
+• Supports: 
+— Accelerometer only (roll, pitch and tilt) 
+— Magnetometer only (2D auto) 
+— Gyro only 
+— Accelerometer plus magnetometer (eCompass) 
+— Accelerometer plus gyro (gaming) 
+— Accelerometer plus magnetometer plus gyroscope se nsors 
+• Includes Freescale’s award-winning magnetic compen sation software 
+— Provides geomagnetic field strength, hard- and so ft-iron corrections, and quality-of-fit indication 
+• Very low power consumption  
+— 3 mA 9-axis fusion I DD  on Kinetis ARM ® Cortex ® M0+ devices at 25 Hz fusion rate/200 Hz 
+sensor rate 
+— 0.6mA 9-axis fusion I DD  on Kinetis ARM Cortex M4F devices at 25 Hz fusion rate/200 Hz sensor 
+rate  
+• Programmable sensor sample and fusion rates 
+• Supports multiple 3D frames of reference (aerospac e NED, Android and Windows 8) 
+• Library is coded in standard C99 ANSI C 
+• Compatible with the Freescale Sensor Fusion Toolbo x for Android and Windows 
+• Supported by Freescale CodeWarrior, Kinetis Design  Studio and Processor Expert tools 
+• Out-of-the box support for the following Freedom D evelopment Platforms with FRDM-FXS-MULTx 
+family of sensor boards 
+— Cortex M0+: FRDM-KL25Z / FRDM-KL26Z / FRDM-KL46Z 
+— Cortex M4:  FRDM-K20D50M 
+— Cortex M4F:  FRDM-K64F / FRDM-K22F (KDS only) 
+• Library version 5.00 includes bonus bare-metal imp lementations for tilt and eCompass. 
+Typical Applications 
+• Notebook, tablet and smartphone sensor fusion 
+• Gaming, motion control, head-mounted displays, wea rable electronics 
+• Air mouse, remote control 
+• Navigation, eCompass, IoT (Internet of Things) sen sor data management 
+Introduction 
+ 
+4   Freescale  Sensor Fusion Library for Kinetis  MCUs , Rev. 0.7, 9/2015 
+  Freescale Semiconductor, Inc.  
+Table 1. Feature Comparison of the Freescale Sensor  Fusion Algorithm Options 
+Feature Accel only Mag only Gyro Only Accel + gyro Accel + mag Accel + mag + gyro 
+Filter type Low pass Low pass N/A Indirect Kalman Low pass 1 Indirect Kalman 
+Roll / Pitch / Tilt in degrees Yes No Yes Yes Yes Y es 
+Yaw in degrees No Yes Yes No Yes Yes 
+Angular rate 2 in degrees/second virtual 2 axis 3 Yaw only Yes Yes virtual 3 axis Yes 
+Compass heading (magnetic north) in degrees No Yes No No Yes Yes 
+Quarternion and rotation vector Yes Yaw only Yes 5 Yes Yes Yes 
+Rotation matrix Yes Yaw only Yes 5 Yes Yes Yes 
+Linear acceleration separate from gravity No No No Yes No Yes 
+NED (North-East-Down) frame of reference Yes 4 Yes Yes 4 Yes 4 Yes Yes 
+ENU (Windows 8 variant) frame of reference Yes 4 Yes Yes 4 Yes 4 Yes Yes 
+ENU (Android variant) frame of reference Yes 4 Yes Yes 4 Yes 4 Yes Yes 
+Magnetic calibration included N/A Yes N/A N/A Yes Y es 
+Gyro offset calibration included N/A N/A No Yes N/A  Yes 
+FRDM-KL25Z board support Yes Yes Yes Yes Yes Yes 
+FRDM-KL46Z board support Yes Yes Yes Yes Yes Yes 
+FRDM-K20D50M board support Yes Yes Yes Yes Yes Yes 
+FRDM-KL26Z board support Yes Yes Yes Yes Yes Yes 
+FRDM-K64F board support Yes Yes Yes Yes Yes Yes 
+FRDM-K22F board support KDS only 
+1.  More precisely: a non-linear modified exponenti al low pass quaternion SLERP filter. 
+2.  Angular rate for 6 and 9-axis configurations wi th a gyro include corrections for gyro offset. 
+3.  Subject to well-known limitation of being blind  to rotation about axes aligned with gravity. 
+4.  These solutions do not include a magnetometer, therefore there is no sense of compass heading. 
+5. Rotations for gyro-only solution are relative to  sensor position (there is no global frame). 
+  
+  
+ 
+Freescale Sensor Fusion Library for Kinetis MCUs, R ev. 0.7, 9/2015  
+Freescale Semiconductor, Inc.  
+Table 2. Feature Options 
+Feature Options 
+License BSD 3-Clause 
+CPU selection MKL25Z128VLK4  
+MKL26Z128VLH4  
+MK20DX128VLH5  
+MKL46Z256VMC4  
+MK64FN1M0VLL12 
+MK22FN512VLH12 (KDS only) 
+Board customizable Yes 
+Sensor sample rate Programmable 
+Fusion rate Programmable 
+Frame of Reference Programmable 
+Algorithms Executing Programmable 
+Sleep mode enabled between 
+samples/calculations No 
+It can be added by user, but will interfere with UA RT operation 
+RTOS MQX-Lite 
+Code flexibility Full source code is provided.  All files are can be  modified. 
+Access to Processor Expert Yes 
+Product Deliverables • This datasheet 
+• Software user guide 
+• Zip file containing both CodeWarrior and KDS proje cts 
+1.  Listed MCUs are those supported by included pro ject templates. The fusion library should be portab le to any ARM ® 
+processor without change. Ports to other architectu res are expected to be very straightforward, as the  library is written 
+in standard C. 
+2.  FRDM-KL25Z, FRDM-KL26Z, FRDM-KL46Z, FRDM-K20D50 M, FRDM-K64F and FRDM-K22F are supported out-of-the  
+box and may be used as templates for other boards. 
+3.  The sensor fusion library was written assuming the MQXLite RTOS, but should be easily adaptable to  other operating 
+systems. See the "Freescale Sensor Fusion for Kinet is User Guide" for additional details.  The sensor fusion library has 
+also been incorporated into Freescale’s Intelligent  Sensing Framework (ISF).  ISF 2.2 offers an RTOS a bstraction that 
+allows you to target alternate real time operating systems. 
+The Freescale Sensor Fusion Toolbox includes bonus projects for 3-axis tilt and 6-axis eCompass 
+running without an RTOS. Sensor shield boards are n ot needed for these configurations. This results in  
+very low-cost demonstration platforms. The bonus pr ojects are compatible with the Sensor Fusion 
+Toolbox for Windows over USB connection.  The FRDM- KL46Z eCompass version can also be used 
+stand-alone since the compass heading is displayed directly on the FRDM-KL46Z LCD display.  
+The bare-board eCompass projects have sensor sampli ng, sensor fusion and magnetic algorithms run 
+as a single task at 25Hz. On power up, the green LE D flashes slowly to indicate that the software is 
+executing but that there is no magnetic calibration  solution. The green LED then flashes rapidly to 
+signal that the compass heading display is accurate  and that a valid magnetic calibration has been 
+obtained after rotating the Freedom development boa rd. 
+Functional Overview 
+ 
+6  
+  2 Functional Overview 
+2.1 Introduction 
+Sensor fusion encompasses a variety of techniques t hat: 
+• Trade off strengths and weaknesses of the 
+be calculated using the individual components 
+• Improve the quality and noise level of computed res ults by taking advantage of: 
+— Known data redundancies between sensors 
+— Knowledge of system transfer 
+The Freescale Sensor Fusion Library for Kinetis (Fu sion Library) supports several combinations of 
+sensors. In general, performance improves as more s ensors are added to the system. The primary 
+function of the library is t o compute orientation of a sensor subsystem relativ e to a global frame of 
+reference. 
+Orientation can be expressed in a number of differe nt ways: 
+• Tilt from vertical (may also be expressed as roll +  pitch) 
+• Compass heading (geomagnetic north) 
+• Full 3D rotation from a global frame in any of the following forms: 
+— Rotation matrix 
+— Rotation vector (3D axis of rotation and rotation a bout that axis) 
+— Quaternion 
+— Euler angles (roll, pitch and yaw) 
+For additional portability details and guidelines r efer to the 
+User Guide which is part of the Sensor Fusion Library 
+source code form and is designed to sit on top of board abstractions pro vided by Processor Expert and 
+MQXLite. The C source and header files in the Sources directory of the pr oject templates are board and 
+MCU independent. Board dependencies are included as compile time opt ions.  
+does not bring out the GPIO, I2C or UART needed, th e board will not be compati 
+and therefore will not be supported by Processor Ex pert. 
+2.2 Accelerometer Only 
+An accelerometer measures linear acceleration minus  gravity. If linear acceleration is zero, this sens or 
+can be used to measure tilt from vertical, roll and  p 
+configuration. 
+Figure 
+ Freescale  Sensor Fusion Library for Kinetis 
+Freescale Functional Overview  
+Sensor fusion encompasses a variety of techniques t hat:  
+Trade off strengths and weaknesses of the  various sensors to compute something more than can 
+be calculated using the individual components  
+Improve the quality and noise level of computed res ults by taking advantage of: 
+Known data redundancies between sensors  
+Knowledge of system transfer functions, dynamics and kinematics 
+The Freescale Sensor Fusion Library for Kinetis (Fu sion Library) supports several combinations of 
+sensors. In general, performance improves as more s ensors are added to the system. The primary 
+o compute orientation of a sensor subsystem relativ e to a global frame of 
+Orientation can be expressed in a number of differe nt ways:  
+Tilt from vertical (may also be expressed as roll +  pitch)  
+Compass heading (geomagnetic north)  
+from a global frame in any of the following forms:  
+Rotation vector (3D axis of rotation and rotation a bout that axis)  
+Euler angles (roll, pitch and yaw)  
+For additional portability details and guidelines r efer to the Freescale Se nsor Fusion for Kinetis MCUs 
+Sensor Fusion Library installation. The Fusion Library is available in 
+is designed to sit on top of board abstractions pro vided by Processor Expert and 
+and header files in the Sources directory of the pr oject templates are board and 
+Board dependencies are included as compile time opt ions.  If a particular board 
+does not bring out the GPIO, I2C or UART needed, th e board will not be compati ble with the software 
+and therefore will not be supported by Processor Ex pert.  
+Accelerometer Only  
+An accelerometer measures linear acceleration minus  gravity. If linear acceleration is zero, this sens or 
+can be used to measure tilt from vertical, roll and  p itch. Computation of yaw is not supported by this 
+Figure 1. Accelerometer only block diagram 
+Sensor Fusion Library for Kinetis  MCUs , Rev. 0.7, 9/2015 
+Freescale  Semiconductor, Inc. various sensors to compute something more than can 
+Improve the quality and noise level of computed res ults by taking advantage of:  
+The Freescale Sensor Fusion Library for Kinetis (Fu sion Library) supports several combinations of 
+sensors. In general, performance improves as more s ensors are added to the system. The primary 
+o compute orientation of a sensor subsystem relativ e to a global frame of 
+nsor Fusion for Kinetis MCUs 
+installation. The Fusion Library is available in 
+is designed to sit on top of board abstractions pro vided by Processor Expert and 
+and header files in the Sources directory of the pr oject templates are board and 
+If a particular board 
+ble with the software 
+An accelerometer measures linear acceleration minus  gravity. If linear acceleration is zero, this sens or 
+itch. Computation of yaw is not supported by this 
+ 
+  
+ 
+Freescale Sensor F usion Library for Kinetis MCUs 
+Freescale Semiconductor, Inc. 2.3 Accelerometer Plus Magnetometer 
+The accelerometer plus magnetometer configuration i s often used as an electronic compass. 
+electronic compass is subject to the linear acceler ation equals zero, assumption. Accuracy is 
+dependent upon negligible magnetic interference fro m the environment in which the sensors travel. 
+Figure 2. Accelerometer plus 
+2.4 Accelerometer Plus Gyroscope 
+Using a gyroscope in addition to an accelerometer y ields the ability to smoothly measure rotation in 3 D 
+space, although the system can only yield orientati on to some random horizontal global frame of 
+reference. That is, the system has no sense of magn etic north. Computation of yaw is not supported by 
+this configuration. 
+This configuration is commonly known as an Inertial  Measurement Unit (IMU). 
+Figure 3. Accelerometer Plus Gy 
+2.5 Accelerometer Plus Magnetometer Plus Gyroscope 
+Sometimes referred to as Magnetic, Angular Rate and  Gravity (MARG), this subsystem offers an 
+optimal combination of sensors for smooth tracking of orientation and separation of gravity an 
+acceleration. This system is capable of yielding ab solute orientation data with respect to magnetic 
+north. 
+usion Library for Kinetis MCUs , Rev. 0.7, 9/2015  Accelerometer Plus Magnetometer  
+The accelerometer plus magnetometer configuration i s often used as an electronic compass. 
+electronic compass is subject to the linear acceler ation equals zero, assumption. Accuracy is 
+dependent upon negligible magnetic interference fro m the environment in which the sensors travel. 
+Accelerometer plus magnetometer block diagram 
+Accelerometer Plus Gyroscope  
+Using a gyroscope in addition to an accelerometer y ields the ability to smoothly measure rotation in 3 D 
+space, although the system can only yield orientati on to some random horizontal global frame of 
+reference. That is, the system has no sense of magn etic north. Computation of yaw is not supported by 
+This configuration is commonly known as an Inertial  Measurement Unit (IMU).  
+Accelerometer Plus Gy roscope Block Diagram 
+Accelerometer Plus Magnetometer Plus Gyroscope 
+Sometimes referred to as Magnetic, Angular Rate and  Gravity (MARG), this subsystem offers an 
+optimal combination of sensors for smooth tracking of orientation and separation of gravity an 
+acceleration. This system is capable of yielding ab solute orientation data with respect to magnetic The accelerometer plus magnetometer configuration i s often used as an electronic compass.  The 
+electronic compass is subject to the linear acceler ation equals zero, assumption. Accuracy is 
+dependent upon negligible magnetic interference fro m the environment in which the sensors travel.  
+ 
+Using a gyroscope in addition to an accelerometer y ields the ability to smoothly measure rotation in 3 D 
+space, although the system can only yield orientati on to some random horizontal global frame of 
+reference. That is, the system has no sense of magn etic north. Computation of yaw is not supported by 
+ 
+Accelerometer Plus Magnetometer Plus Gyroscope  
+Sometimes referred to as Magnetic, Angular Rate and  Gravity (MARG), this subsystem offers an 
+optimal combination of sensors for smooth tracking of orientation and separation of gravity an d linear 
+acceleration. This system is capable of yielding ab solute orientation data with respect to magnetic 
+Additional Support 
+ 
+8  
+  Figure 4. Accelerometer Plus Magnetometer Plus Gyroscope Bloc k Diagram 
+3 Additional Support 
+Freescale Sensor Fusion Toolbox provides support for both Android and Windo ws operating systems. 
+See Table  for the differences between the two implementations . 
+Table 3. Fre escale Sensor Fusion Toolbox Features by Platform 
+Feature 
+Bluetooth wireless link 
+Ethernet wireless link 
+UART over USB 
+OS requirements 
+Support for native sensors 
+Device View 
+Panorama View 
+Statistics View 
+Canvas View 
+Orientation XY Plots 
+Inertial XY Plots 
+Magnetics 
+Kalman 
+Altimeter XY Plots 
+Data Logging 
+Integrated documentation 
+ Freescale  Sensor Fusion Library for Kinetis 
+Freescale Accelerometer Plus Magnetometer Plus Gyroscope Bloc k Diagram 
+Additional Support  
+Toolbox provides support for both Android and Windo ws operating systems. 
+for the differences between the two implementations .  
+escale Sensor Fusion Toolbox Features by Platform  
+Android 
+/uni2714 Requires BT on PC (built 
+On WiGo board only 
+— 
+>=Android 4.0.3 >=Windows 7.0 
+/uni2714 
+/uni2714 
+/uni2714 
+/uni2714 
+/uni2714 
+— 
+— 
+— 
+— 
+— 
+/uni2714 
+/uni2714 
+Sensor Fusion Library for Kinetis  MCUs , Rev. 0.7, 9/2015 
+Freescale  Semiconductor, Inc.  
+Accelerometer Plus Magnetometer Plus Gyroscope Bloc k Diagram  
+Toolbox provides support for both Android and Windo ws operating systems. 
+ 
+PC 
+Requires BT on PC (built -in or dongle) 
+— 
+/uni2714  
+>=Windows 7.0  
+— 
+/uni2714 
+— 
+— 
+— 
+/uni2714 
+/uni2714 
+/uni2714 
+/uni2714 
+/uni2714 
+/uni2714 
+/uni2714 
+  
+ 
+Freescale Sensor Fusion Library for Kinetis MCUs 
+Freescale Semiconductor, Inc. Feature 
+Availability 
+Price 
+ 
+3.1 Freescale Sensor Fusion Toolbox for Android 
+The Fusion Library is supplied in the form of CodeW arrior projects for specific Freescale development 
+boards. The basic function of the Sensor Fusion 
+projects are compatible with the Freescale Sensor F usion Toolbox for Android, which can be freely 
+downloaded from Google Play. For download and train ing links, 
+Figure 5. Freescale Sensor Fusion Toolbox for Android Basic F unctions 
+3.2 Freescale Sensor Fusion Toolbox for Windows 
+The Sensor Fusion Toolbox includes an equivalent v 
+and training links, visit freescale.com/sensorfusion 
+Important Note : Version 5.0 of the Sensor Fusion Library has a mo dified Kalman packet structure as 
+compared to that used in prior releases.  Be sure y ou have downloaded the Windows toolbox built 3 
+Sept 2015 or later. 
+Freescale Sensor Fusion Library for Kinetis MCUs , Rev. 0.7, 9/2015  Android 
+Google Play Freescale website 
+Free 
+Freescale Sensor Fusion Toolbox for Android  
+The Fusion Library is supplied in the form of CodeW arrior projects for specific Freescale development 
+boards. The basic function of the Sensor Fusion Android implementation are shown 
+projects are compatible with the Freescale Sensor F usion Toolbox for Android, which can be freely 
+downloaded from Google Play. For download and train ing links, visit freescale. com/ 
+Freescale Sensor Fusion Toolbox for Android Basic F unctions 
+Freescale Sensor Fusion Toolbox for Windows  
+The Sensor Fusion Toolbox includes an equivalent v ersion of the software for Windows. For download 
+freescale.com/sensorfusion . 
+: Version 5.0 of the Sensor Fusion Library has a mo dified Kalman packet structure as 
+compared to that used in prior releases.  Be sure y ou have downloaded the Windows toolbox built 3 PC 
+Freescale website  
+Free 
+The Fusion Library is supplied in the form of CodeW arrior projects for specific Freescale development 
+Android implementation are shown in Figure 5 . These 
+projects are compatible with the Freescale Sensor F usion Toolbox for Android, which can be freely 
+com/ sensorfusion . 
+ 
+Freescale Sensor Fusion Toolbox for Android Basic F unctions  
+ersion of the software for Windows. For download 
+: Version 5.0 of the Sensor Fusion Library has a mo dified Kalman packet structure as  
+compared to that used in prior releases.  Be sure y ou have downloaded the Windows toolbox built 3 
+Additional Support 
+ 
+10  
+  Figure 6  and Figure 7  are Sensor Fusion Toolbox screenshots of the Window s version. 
+ 
+ 
+Figure 
+ Freescale  Sensor Fusion Libra ry for Kinetis 
+Freescale are Sensor Fusion Toolbox screenshots of the Window s version. 
+Figure 6. PC Version - Main Tab 
+Figure 7. PC Version - Magnetics Tab 
+ry for Kinetis  MCUs , Rev. 0.7, 9/2015 
+Freescale  Semiconductor, Inc. are Sensor Fusion Toolbox screenshots of the Window s version.  
+ 
+ 
+
+  
+ 
+Freescale Sensor Fusion Library for Kinetis MCUs 
+Freescale Semiconductor, Inc. 3.3 Terms and Acronyms 
+Term 
+DUT Device Under Test 
+ENU A global frame of reference described by X = 
+g abbreviation for gravities. 1 standard gravity 
+the local gravimetric field, which can vary by 1/2 percent depending upon altitude and latitude. 
+gauss CGS system unit for measuring magnetic field streng th. 100 
+IMU Inertial Measurement Unit = acce 
+Kinetis Freescale family of ARM ®-based MCUs 
+MagCal Magnetic Calibration 
+MARG Magnetic Angular Rate Gravity = IMU + magnetometer 
+MCU Micro-Controller Unit 
+microTesla The Tesla is the SI unit for measuring magnetic fie ld strength. 1E 
+NED A global frame of reference described by X = 
+pitch In the Aerospace/NED frame of reference, defined as  a rotation about the Y 
+RHR Right Hand Rule— a standard convention for describing the positive/n egative sense of rotations about an axis 
+of rotation. See http://en.wikipedia.org/wiki/Right_hand_rule 
+roll In the Aero space/NED frame of reference, defined as a rotation  about the X 
+RPY Roll, Pitch, and Yaw. In the Aerospace/NED frame of  reference these are defined as rotations about the  X 
+axis,Y axis, and Z axis 
+SI International System of Units (meter, kilogram, 
+SLERP Spherical Linear int ERP olation 
+SysTick A feature of the ARM ® processor; a 
+clock cycle. 
+tilt Angle from vertical 
+UART Universal Asynchronous Receiver / Transmitter, also  known as SCI (Serial Communications Interface) 
+yaw In the Aerospace/NED frame of reference, defined as  a rotation about the Z 
+Freescale Sensor Fusion Library for Kinetis MCUs , Rev. 0.7, 9/2015  Terms and Acronyms  
+Definition 
+A global frame of reference described by X = East, Y = North, Z = Up 
+abbreviation for gravities. 1 standard gravity  = 9.80665 m/s 2. Accelerometers are commonly trimmed using 
+the local gravimetric field, which can vary by 1/2 percent depending upon altitude and latitude. 
+CGS system unit for measuring magnetic field streng th. 100 µT = 1 gauss.  
+Inertial Measurement Unit = acce lerometer + gyro 
+based MCUs  
+Magnetic Angular Rate Gravity = IMU + magnetometer  
+The Tesla is the SI unit for measuring magnetic fie ld strength. 1E –4 Tesla = 100 µT = 1 gauss 
+A global frame of reference described by X = North, Y = East, Z = Down 
+In the Aerospace/NED frame of reference, defined as  a rotation about the Y -axis 
+a standard convention for describing the positive/n egative sense of rotations about an axis 
+http://en.wikipedia.org/wiki/Right_hand_rule . 
+space/NED frame of reference, defined as a rotation  about the X -axis 
+Roll, Pitch, and Yaw. In the Aerospace/NED frame of  reference these are defined as rotations about the  X 
+ 
+International System of Units (meter, kilogram,  second, ...) 
+olation - See http://en.wikipedia.org/wiki/SLERP  
+processor; a  clock timer which for the purposes of this discussion, 1 sysTick = 
+Universal Asynchronous Receiver / Transmitter, also  known as SCI (Serial Communications Interface) 
+In the Aerospace/NED frame of reference, defined as  a rotation about the Z -axis commonly trimmed using 
+the local gravimetric field, which can vary by 1/2 percent depending upon altitude and latitude.  
+µT = 1 gauss  
+a standard convention for describing the positive/n egative sense of rotations about an axis 
+Roll, Pitch, and Yaw. In the Aerospace/NED frame of  reference these are defined as rotations about the  X 
+this discussion, 1 sysTick = 1 CPU 
+Universal Asynchronous Receiver / Transmitter, also  known as SCI (Serial Communications Interface)  
+Mechanical and Electrical Specifications 
+ 
+12   Freescale  Sensor Fusion Library for Kinetis  MCUs , Rev. 0.7, 9/2015 
+  Freescale Semiconductor, Inc. 3.4 References 
+1. "Orientation Representations: Part 1" at http://blo gs.freescale.com/iot/2012/10/orientation-
+representations-part-1/ community/the-embedded-beat /blog/2012/ 10/29/orientation-
+representations-part-1  
+2. "Orientation Representations: Part 2" at http://blo gs.freescale.com/sensors/2013/01/orientation-
+representations-part-2/ community/the-embedded-beat /blog/2013/ 01/22/orientation-
+representations-part-2  
+3. "Hard and soft iron magnetic compensation explained " at 
+http://blogs.freescale.com/sensors/2011/03/hard-and -soft-iron-magnetic-compensation-explained/ 
+community.freescale.com/community/the-embeddedbeat/  blog/2011/03/14/hard- and-soft-iron-
+magnetic-compensation-explained  
+4. CodeWarrior Integrated Development Environment S oftware at freescale.com/codewarrior  
+5. Kinetis Design Studio Integrated Development Enviro nment  
+6. "Euler Angles" at http://en.wikipedia.org/wiki/Eule r_Angles  
+7. "Introduction to Random Signals and Applied Kalm an Filtering", 3rd edition, by Robert Grover 
+brown and Patrick Y.C. Hwang, John Wiley & Sons, 19 97 
+8. "Quaternions and Rotation Sequences", Jack B. Ku ipers, Princeton University Press, 1999 
+9. Freescale Freedom development platform home page  at freescale.com/freedom  
+10. OpenSDA User’s Guide , Freescale Semiconductor, Rev 0.93, 2012-09-18 
+11. PE micro Open SDA Support  
+12. PE micro Embedded OSBDM support  
+13. Matlab computer software by MathWorks—http://www.ma thworks.com/products/ matlab/  
+14. www.freescale.com/opensda  
+4 Mechanical and Electrical Specifications 
+4.1 General Considerations 
+Fusion algorithms can be tuned to trade off one performance parameter versus anoth er. Examples 
+include: 
+• Speedy handling of magnetic interference versus sl ower convergence to magnetic north 
+• Smoothness versus responsiveness 
+• Accuracy versus bandwidth 
+NOTE 
+All of the above means that there is no one correct configuration. Accordingly, this datasheet presents  
+typical performance as observed on the sample proje cts supplied by Freescale on specific Freescale 
+development platforms.  No attempt has been made to  measure a statistically significant number of 
+boards.  Measured values are typically those observ ed on as few as one board. 
+  
+ 
+Freescale Sensor Fusion Library for Kinetis MCUs, R ev. 0.7, 9/2015  
+Freescale Semiconductor, Inc. 4.2 Hardware Platforms Used to Measure Performance 
+In the following subsections, some parametrics are measured, some represent simulated results. There 
+are multiple methods used to determine parametrics.  These make use of hardware platforms for 
+benchmarking purposes, in addition to Matlab. 
+Kinetis Cortex M0+  
+This configuration is composed of a Freescale KL25Z , KL46Z or KL26Z Freedom development platform 
+paired with a FXS-MULT2-B Bluetooth-enabled sensor board 1. Use of Bluetooth allows the board to be 
+rotated freely, untethered by cords or power cables . 
+Table 4. Cortex M0+ Test Configuration 
+Component / Parameter Value 
+Baseboard FRDM-KL25Z / FRDM-KL26Z / FRDM-KL-46Z 
+Sensor Board FRDM-FXS-MULT2-B 
+MCU Kinetis MKL25Z128VLK4 / MKL26Z128VLH4 / MKL46Z256VM C4 
+CPU ARM ® Cortex M0+ 
+CPU Clock 48 MHz 
+Bus Clock 24 MHz 
+Accelerometer 
+FXOS8700CQ 
+Magnetometer 
+Gyroscope FXAS21000 
+Sensor Sampling Rate 200 Hz 
+Fusion Rate 25 Hz 
+Magnetic Calibration Rate Twice per minute once ful l calibration is reached 
+ 
+This board combination is battery powered and nomin ally regulated to 3.3 V for use by the sensors in 
+question. 
+                                                
+1  The primary difference between the FRDM-FXS-MULT I-B and FRDM-FXS-MULT2-B is that the latter include s 
+a production FXAS21002 gyroscope, whereas the forme r used FXAS21000 pre-production units.  The FRDM-
+FXS-MULTI-B board is no longer in production, but c ontinues to be supported by the kit.  The two board s are 
+similar in appearance. 
+Mechanical and Electrical Specifications 
+ 
+14   Freescale  Sensor Fusion Library for Kinetis  MCUs , Rev. 0.7, 9/2015 
+  Freescale Semiconductor, Inc.  
+Figure 8. FRDM-KL25Z / FRDM-FXS-MULTI-B sensor fusi on prototype platform 
+ 
+Figure 9. Expanded Diagram of FRDM-FXS-MULT2-B Sens or Board 
+  
+
+  
+ 
+Freescale Sensor Fusion Library for Kinetis MCUs, R ev. 0.7, 9/2015  
+Freescale Semiconductor, Inc. Kinetis Cortex M4  
+Table 5. Kinetis Cortex M4 
+Component / Parameter Value 
+Baseboard FRDM-K20D50M 
+Sensor Board FRDM-FXS-MULT2-B 
+MCU Kinetis MK20DX128VLH5 
+CPU ARM ® Cortex M4 
+CPU Clock 48 MHz 
+Bus Clock 24 MHz 
+Accelerometer 
+FXOS8700CQ 
+Magnetometer 
+Gyroscope FXAS21000 
+Sensor Sampling Rate 200 Hz 
+Fusion Rate 25 Hz 
+Magnetic Calibration Rate Twice per minute once full calibration is reached 
+ 
+This board combination is battery powered and nomin ally regulated to 3.3 V for use by the sensors in 
+question. Physically, the FRDM-K20D50M / FRDM-FXS-M ULT2- B board combination is similar to the 
+KL25Z variant shown in Figure 8 , with the exception that the bottom board is red. 
+Kinetis Cortex M4 with FPU 
+Table 6. Kinetis Cortex M4 with FPU 
+Component / Parameter Value 
+Baseboard FRDM-K64F / FRDM-K22F 
+Sensor Board FRDM-FXS-MULT2-B 
+MCU Kinetis MK64FN1M0VLL12 / MK22FN512VLH12 
+CPU ARM ® Cortex M4 with FPU 
+CPU Clock 120 MHz 
+Bus Clock 60 MHz 
+Accelerometer 
+FXOS8700CQ 
+Magnetometer 
+Gyroscope FXAS21000 
+Sensor Sampling Rate 200 Hz 
+Fusion Rate 25 Hz 
+Magnetic Calibration Rate Twice per minute once full calibration is reached 
+ 
+The FRDM-K64F /FRDM-K22F / FRDM-FXS-MULTI-B board c ombinations are similar to the KL25Z 
+variant shown in Figure 8 , except that the bottom base board is different. 
+Mechanical and Electrical Specifications 
+ 
+16  
+  4.3 Simulation Environments 
+Many parameters are difficult, if not impossible, t o reliably measure in a lab or production 
+Ambient magnetic fields vary tremendously in indoor  environments. Determining filter sensitivities to 
+various input parameters can only be done in a simu lated environment. 
+Accordingly, the subsequent sub- sections discuss environments that may 
+areas. 
+Pure Matlab  
+Matlab is commonly used in the early development of  sensor fusion algorithms. It can be used to model 
+physical stimulus, expected responses and filter op eration. See the next section for details concernin g 
+senso r and environmental models used to construct stimul us. 
+Matlab Stimulus/Expected Response + Hardware 
+Once algorithms are functional, they are translated  into C, optimized and then optimized again. The 
+result often makes use of fixed point arit 
+accurate results, a mixture of Matlab (used to gene rate test stimulus and expected response) and 
+hardware (used to run the filter) are used to deter mine many parameters. 
+Simulated values were compu ted with version 4.17 of the sensor fusion library.   Version 4.22 should 
+have almost identical results.  Version 5.00 is exp ected to have better dynamic tracking than indicate d 
+in this datasheet, but simulations are still outsta nding. 
+Figure 10. Mixed Simulation/Hardware Characterization 
+Unless stated otherwise elsewhere, parameters used to create the simulated sensors and environment 
+are: 
+• Earth magnetic field corresponding to U.S. zip code  85284 (Tempe, Arizona) on 7 
+as determined using the NOAA calculator at 
+— Declination: 10 degrees 39’ 36” 
+— Inclination: 59 degrees 32’ 53” 
+— Horizontal Intensity: 24.2976 
+— North Component (+N | -S): 23.8782 
+— East Component (+E | -W): 4.4945 
+— Vertical Component (+D | - U): 
+Mechanical and Electrical Specifications  
+ Freescale  Sensor Fusion Library for Kinetis 
+Freescale Simulation Environments  
+Many parameters are difficult, if not impossible, t o reliably measure in a lab or production 
+Ambient magnetic fields vary tremendously in indoor  environments. Determining filter sensitivities to 
+various input parameters can only be done in a simu lated environment.  
+sections discuss environments that may be used to explore these 
+Matlab is commonly used in the early development of  sensor fusion algorithms. It can be used to model 
+physical stimulus, expected responses and filter op eration. See the next section for details concernin g 
+r and environmental models used to construct stimul us.  
+Matlab Stimulus/Expected Response + Hardware -based Fusion  
+Once algorithms are functional, they are translated  into C, optimized and then optimized again. The 
+result often makes use of fixed point arit hmetic running on an MCU to compute results. To ens ure bit 
+accurate results, a mixture of Matlab (used to gene rate test stimulus and expected response) and 
+hardware (used to run the filter) are used to deter mine many parameters.  
+ted with version 4.17 of the sensor fusion library.   Version 4.22 should 
+have almost identical results.  Version 5.00 is exp ected to have better dynamic tracking than indicate d 
+in this datasheet, but simulations are still outsta nding.  
+Mixed Simulation/Hardware Characterization  
+Unless stated otherwise elsewhere, parameters used to create the simulated sensors and environment 
+Earth magnetic field corresponding to U.S. zip code  85284 (Tempe, Arizona) on 7 
+as determined using the NOAA calculator at ngdc.noaa.gov/geomag-web  
+Declination: 10 degrees 39’ 36”  
+Inclination: 59 degrees 32’ 53”  
+24.2976  µT 
+23.8782  µT 
+4.4945  µT 
+U):  41.3285 µT 
+Sensor Fusion Library for Kinetis  MCUs , Rev. 0.7, 9/2015 
+Freescale  Semiconductor, Inc. Many parameters are difficult, if not impossible, t o reliably measure in a lab or production environment. 
+Ambient magnetic fields vary tremendously in indoor  environments. Determining filter sensitivities to 
+be used to explore these 
+Matlab is commonly used in the early development of  sensor fusion algorithms. It can be used to model 
+physical stimulus, expected responses and filter op eration. See the next section for details concernin g 
+Once algorithms are functional, they are translated  into C, optimized and then optimized again. The 
+hmetic running on an MCU to compute results. To ens ure bit -
+accurate results, a mixture of Matlab (used to gene rate test stimulus and expected response) and 
+ted with version 4.17 of the sensor fusion library.   Version 4.22 should 
+have almost identical results.  Version 5.00 is exp ected to have better dynamic tracking than indicate d 
+ 
+Unless stated otherwise elsewhere, parameters used to create the simulated sensors and environment 
+Earth magnetic field corresponding to U.S. zip code  85284 (Tempe, Arizona) on 7  November 2013 
+
+  
+ 
+Freescale Sensor Fusion Library for Kinetis MCUs 
+Freescale Semiconductor, Inc. — Total field: 47.9418 µT 
+• Ideal accelerometer model + simple noise 
+— Sample rate = 200 Hz 
+— milli- g noise on X,Y,Z 
+— 1 g = 9.80665 m/s 2 assumed 
+• Ideal magnetometer model + simple nose 
+— Sample rate = 200 Hz 
+— X, Y noise 0.85 µT; Z noise 1.3 
+• No hard/soft iron distortion 
+• Ideal gyroscope model and simple noise 
+— Sample rate 200 Hz 
+— X, Y, Z noise 0.3 dps 
+For all tests, the Freescale Matlab- based Trajectory & Sensor Simulation Toolkit (TSim)  is used to 
+create DUT trajectories and simulated sensors readi ngs. 
+Some of the tests require that magnetic calibration  procedure is run before the test to initialize the  
+sensor fusion software magnetic buffer. Magnetic calibration is implemente d as a trajectory made up of 
+a sequence of random rotations lasting 30seconds. 
+Benchtop Rotary Table 
+A variant on the Matlab- based system is shown 
+desktop rotary table and to post- process the fusion results into reports. Physical s ensor readings are 
+used to drive the fusion routines. Because indoor e nvironments vary magnetically, results may vary 
+from day to day as the setup is moved or electronics in the area cycle on and off. 
+Results will also change simply because the state o f the magnetic buffer is continuously updated. 
+Figure 
+Freescale Sensor Fusion Library for Kinetis MCUs , Rev. 0.7, 9/2015  Ideal accelerometer model + simple noise  
+assumed  
+Ideal magnetometer model + simple nose  
+1.3  µT 
+Ideal gyroscope model and simple noise  
+based Trajectory & Sensor Simulation Toolkit (TSim)  is used to 
+create DUT trajectories and simulated sensors readi ngs.  
+Some of the tests require that magnetic calibration  procedure is run before the test to initialize the  
+magnetic buffer. Magnetic calibration is implemente d as a trajectory made up of 
+a sequence of random rotations lasting 30seconds.  
+based system is shown in Figure 11 . In this case, Matlab is used to control a 
+process the fusion results into reports. Physical s ensor readings are 
+used to drive the fusion routines. Because indoor e nvironments vary magnetically, results may vary 
+moved or electronics in the area cycle on and off.  
+Results will also change simply because the state o f the magnetic buffer is continuously updated. 
+Figure 11. Benchtop Rotary Table Setup based Trajectory & Sensor Simulation Toolkit (TSim)  is used to 
+Some of the tests require that magnetic calibration  procedure is run before the test to initialize the  
+magnetic buffer. Magnetic calibration is implemente d as a trajectory made up of 
+is used to control a 
+process the fusion results into reports. Physical s ensor readings are 
+used to drive the fusion routines. Because indoor e nvironments vary magnetically, results may vary 
+Results will also change simply because the state o f the magnetic buffer is continuously updated.  
+ 
+Mechanical and Electrical Specifications 
+ 
+18   Freescale  Sensor Fusion Library for Kinetis  MCUs , Rev. 0.7, 9/2015 
+  Freescale Semiconductor, Inc. 4.4 Frame of Reference 
+Table summarizes differences between the standard frames of reference supported by the fusion 
+library. 
+Table 7. Frame of Reference Variations 
+ NED Android Windows 8 
+Axes alignment NED ENU ENU 
+Angle rotation order Yaw then pitch then roll Yaw then roll then pitch Y aw then pitch then roll 
+Gimbal lock Roll instability (x axis) at ±90 
+deg pitch (y axis) Pitch instability (x axis) at ±90 
+deg roll (y axis) Roll instability (y axis) at ±90 
+deg pitch (x axis) 
+Roll range Clockwise  
+–180 to 180 deg Anti-clockwise  
+–90 to 90 deg Clockwise  
+–90 to 90 deg 
+Pitch range –90 to 90 deg –180 to 180 deg –180 to 180 deg 
+Yaw range 0 to 360 0 to 360 0 to 360 
+Compass heading Yaw Yaw –Yaw 
+1.  A clockwise rotation is defined as one that is positive in the Right-Hand-Rule (RHR) sense. 
+4.5 Electrical Specifications 
+The parameters in each table are measured using the  configurations defined in Hardware Platforms 
+Used to Measure Performance . The MCU currents are estimated using the process defined in MCU 
+Current . 
+Tables 8 and 9 were developed using the build #5.00  of the Sensor Fusion Library.  
+Table 8. Typical I DD  for FRDM-KL26Z only 
+Function Fusion I dd @ 25Hz rate (mA) Fusion I dd / Hz (mA) 
+Accel only 0.25 0.01 
+2D Mag 0.19 0.01 
+Gyro only 0.74 0.03 
+Accel + Mag, eCompass 0.31 0.01 
+Accel + Gyro 0.92 0.04 
+9-axis 3.20 0.13 
+subtotal 5.61 0.22 
+estimated RTOS/other 2.79 0.44 
+Table 9. 9-Axis I DD  as a Function of Board and Development Tool 
+Function Fusion I dd @ 25Hz rate (mA) 
+Compiled with CodeWarrior Fusion I dd / Hz (mA) 
+Compiled with KDS 
+FRDM-K64F 0.40 0.51 
+FRDM-K22F N/A 0.41 
+FRDM-K20D50M 3.53 4.11 
+FRDM-KL46Z 3.70 4.16 
+FRDM-KL26Z 3.20 3.76 
+FRDM-KL25 2.47 2.93 
+  
+ 
+Freescale Sensor Fusion Library for Kinetis MCUs, R ev. 0.7, 9/2015  
+Freescale Semiconductor, Inc.  
+4.6 Computation Metrics 
+The Sensor Fusion Library computations are measured  directly using the Sensor Fusion Toolbox and 
+the ARM ® sysTick clock. 
+4.6.1 Statistics from Build #5.00 of the Sensor Fusion Li brary 
+For the current build (5.00), Freescale used the bu ilt in sysTick counter to measure each iteration of  the 
+algorithm in units of CPU clock cycles. The custome r can repeat the exact same measurement, 
+because both PC and Android Sensor Fusion Toolboxes  display this information in a real-time basis. 
+The test results will vary depending device movemen t are presented as “typical” numbers. 
+Table 10. SysTick Values for Freedom Development Pl atforms and Sensor Combinations 
+Freedom Platform Accel 2D Mag Gyro eCompass Accel 
++Gyro 9-axis 
+SysTick Values for CodeWarrior Build 5.00 in kTicks  
+KL25Z 58 46 172 72 208 740 
+KL26Z 58 45 171 71 210 740 
+KL46Z 59 45 171 72 207 740 
+K20D50M 34 26 63 42 157 509 
+K64F 3.1 2.86 4.5 3.6 10.6 50.5 
+KL25Z 58 46 172 72 208 740 
+SysTick Values for KDS Build 5.00 in kTicks 
+KL25Z 59 47 174 74 211 840 
+KL26Z 61 48 173 75 211 860 
+KL46Z 60 49 174 74 210 840 
+K20D50M 35 27 66 44 160 580 
+K64F 3.3 3.1 4.9 3.9 11.4 54.6 
+K22F 3.9 3.7 5.8 4.4 13.4 59.1 
+ 
+  
+Mechanical and Electrical Specifications 
+ 
+20   Freescale  Sensor Fusion Library for Kinetis  MCUs , Rev. 0.7, 9/2015 
+  Freescale Semiconductor, Inc. Table 11. Memory Requirements for “All Algorithms” Builds 
+Freedom Platform Text Data BSS Flash RAM 
+CodeWarrior 
+FRDM-KL25Z 96028 72 14776 96100 14848 
+FRDM-KL26Z 96020 72 14780 96092 14852 
+FRDM-KL46Z 95956 72 14780 96028 14852 
+FRDM-K20D50M 88116 72 14972 88188 15044 
+FRDM-K64F 79724 84 16484 79808 16568 
+KDS 
+FRDM-KL25Z 77812 172 14816 77984 14988 
+FRDM-KL26Z 77828 172 14816 78000 14988 
+FRDM-KL46Z 77772 172 14816 77944 14988 
+FRDM-K20D50M 67356 172 15008 67528 15180 
+FRDM-K64F 65024 184 16652 65208 16836 
+FRDM-K22F 62268 184 16492 62452 16676 
+Table 12. CodeWarrior Memory Requirements for FRDM- KL25Z and Single Algorithm 
+Freedom Platform Text Data BSS Flash RAM 
+Accel (Tilt) 34280 64 12580 34344 12644 
+2D Mag 53904 64 12580 53968 12644 
+Gyro Only 33944 64 12528 34008 12592 
+Accel/Mag 55172 64 12588 55236 12652 
+Accel/Gyro 54716 72 12892 54788 12964 
+9-axis 75552 64 13664 75616 13728 
+4.7 Magnetic Calibration Metrics 
+4.7.1 Background 
+Hard-iron effects are due to magnetic materials in the vicinity of the sensor. These materials result in an 
+apparent offset to sensor readings when the source of interference is fixed spatially, relative to the  
+sensor. 
+For a given point in space, plotting magnetometer m easurements at various sensor rotations results in 
+the sphere shown on the right hand side of Figure 12 . This makes sense, as the magnitude of the 3D 
+magnetic field should not change just because the s ensor is rotated. 
+Soft-iron effects result from the interaction of fe rrous materials near the sensor interacting with th e 
+ambient magnetic field. If the source of soft iron interference is again fixed spatially with respect to the 
+sensor and does not demonstrate magnetic hysteresis , then the sphere of plotted measurements is 
+distorted into an ellipsoid. This is shown (along w ith a hard-iron offset) on the left side of Figure 12 . 
+Reference 2: Orientation Representations provides background on the topic of hard- and soft- iron 
+magnetic compensation. For the case where the senso r and sources of interference are spatially fixed 
+with respect to one another, the distortions are li near, and can be reversed mathematically. This is t he 
+function of the Freescale magnetic calibration libr ary. 
+  
+ 
+Freescale Sensor Fusion Library for Kinetis MCUs, R ev. 0.7, 9/2015  
+Freescale Semiconductor, Inc.  
+Figure 12. Distorted (left) and Corrected (right) M agnetic Field Data (simulated) 
+Both hard- and soft-iron interferences are a functi on of the sensor environment, and not the sensor 
+itself. Each product design will inevitably result in different distortions. 
+Engineers assigned the task of physically designing  PCBs and housings should pay careful attention to 
+sources of magnetic interference early in the desig n phase. 
+Inductive charging films found in some portable dev ices exhibit a significant amount of magnetic 
+hysteresis. This is a nonlinear phenomena and canno t be fully corrected by the Freescale magnetic 
+calibration library. 
+4.7.2 The Magnetic Buffer 
+Freescale’s magnetic calibration library performs a  total least squares fit of a number of data points  to 
+map the measured ellipsoid of measurements back int o the ideal sphere. Quality of that fit improves as  
+number and spacing of samples across the ellipsoid surface increases. There is a tradeoff in terms of 
+data set size used for calibration versus CPU resou rces versus quality of fit. 
+Figure 13 shows improvement in standard deviation of computed  results (for a uniform field) versus 
+constellation size.  
+
+Mechanical and Electrical Specifications 
+ 
+22   Freescale  Sensor Fusion Library for Kinetis  MCUs , Rev. 0.7, 9/2015 
+  Freescale Semiconductor, Inc.  
+Figure 13. Simulated Standard Deviation and Varianc e as f(constellation size) 
+4.7.3 Magnetic Calibration Performance Metrics 
+Table 13 provides some basic guidance with regard to perform ance of the magnetic calibration library 
+in a stand-alone configuration. 
+Table 13. Magnetic Calibration Performance Metrics 
+Characteristic Symbol Conditions Min Typ Max Unit 
+Compass heading linearity; 
+see Compass Heading 
+Linearity and Accuracy  TBD — — < 5 — degrees 
+Compass heading accuracy; 
+see Compass Heading 
+Linearity and Accuracy  TBD — < 5 — degrees  
+NOTE: 
+The results shown in this table are more conservati ve than simulated numbers, and are more likely to b e representative of 
+actual results. 
+ 
+4.8 Fusion Model Performance Metrics 
+4.8.1 Background 
+The six and nine-axis Kalman filters are optimized for calculation of device orientation. Unmodelled 
+sources of error will affect the other sensor outpu ts. Tradeoffs are a function of the Kalman filter 
+configuration and are subject to change. 
+Separate tables are presented for each of the senso r combination options provided by the Fusion 
+Library. Common test conditions and setups are used  for all options. 
+  
+
+  
+ 
+Freescale Sensor Fusion Library for Kinetis MCUs 
+Freescale Semiconductor, Inc. NOTE: Results that follow are simulated 
+nonlinearity and other factors. See Simulation Environments 
+to be improved from the 4.17 plots shown here. 
+4.8.2 Gyro Offset Step Response 
+Gyro Offset Step Response plots are shown in 
+Accelerometer+Gyro algorithms, respectively and pro vide an indication of the responsiveness of the 
+system to changes in gyro offsets. The simulation a rtificially introduces a step in the modeled gyro 
+offset. However, under normal circumstances, gy 
+change such as this would likely occur are: 
+• at powerup 
+• if the gyro has an autonomous offset cancellation c ircuit (which Freescale recommends be turned 
+OFF). 
+Figure 14. Gyro 
+Freescale Sensor Fusion Library for Kinetis MCUs , Rev. 0.7, 9/2015  Results that follow are simulated build 4.17 using basic sensor m odels which include noise effects, but ignore 
+Simulation Environments  for details.  B uild 5.00 dynamic performance is expected 
+to be improved from the 4.17 plots shown here.  
+Gyro Offset Step Response  
+Gyro Offset Step Response plots are shown in Figure 14 and Figure 15 for 9- axis and 
+Accelerometer+Gyro algorithms, respectively and pro vide an indication of the responsiveness of the 
+system to changes in gyro offsets. The simulation a rtificially introduces a step in the modeled gyro 
+offset. However, under normal circumstances, gy ro offsets change very slowly. The only times that a 
+change such as this would likely occur are:  
+if the gyro has an autonomous offset cancellation c ircuit (which Freescale recommends be turned 
+Gyro Offset Step Response for 9-Axis algorithm odels which include noise effects, but ignore 
+uild 5.00 dynamic performance is expected 
+axis and  6- axis 
+Accelerometer+Gyro algorithms, respectively and pro vide an indication of the responsiveness of the 
+system to changes in gyro offsets. The simulation a rtificially introduces a step in the modeled gyro 
+ro offsets change very slowly. The only times that a 
+if the gyro has an autonomous offset cancellation c ircuit (which Freescale recommends be turned 
+ 
+Mechanical and Electrical Specifications 
+ 
+24  
+  Figure 15. Gyro Offset Step Response for 6 
+4.8.3 Error in Computed Linear Acceleration 
+Estimation of linear acceleration in the 9 
+lasting less than 1 second. Continuous acceleration s are inconsistent with modeled dynamics, and the 
+acceleration estimation error increases. The accele ration error starts leaking into the estimates of 
+orientation resulting in errors in gyro offset and magnetic disturbance e stimates. 
+and Figure 18 present the true and 9 
+lasting 0.5 s, 1 s and 5 s respectively. 
+Figure 16. True and calculated linear acceleration, accelerati on time 0.5 s Mechanical and Electrical Specifications  
+ Freescale  Sensor Fusion Library for Kinetis 
+Freescale  
+Gyro Offset Step Response for 6 -Axis Accelerometer+Gyro algorithm 
+Error in Computed Linear Acceleration  
+Estimation of linear acceleration in the 9 -axis algorithm is optimized f or short duration accelerations 
+lasting less than 1 second. Continuous acceleration s are inconsistent with modeled dynamics, and the 
+acceleration estimation error increases. The accele ration error starts leaking into the estimates of 
+in errors in gyro offset and magnetic disturbance e stimates. Figure 16 
+present the true and 9 -axis algorithm calculated linear acceleration for 
+respectively.  
+ 
+True and calculated linear acceleration, accelerati on time 0.5 s 
+Sensor Fusion Library for Kinetis  MCUs , Rev. 0.7, 9/2015 
+Freescale  Semiconductor, Inc.  
+Axis Accelerometer+Gyro algorithm  
+or short duration accelerations 
+lasting less than 1 second. Continuous acceleration s are inconsistent with modeled dynamics, and the 
+acceleration estimation error increases. The accele ration error starts leaking into the estimates of 
+Figure 16 , Figure 17 
+axis algorithm calculated linear acceleration for accelerations 
+True and calculated linear acceleration, accelerati on time 0.5 s  
+  
+ 
+Freescale Sensor Fusion Libra ry for Kinetis MCUs 
+Freescale Semiconductor, Inc. Figure 17. True and calculated linear acceleration, accelerati on time 1 
+Figure 18. True and calculated linear acceleration, accelerati on time 5 s 
+Similar dependence on the magnetic pulse duration t ime was noticed in the Orientation Magnetic 
+Immunity tests. A slow- moving magnet introduces a longer 
+than a fast- moving magnet. The longer the magnetic disturbance pulse lasts, the greater the orientation 
+error it causes on the output of the fusion algorit hm. 
+4.8.4 Limitations Imposed via Sensor Choice/Configuration
+Table 14 represents the sensor configuration used to determi ne parameters specified in this datasheet. 
+ry for Kinetis MCUs , Rev. 0.7, 9/2015   
+True and calculated linear acceleration, accelerati on time 1 
+ 
+True and calculated linear acceleration, accelerati on time 5 s 
+Similar dependence on the magnetic pulse duration t ime was noticed in the Orientation Magnetic 
+moving magnet introduces a longer lasting magnetic field disturbance pulse 
+moving magnet. The longer the magnetic disturbance pulse lasts, the greater the orientation 
+error it causes on the output of the fusion algorit hm.  
+Limitations Imposed via Sensor Choice/Configuration  
+represents the sensor configuration used to determi ne parameters specified in this datasheet. True and calculated linear acceleration, accelerati on time 1  s 
+True and calculated linear acceleration, accelerati on time 5 s  
+Similar dependence on the magnetic pulse duration t ime was noticed in the Orientation Magnetic 
+lasting magnetic field disturbance pulse 
+moving magnet. The longer the magnetic disturbance pulse lasts, the greater the orientation 
+represents the sensor configuration used to determi ne parameters specified in this datasheet.  
+Mechanical and Electrical Specifications 
+ 
+26   Freescale  Sensor Fusion Library for Kinetis  MCUs , Rev. 0.7, 9/2015 
+  Freescale Semiconductor, Inc. Table 14. Sensor/Configuration Imposed Limitations 
+Characteristic Symbol Min Max Unit 
+Maximum Angular Rate AR max –2000 +2000 dps 
+Linear Acceleration LA max –4 +4 g 
+Magnetic Field Bmax –1200 +1200 µT 
+ 
+It is believed that the fusion algorithms themselve s have no upper limits on any of the parameters 
+above. These are strictly limits associated with th e specific physical sensors used to characterize th e 
+library. 
+4.8.5 9-Axis Parametrics 
+Table 15 provides guidance for the 9-axis (accelerometer/mag netometer/gyro) indirect Kalman filter 
+implementation. 
+NOTE: All parametrics provided in the following table are  based on build 4.17 simulations.  Build 5.00 simul ations 
+are still pending.  
+Table 15. 9-axis Sensor Fusion Performance Metrics 
+Characteristic Symbol Conditions(s) Min Typ Max Uni t 
+Orientation static drift OSD See Orientation Static Drift  — 0.05 — degrees 
+Orientation static noise OSN See Orientation Static Noise  — 1.21 — degrees 
+RMS 
+Orientation dynamic drift ODD See Orientation Dynamic Drift  — 0.17 — degrees 
+Max angular Rate AR MAX See Maximum Angular Rate  — 1600 Error! 
+Reference 
+source not 
+found.  — dps 
+Orientation response delay ORD See Orientation Response 
+Delay  — <1 — 2fusion 
+time 
+interval 
+Gyro offset step response TGOSR See Gyro Offset Step 
+Response  — 3.76 — seconds 
+Error in computed linear 
+acceleration LAE See Error in Computed Linear 
+Acceleration   — 0.243 — g 
+Compass heading 
+linearity 3 CH l See Compass Heading 
+Linearity and Accuracy  — 1.02 — degrees 
+Compass heading 
+accuracy CH acc — 1.37 — degrees 
+Orientation magnetic 
+immunity - static device Omis See Orientation Magnetic 
+Immunity (Static Device)  — 9.36 — degrees 
+Orientation magnetic 
+immunity - moving device Omim See Orientation Magnetic 
+Immunity (Moving Device)  — 8.98 — degrees 
+  
+ 
+Freescale Sensor Fusion Library for Kinetis MCUs, R ev. 0.7, 9/2015  
+Freescale Semiconductor, Inc. 1.  The Sensor Fusion algorithm has no intrinsic li mitation; this was the maximum value supported by t he gryo in Freescale 
+testing. 
+2.  Number of output sampling periods where one per iod = 40 ms 
+3.  Linear sensors, which yields very good compass heading values were assumed. However experience sho ws that +/5 
+degrees are more realistic values. 
+4.8.6 6-axis Accelerometer + Magnetometer Parametrics 
+NOTE: All parametrics provided in the following table are  based on build 4.17 simulations.  Build 5.00 is be lieved to 
+have similar performance.  
+Table 16. 6-axis Sensor Fusion Accel + Mag Performa nce Metrics 
+Characteristic Symbol Conditions(s) Min Typ Max Uni t 
+Orientation static drift OSD See Orientation Static Drift  — 0.0018 — degrees 
+Orientation static noise OSN See Orientation Static Noise  — 1.06 — degrees 
+RMS 
+Orientation dynamic drift ODD See Orientation Dynamic Drift  — 1.16 — degrees 
+Orientation response delay ORD See Orientation Response 
+Delay  — <10 — sample 
+periods Er 
+ror! 
+Reference 
+source not 
+found.  
+2Compass heading 
+linearity CH l See Compass Heading 
+Linearity and Accuracy  — 1.20 — degrees 
+Compass heading 
+accuracy 2 CH acc — 1.58 — degrees 
+1.  Number of output sampling periods where one per iod = 40 ms 
+2.  Linear sensors, which yields very good compass heading values were assumed. However, experience sh ows that ±5 
+degrees are more realistic values. 
+ 
+4.8.7 6-axis Accelerometer + Gyro Parametrics 
+NOTE: All parametrics provided in the following table are  based on build 4.17 simulations.  Build 5.00 is be lieved to 
+have similar static and improved dynamic performanc e. 
+Table 17. 6-axis Sensor Fusion Gyro + Accel Perform ance Metrics 
+Characteristic Symbol Conditions(s) Min Typ Max Uni t 
+Orientation static drift OSD See Orientation Static Drift  — 19.07 — degrees 
+Orientation static noise OSN See Orientation Static Noise  — 0.068 — degrees 
+RMS 
+Orientation dynamic drift ODD See Orientation Dynamic Drift  — 2.04 — degrees 
+Max angular Rate AR MAX See Maximum Angular Rate  — 1440 — dps 
+Orientation response delay ORD See Orientation Response 
+Delay Error! Reference source not found.  — <1 — sample 
+periods 2 
+Gyro offset step response TBD See Gyro Offset Step 
+Response  — 3.76 — seconds 
+Test Descriptions 
+ 
+28   Freescale  Sensor Fusion Library for Kinetis  MCUs , Rev. 0.7, 9/2015 
+  Freescale Semiconductor, Inc. 1.  Output sampling period = 40 ms 
+2.  Number of output sampling periods where one per iod = 40 ms 
+4.8.8 3-axis Accelerometer Only Parametrics 
+NOTE: All parametrics provided in the following table are  based on build 4.17 simulations.  Build 5.00 shoul d be 
+similar.  
+Table 18. 3-axis Accelerometer Performance Metrics 
+Characteristics Symbol Conditions Min Typ Max Units  
+Tilt Error RMS TAE Note 1 — 0.082 — degrees 
+Orientation response delay ORD See Orientation Response 
+Delay 2 — < 5 — output 
+sample 
+period 
+1.  RMS of accelerometer tilt angle error is calcul ated using the simulated sensor noise RMS values al ong each of the 
+three axes and the following formula (given for til t error from the z-axis) 
+TAE=arctan/uni0009/g4684/g3495/g2898/g2902/g2897/g2903 /g3118/g3182/g2878/g2898/g2902/g2897/g2903 /g3118/g3183
+/g2869/g2917/g2879/g2898/g2902/g2897/g2903 /g3184/g4685 , 
+where NRMSx, NRMSy, NRMSz - RMS values of accelerom eter noise for X, Y, Z axes in g units. 
+2.  Number of output sampling periods where one per iod = 40 ms 
+5 Test Descriptions 
+Each of the following sub-sections defines the spec ification intent and the sample procedure for the 
+specifications listed in Mechanical and Electrical Specifications . Procedures may evolve in future drafts 
+of this document in order to better service the spe cification intents. 
+5.1 MCU Current 
+5.1.1 Intent 
+This is the average current consumption of the MCU executing the core Fusion routines. This is 
+obviously specific to the particular MCUs listed. T his metric must be associated with a specific 
+hardware configuration similar to those defined ear lier in this document. The Freedom Development 
+Platform was powered via the OpenSDA USB port for t he results specified. 
+5.1.2 Procedure 
+1. This procedure uses modified versions of the sta ndard demo build: 
+a. Measure (using the Sensor Fusion Toolbox) sysTic k fusion which only includes time spent in the 
+core fusion routines . It does not include: 
+1) calls to magnetic calibration 
+2) reading sensor data 
+3) applying hardware abstraction layer 
+4) RTOS 
+5) Communications overhead 
+  
+ 
+Freescale Sensor Fusion Library for Kinetis MCUs, R ev. 0.7, 9/2015  
+Freescale Semiconductor, Inc. 2. Percentage of time spent in the core fusion rout ines = 100*sysTick fusion / total_sysTicks 2  
+3. Idd Current into the MCU is measured via power jumper o n the board using a simple DVM 3 
+4. Fusion I dd = MCU I dd X percentage 
+5. All currents shown are in mA 
+6. Sample size = 1 board 
+For devices with floating point units, this may yie ld a somewhat optimistic number, as the computation  
+makes the assumption that all MCU instructions cons ume the same amount of power.  In fact, we can 
+expect floating point instructions to consume a bit  more. 
+5.2 Flash and RAM Required 
+5.2.1 Intent 
+These parameters are total RAM and flash memory req uired to implement and execute the Fusion 
+Library plus MQX-Lite RTOS. The projects for the bi naries were created using both CodeWarrior and 
+Kinetis Design Studio.  Values for Text, Data and B SS were read directly from the console window after  
+builds completed. 
+This includes space for code storage, static and dy namic (stack) variables. This metric must be 
+associated with a specific hardware configuration s imilar to those defined in earlier in this document . 
+5.2.2 Procedure 
+The text, data and bss sizes for each build were ex tracted using the technique outlined at MCU on 
+Eclipse; text, data and bss: Code and Data Size Exp lained . 
+1. text ; includes the user code, the vector table plus con stants. 
+2. data ; is for initialized variables, and it counts for R AM and FLASH. The linker allocates the data in 
+FLASH which then is copied from ROM to RAM in the s tartup code. 
+3. bss ; is for the uninitialized data in RAM which is ini tialized with zero in the startup code. 
+Refer to Computation Metrics for statistics gathered using the 5.00 build. 
+5.3 Fusion Loop Execution Time 
+This is simply CPU cycle time X sysTick fusion  as measured in Section 5.1. 
+5.4 Compass Heading Linearity and Accuracy 
+5.4.1 Intent 
+Linearity is defined as the deviation of measured d ata from a least squares straight line approximatio n 
+of that data. 
+Absolute accuracy is defined as the maximum differe nce between measured and ideal values. 
+                                                
+2  Which is simply the clock rate of the MCU divided  by the sensor fusion rate (nominally 25) 
+3  Consult the user guide / schematic for your Freedo m board to determine the specific jumper number 
+applicable to that board. 
+Test Descriptions 
+ 
+30  
+  These two concepts are illustrated in 
+This metric must be stated specifically for a hardw are configuration similar to those defined 
+this document. 
+Figure 
+5.4.2 Procedure 
+Heading Linearity 
+Setup as defined in Matlab Stimulus/Expected Response + Hardware 
+post-process data. 
+1. Precondition the DUT by executing magnetic calibrat ion trajectory leaving DUT in AZ = + 1 
+orientation (See Matlab Stimulus/Expected Response + Hardware 
+2. Rotate DUT around the z- axis from 0 to 360 degrees with an increment step o f 10 degrees as 
+follows 
+3. Program rate table with desired steps and maximum v elocity 
+a. Rotate tabletop by 10 degrees over 0.5 second per 
+b. Pause 0.5 seconds 
+c. Read orientation 
+d. Repeat steps a- c above until 360 degrees is reached. 
+Absolute Heading Accuracy 
+These numbers are based on simulations that are ide alized models. The real 
+be approximately 5 degrees. 
+ Freescale  Sensor Fusion Library for Kinetis 
+Freescale These two concepts are illustrated in Figure 19 . 
+This metric must be stated specifically for a hardw are configuration similar to those defined 
+Figure 19. Nonlinearity vs. Absolute Accuracy 
+Matlab Stimulus/Expected Response + Hardware -based Fusion 
+Precondition the DUT by executing magnetic calibrat ion trajectory leaving DUT in AZ = + 1 
+Matlab Stimulus/Expected Response + Hardware -based Fusion 
+axis from 0 to 360 degrees with an increment step o f 10 degrees as 
+Program rate table with desired steps and maximum v elocity  
+Rotate tabletop by 10 degrees over 0.5 second per iod 
+c above until 360 degrees is reached.  
+These numbers are based on simulations that are ide alized models. The real -world values will tend to 
+Sensor Fusion Library for Kinetis  MCUs , Rev. 0.7, 9/2015 
+Freescale  Semiconductor, Inc. This metric must be stated specifically for a hardw are configuration similar to those defined earlier in 
+ 
+based Fusion . Matlab is used to 
+Precondition the DUT by executing magnetic calibrat ion trajectory leaving DUT in AZ = + 1 
+based Fusion ) 
+axis from 0 to 360 degrees with an increment step o f 10 degrees as 
+world values will tend to 
+  
+ 
+Freescale Sensor Fusion Library for Kinetis MCUs 
+Freescale Semiconductor, Inc. 5.5 Orientation Static Drift 
+5.5.1 Intent 
+The maximum change in orientation observed for a DU T remaining motionless for 100 seconds. 
+5.5.2 Procedure 
+Setup as defined in Matlab Stimulus/Expected Response + Hardware 
+post-process data. 
+This me tric must be associated with a specific hardware co nfiguration similar to those defined 
+in this document . Matlab is used to record and post 
+1. Precondition the DUT by executing magnetic calibrat ion trajectory leaving DUT in a given 
+orientation. 
+2. While the DUT remains in given orientation collect orientation samples for 120 seconds. 
+3. Plot and process the last 100 s of the test. Orient ation static drift is the maximum angle change in 
+the measured rotation vectors.  
+4. Repeat steps 1-3 for all 6 major orientations of the development board as sh own in 
+Figure 20 
+Sensor Fusion Library for Kinetis MCUs , Rev. 0.7, 9/2015  Orientation Static Drift  
+The maximum change in orientation observed for a DU T remaining motionless for 100 seconds. 
+Matlab Stimulus/Expected Response + Hardware -based Fusion 
+tric must be associated with a specific hardware co nfiguration similar to those defined 
+. Matlab is used to record and post - process data. 
+Precondition the DUT by executing magnetic calibrat ion trajectory leaving DUT in a given 
+While the DUT remains in given orientation collect orientation samples for 120 seconds. 
+Plot and process the last 100 s of the test. Orient ation static drift is the maximum angle change in 
+ 
+6 major orientations of the development board as sh own in 
+20 . Major orientations relative to gravity The maximum change in orientation observed for a DU T remaining motionless for 100 seconds.  
+based Fusion . Matlab is used to 
+tric must be associated with a specific hardware co nfiguration similar to those defined in earlier 
+Precondition the DUT by executing magnetic calibrat ion trajectory leaving DUT in a given 
+While the DUT remains in given orientation collect orientation samples for 120 seconds.  
+Plot and process the last 100 s of the test. Orient ation static drift is the maximum angle change in 
+6 major orientations of the development board as sh own in Figure 20.  
+ 
+Test Descriptions 
+ 
+32   Freescale  Sensor Fusion Library for Kinetis  MCUs , Rev. 0.7, 9/2015 
+  Freescale Semiconductor, Inc. 5.6 Orientation Static Noise 
+5.6.1 Intent 
+RMS noise as a function of orientation for a motion less DUT. 
+5.6.2 Procedure 
+This can be based upon data gathered for the orient ation static drift test. The classic standard devia tion 
+equation is used to compute the metric/value. 
+5.7 Orientation Dynamic Drift 
+5.7.1 Intent 
+Measure of the ability of fusion code to return to a known orientation after movement. 
+5.7.2 Procedure 
+Setup as defined in Matlab Stimulus/Expected Response + Hardware-based Fusion and in Figure 9 . 
+Matlab is used to post-process data. 
+1. Precondition the DUT by executing magnetic calib ration trajectory leaving DUT in a given 
+orientation. 
+2. Keep DUT in a given orientation motionless for 2  seconds. 
+3. Rotate DUT at 0.5 revolution/sec for 10 seconds around vertical axis. 
+4. Keep DUT in its last orientation motionless for 2 seconds. 
+5. Determine the initial orientation by averaging o rientation samples from the initial motionless peri od 
+and the final orientation by averaging the samples from the final motionless period. The difference 
+between the two orientations is the orientation dyn amic drift. 
+6. Repeat steps 1-5 for all six major orientations of the development board. 
+5.8 Maximum Angular Rate 
+5.8.1 Intent 
+This test determines the maximum rotation rate for which the filter is able to correctly track orienta tion. 
+5.8.2 Procedure 
+Setup as defined in Matlab Stimulus/Expected Response + Hardware-based Fusion . Matlab is used to 
+post-process data. 
+1. Rotate DUT around X axis five times starting at rotation rate 360 dps. 
+2. Plot the ideal simulated orientation together wi th the orientation samples calculated by Kalman 
+filter fusion algorithms: 9DOF and 6DOF Acceleromet er + Gyro and notice if fusion data tracks the 
+ideal orientation. 
+3. Increase the rotation rate by 360 dps and repeat  steps 1 and 2. 
+4. The highest angular rate at which the fusion alg orithm orientation still tracks the ideal simulated  
+orientation is the maximum angular rate. 
+  
+ 
+Freescale Sensor Fusion Library for Kinetis MCUs 
+Freescale Semiconductor, Inc. 5.9 Orientation Response Delay 
+5.9.1 Waveform Definitions 
+90°  Input Change in Orientation  
+The 90°  input orientation change waveform is define d as: 
+• From any starting orientation 
+• Through the center of mass of the accelerometer 
+• A change in one of roll, pitch or yaw (global frame ) 
+• Orientation change = ±90°  
+• Orientation change is linear in time 
+• Transition period = 1.0 seconds 
+• Propagation delays are measured from the 1/2 point (±45° ) 
+Output Orientation Changes  
+When measuring changes in orientation, there are ma ny ways to get from orientation A to orientation B.  
+It is assumed that output orientation changes shoul d track input orientation changes. The Fusion 
+Library will inherently output those values. Howeve r, to 
+propagation delays, the 50% point in computed orien tations changes is defined as shown in 
+Figure 21. Propagation delays are measured at the plane that b i 
+5.9.2 Intent 
+Orientation response delay is measured from change in physical orientation to the related change in 
+fusion orientation output. 
+5.9.3 Procedure 
+Using 90°  input orientation change as defined in 
+measured from the 50% point on the input wav 
+defined in Output Orientation Changes 
+Freescale Sensor Fusion Library for Kinetis MCUs , Rev. 0.7, 9/2015  Orientation Response Delay  
+Waveform Definitions  
+The 90°  input orientation change waveform is define d as:  
+of the accelerometer  
+A change in one of roll, pitch or yaw (global frame )  
+Orientation change is linear in time  
+Transition period = 1.0 seconds  
+Propagation delays are measured from the 1/2 point (±45° )  
+When measuring changes in orientation, there are ma ny ways to get from orientation A to orientation B.  
+It is assumed that output orientation changes shoul d track input orientation changes. The Fusion 
+Library will inherently output those values. Howeve r, to  avoid any ambiguity when measuring 
+propagation delays, the 50% point in computed orien tations changes is defined as shown in 
+ 
+Propagation delays are measured at the plane that b i sects and is perpendicular to SLERP 
+Orientation response delay is measured from change in physical orientation to the related change in 
+Using 90°  input orientation change as defined in 90°  Input Change in Orientation , the response delay is 
+measured from the 50% point on the input wav eform to the 50% point of the output waveform as 
+Output Orientation Changes . When measuring changes in orientation, there are ma ny ways to get from orientation A to orientation B.  
+It is assumed that output orientation changes shoul d track input orientation changes. The Fusion 
+avoid any ambiguity when measuring 
+propagation delays, the 50% point in computed orien tations changes is defined as shown in Figure 21 . 
+sects and is perpendicular to SLERP A–B 
+Orientation response delay is measured from change in physical orientation to the related change in 
+, the response delay is 
+eform to the 50% point of the output waveform as 
+Test Descriptions 
+ 
+34   Freescale  Sensor Fusion Library for Kinetis  MCUs , Rev. 0.7, 9/2015 
+  Freescale Semiconductor, Inc. 5.10 Orientation Magnetic Immunity (Static Device) 
+5.10.1 Intent 
+The test response of the stationary DUT to momentar y changes in the local magnetic field is used to 
+measure the orientation magnetic immunity. Because the device is stationary, the accelerometer and 
+gyroscope readings remain relatively constant, chan ging only due to sensor noise. 
+5.10.2 Procedure 
+Setup as defined in Matlab Stimulus/Expected Response + Hardware-based Fusion . Matlab is used to 
+post-process data. 
+1. Starting point = device stationary, fusion outpu ts stable 
+2. 100 µT magnet moving at 0.25 m/s 
+3. Closest approach to magnetic sensor = 5 cm 
+4. Test to be simulated using environment specified  in Matlab Stimulus/Expected Response + 
+Hardware-based Fusion . Magnetic interference may be modeled as a time va rying field which is 
+consistent with the description above. 
+5.11 Orientation Magnetic Immunity (Moving Device) 
+5.11.1 Intent 
+This test measures the immunity of a linearly, with  no rotation, moving DUT to a 100 µT magnet change 
+in the magnetic field. The outputs of all accelerat ion and magnetic sensors change during this test. 
+Gyro outputs should be constant throughout, with an y changes attributed to noise only. 
+5.11.2 Procedure 
+1. Starting point = device stationary, fusion outpu ts stable. 
+2. Use a 100 µT magnet. 
+3. The DUT moves by magnet at 0.25 m/s with the clo sest approach to magnet=5cm. 
+4. Test to be simulated using environment specified  in Matlab Stimulus/Expected Response + 
+Hardware-based Fusion . Magnetic interference may be modeled as a locatio n varying field which 
+is consistent with the description above. 
+5.12 Error in Computed Gyro Bias 
+5.12.1 Intent 
+Measure how well the fusion library tracks slowly v arying gyro bias. 
+5.12.2 Procedure 
+Test to be simulated using environment specified in  Matlab Stimulus/Expected Response + Hardware-
+based Fusion.  
+1. Starting point = device stationary, fusion outpu ts stable 
+2. Add 10 dps gyro offset as step function 
+3. Run test until computed gyro offset stabilizes 
+  
+ 
+Freescale Sensor Fusion Library for Kinetis MCUs, R ev. 0.7, 9/2015  
+Freescale Semiconductor, Inc. 4. Note computed/actual for final value 
+5. Note response time 
+5.13 Gyro Offset Step Response 
+5.13.1 Intent 
+Measure how well the fusion library tracks varying gyro offset. 
+5.13.2 Procedure 
+Setup as defined in Matlab Stimulus/Expected Response + Hardware-based Fusion . Matlab is used to 
+post-process data. 
+1. Starting point = DUT is stationary and fusion ou tputs are stable. 
+2. Add offset of 10 dps to gyro X read data. 
+3. Run test until computed gyro offset stabilizes. 
+4. Plot the gyro read data step function and the re sponse fusion algorithm estimated offset. Record 
+response time as time between 50% step change in gy ro X read data and 50% change in fusion 
+algorithm estimated gyro X offset. 
+5.14 Error in Computed Linear Acceleration 
+5.14.1 Intent 
+Measure how well the fusion library tracks linear a cceleration. 
+5.14.2 Procedure 
+Setup as defined in Matlab Stimulus/Expected Response + Hardware-based Fusion . Matlab is used to 
+post-process data. 
+1. Starting point = DUT is stationary and fusion ou tputs are stable. 
+2. Subject DUT to acceleration A*sin(2*pi*f*t), whe re: A = 2 g, f = 1 Hz, t = zero to one second 
+(1 period), pi = 3.141592654 
+3. Plot the ideal DUT acceleration and fusion algor ithm computed acceleration. Determine the 
+maximum error between the two accelerations. 
+Revision history for FSFLK_DS 
+ 
+36   Freescale  Sensor Fusion Library for Kinetis  MCUs , Rev. 0.7, 9/2015 
+  Freescale Semiconductor, Inc. 6 Revision history for FSFLK_DS 
+Rev. No. Date Description 
+0 12 Nov 2013 • ROUGH DRAFT ONLY - PRE-REVIEW 
+0.1 22 Nov 2013 • Preliminary draft includes updates from 1st review . 
+0.2 Feb 2014 • Initial public release. 
+0.3 Apr 2014 • Updated for licensing, software updates and board support changes. 
+0.4 May 2014 • Updated for software updates, additional (FRDM-K64 F) board support changes and 
+electrical specs and computation metrics. 
+0.5 Sept 2014 • Updated Fusion Performance Metrics section by addi ng four new figures and tables. 
+• adjusted selected parametric values 
+• altered several Test Description procedures. 
+0.6 Sept 2014 • Separated out Computational Metrics section and va rious minor markups 
+• Changed Feature - License, option text. 
+• Feature Comparison Based on License Option, Added KDS to Product Deliverables row 
+• Moved sections 4.1, 4.1.1 & 4.1.2 and merged in 4. 11 
+• Added xrefs from Electrical Specs tables to approp riate Test Description sections 
+• Adjusted Performance Metric tables, symbols and un its in some cases 
+0.7 Sept 2015 • Updated for build 5.00 of the sensor fusion librar y.  This version has completely 
+redesigned 6 and 9-axis Kalman filters.   
+• Updated all computation metrics.   
+• Removed outdated fusion time measurements.    
+• Added K22F for KDS.  Added additional fusion optio ns.   
+• Changed document name from XSFLK_DS to FSFLK_DS. 
+• Noted that MULTI-B boards have been replaced with MULT2-B boards. 
+ 
+ 
+ 
+ 
+ Document Number: FSFLK_DS  
+Revision Rev. 0.7, 9/2015 
+   
+How to Reach Us: 
+Home Page: 
+freescale.com 
+Web Support: 
+freescale.com/support Information in this document is provided solely to enable system and 
+software implementers to use Freescale products. Th ere are no express 
+or implied copyright licenses granted hereunder to design or fabricate any 
+integrated circuits based on the information in thi s document. Freescale 
+reserves the right to make changes without further notice to any products 
+herein. 
+Freescale makes no warranty, representation, or gua rantee regarding the 
+suitability of its products for any particular purp ose, nor does Freescale 
+assume any liability arising out of the application  or use of any product or 
+circuit, and specifically disclaims any and all lia bility, including without 
+limitation consequential or incidental damages. “Ty pical” parameters that 
+may be provided in Freescale data sheets and/or spe cifications can and 
+do vary in different applications, and actual perfo rmance may vary over 
+time. All operating parameters, including “typicals ,” must be validated for 
+each customer application by customer’s technical e xperts. Freescale 
+does not convey any license under its patent rights  nor the rights of 
+others. Freescale sells products pursuant to standa rd terms and 
+conditions of sale, which can be found at the follo wing address: 
+freescale.com/SalesTermsandConditions. 
+Freescale and the Freescale logo are trademarks of Freescale 
+Semiconductor, Inc., Reg. U.S. Pat. & Tm. Off. All other product or service 
+names are the property of their respective owners. 
+© 2015 Freescale Semiconductor, Inc. 
+ 

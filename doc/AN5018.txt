@@ -1,0 +1,473 @@
+© Freescale Semiconductor, Inc. 
+   
+1 Introduction 
+This document derives the standard Kalman filter 
+equations. It is intended as a primer that should b e 
+read before tackling Application Note AN5023, 
+which describes the more specialized indirect 
+complementary Kalman filter used for the fusion of 
+accelerometer, magnetometer and gyroscope data 
+in the Freescale Sensor Fusion Library  software. 
+Section 2 calculates some mathematical results 
+used in the derivation. The derivation itself is in  
+Section 3. Freescale Semiconductor  Document Number: AN5018 
+APPLICATION NOTE  Rev. 1.0, 9/201 5
+ 
+Basic Kalman Filter Theory  
+Mark Pedley and Michael Stanley 
+ 
+ 
+Contents  
+1 Introduction ................................ ................................ 
+1.1 Terminology ................................ ................................ 
+2 Mathematical Lemmas ............................... . ................................ 
+2.1 Lemma 1 ................................ ................................ 
+2.2 Lemma 2 ................................ ................................ 
+2.3 Lemma 3 ................................ ................................ 
+3 Kalman Filter Derivation ................................ 
+3.1 Process Model ................................ ................................ 
+3.2 Derivation ................................ ................................ 
+3.3 Standard Kalman Equations ................................ 
+3.4 Limiting Cases ................................ ................................ 
+ 
+Introduction 
+2   Basic Kalman Filter Theory, 9/2015 
+ 
+Freescale Semiconductor, Inc.   1.1 Terminology 
+Symbol Definition 
+/g2157/g303… The linear prediction or state matrix at sample     /g1…63. 
+/g2206/g303…=/g2157/g303…/g2206/g303…/g2…79/g2…69+/g2205/g303…  
+/g2206/g3549/g303…/g2…79=/g2157/g303…/g2206/g3549/g303…/g2…79/g2…69/g2…7… 
+/g2159/g303… The measurement matrix relating /g220…/g303… to /g2206/g303… at sample  /g1…63. 
+/g220…/g303…=/g2159/g303…/g2206/g303…+/g2204/g303… 
+/g1…31[] Expectation operator 
+/g2167/g303… The Kalman filter gain matrix at sample /g1…63 
+/g2172/g303…/g2…79 The a priori  covariance matrix of the linear prediction ( a priori ) error /g2206/g3549/g30…4,/g303…/g2…79 at sample /g1…63.  
+/g2172/g303…/g2…79=/g1…31/g3427/g2206/g3549/g30…4,/g303…/g2…79/g2206/g3549/g30…4,/g303…/g2…79/g3021/g3431 
+/g2172/g303…/g2…7… The a posteriori  covariance matrix of the Kalman ( a posteriori ) error /g2206/g3549/g30…4,/g303…/g2…7… at sample /g1…63. 
+/g2172/g303…/g2…7…=/g1…31/g3427/g2206/g3549/g30…4,/g303…/g2…7…/g2206/g3549/g30…4,/g303…/g2…7…/g3021/g3431 
+/g2173/g3050,/g303… The covariance matrix of the additive noise  /g2205/g303… in the process /g2206/g303…. 
+/g2173/g3050,/g303…=/g1…31[/g2205/g303…/g2205/g303…/g3021] 
+/g2173/g3049,/g303… The covariance matrix of the additive noise /g2204/g303… in the measured process /g220…/g303…. 
+/g2173/g3049,/g303…=/g1…31[/g2204/g303…/g2204/g303…/g3021] 
+/g1…4…[] Variance operator  
+/g2204/g303… The additive noise in the measured process /g220…/g303… at sample /g1…63. 
+/g2205/g303… The additive noise in the process of interest /g2206/g303… at sample /g1…63. 
+/g2206/g303… The state vector at time sample /g1…63 of the process /g2206/g303…. 
+/g2206/g303…=/g2157/g303…/g2206/g303…/g2…79/g2…69+/g2205/g303… 
+/g2206/g3549/g303…/g2…79 The linear prediction ( a priori ) estimate of the process /g2206/g303… at sample /g1…63. 
+/g2206/g3549/g303…/g2…79=/g2157/g303…/g2206/g3549/g303…/g2…79/g2…69/g2…7… 
+/g2206/g3549/g303…/g2…7… The Kalman filter ( a posteriori ) estimate of the process /g2206/g303… at sample /g1…63. 
+/g2206/g3549/g303…/g2…7…=/g4666/g2165−/g2167/g303…/g2159/g303…/g4667/g2206/g3549/g303…/g2…79+/g2167/g303…/g220…/g303…=/g4666/g2165−/g2167/g303…/g2159/g303…/g4667/g2157/g303…/g2206/g3549/g303…/g2…79/g2…69/g2…7…+/g2167/g303…/g220…/g303… 
+/g2206/g3549/g30…4,/g303…/g2…79 The error in the linear prediction ( a priori ) estimate of the process /g2206/g303…. 
+/g2206/g3549/g30…4,/g303…/g2…79=/g2206/g3549/g303…/g2…79−/g2206/g303… 
+/g2206/g3549/g30…4,/g303…/g2…7… The error in the a posteriori  Kalman filter estimate of the process /g2206/g303…. 
+/g2206/g3549/g30…4,/g303…/g2…7…=/g2206/g3549/g303…/g2…7…−/g2206/g303… 
+/g220…/g303… The measured process at sample /g1…63. 
+/g220…/g303…=/g2159/g303…/g2206/g303…+/g2204/g303… 
+/g2012/g303…,/g3037 The Kronecker delta function. /g2012/g303…,/g3037=1 for  /g1…63=/g1…62 and zero otherwise.  
+ 
+  
+Basic Kalman Filter Theory, 1/2015  
+ 2 Mathematical Lemmas 
+2.1 Lemma 1 
+The trace of the sum of two square matrices /g2157 and /g215… equals the sum of the individual traces.  
+/g1…72/g1…70 /g4666/g2157+/g215…/g4667=/g3533/g1…27/g3036/g3036 +/g1…2…/g3036/g3036 /g3015/g2…79/g2…69
+/g3036/g2……0/g2…6…=/g3533/g1…27/g3036/g3036 /g3015/g2…79/g2…69
+/g3036/g2……0/g2…6…+/g3533/g1…2…/g3036/g3036 /g3015/g2…79/g2…69
+/g3036/g2……0/g2…6…=/g1…72/g1…70 /g4666/g2157/g4667+/g1…72/g1…70 /g4666/g215…/g4667 (1) 
+ 
+2.2 Lemma 2 
+The derivative with respect to /g2157 of the trace of the matrix product /g2159 = /g2157/g215…  equals  /g215…/g3021. 
+/g2034/g466…/g1…72/g1…70/g4666/g2159/g4667 /g4669
+/g2034/g2157=/g2034/g466…/g1…72/g1…70/g4666/g2157/g215…/g4667 /g4669
+/g2034/g2157=
+/g1737/g1736/g1736/g1736/g1736/g1735/g467…/g2034/g1…72/g1…70 /g4666/g2157/g215… /g4667
+/g2034/g1…27/g2…6…,/g2…6…/g4679/g467…/g2034/g1…72/g1…70 /g4666/g2157/g215… /g4667
+/g2034/g1…27/g2…6…,/g2…69/g4679… /g467…/g2034/g1…72/g1…70 /g4666/g2157/g215… /g4667
+/g2034/g1…27/g2…6…,/g3015/g2…79/g2…69/g4679
+/g467…/g2034/g1…72/g1…70/g4666/g2157/g215…/g4667
+/g2034/g1…27/g2…69,/g2…6…/g4679 /g467…/g2034/g1…72/g1…70/g4666/g2157/g215…/g4667
+/g2034/g1…27/g2…69,/g2…69/g4679… /g467…/g2034/g1…72/g1…70/g4666/g2157/g215…/g4667
+/g2034/g1…27/g2…69,/g3015/g2…79/g2…69/g4679
+… … … …
+/g467…/g2034/g1…72/g1…70/g4666/g2157/g215…/g4667
+/g2034/g1…27/g3014/g2…79/g2…69,/g2…6…/g4679/g467…/g2034/g1…72/g1…70/g4666/g2157/g215…/g4667
+/g2034/g1…27/g3014/g2…79/g2…69,/g2…69/g4679… /g467…/g2034/g1…72/g1…70/g4666/g2157/g215…/g4667
+/g2034/g1…27/g3014/g2…79/g2…69,/g3015/g2…79/g2…69/g4679/g1740/g1739/g1739/g1739/g1739/g173…
+ (2) 
+ 
+If the matrix /g2157 has dimensions /g1…39 × /g1…40  and the matrix /g215… has dimensions /g1…40 × /g1…39 , then /g2159 = /g2157/g215…  has 
+dimensions /g1…39 × /g1…39 . 
+The element /g1…29/g3036/g3037  of matrix /g2159 has value: 
+/g1…29/g3036/g3037 =/g3533/g1…27/g3036/g303… /g1…2…/g303…/g3037 /g3015/g2…79/g2…69
+/g303…/g2……0/g2…6…⇒/g1…72/g1…70 /g4666/g2159/g4667=/g1…72/g1…70 /g4666/g2157/g215… /g4667=/g3533/g1…29/g3036/g3036 /g3014/g2…79/g2…69
+/g3036/g2……0/g2…6…=/g3533 /g3533/g1…27/g3036/g303… /g1…2…/g303…/g3036 /g3015/g2…79/g2…69
+/g303…/g2……0/g2…6…/g3014/g2…79/g2…69
+/g3036/g2……0/g2…6… (3) 
+ 
+Substituting equation (3) into equation (2) gives: 
+/g2034/g466…/g1…72/g1…70/g4666/g2157/g215…/g4667 /g4669
+/g2034/g2157=
+/g1737/g1736/g1736/g1736/g1736/g1735/g467…/g2034/uni2211 /uni2211 /g1…27/g3036/g303… /g1…2…/g303…/g3036 /g3015/g2…79/g2…69
+/g303…/g2……0/g2…6…/g3014/g2…79/g2…69
+/g3036/g2……0/g2…6…
+/g2034/g1…27/g2…6…,/g2…6…/g4679/g467…/g2034/uni2211 /uni2211 /g1…27/g3036/g303… /g1…2…/g303…/g3036 /g3015/g2…79/g2…69
+/g303…/g2……0/g2…6…/g3014/g2…79/g2…69
+/g3036/g2……0/g2…6…
+/g2034/g1…27/g2…6…,/g2…69/g4679… /g467…/g2034/uni2211 /uni2211 /g1…27/g3036/g303… /g1…2…/g303…/g3036 /g3015/g2…79/g2…69
+/g303…/g2……0/g2…6…/g3014/g2…79/g2…69
+/g3036/g2……0/g2…6…
+/g2034/g1…27/g2…6…,/g3015/g2…79/g2…69/g4679
+/g467…/g2034/uni2211 /uni2211 /g1…27/g3036/g303… /g1…2…/g303…/g3036 /g3015/g2…79/g2…69
+/g303…/g2……0/g2…6…/g3014/g2…79/g2…69
+/g3036/g2……0/g2…6…
+/g2034/g1…27/g2…69,/g2…6…/g4679 /g467…/g2034/uni2211 /uni2211 /g1…27/g3036/g303… /g1…2…/g303…/g3036 /g3015/g2…79/g2…69
+/g303…/g2……0/g2…6…/g3014/g2…79/g2…69
+/g3036/g2……0/g2…6…
+/g2034/g1…27/g2…69,/g2…69/g4679… /g467…/g2034/uni2211 /uni2211 /g1…27/g3036/g303… /g1…2…/g303…/g3036 /g3015/g2…79/g2…69
+/g303…/g2……0/g2…6…/g3014/g2…79/g2…69
+/g3036/g2……0/g2…6…
+/g2034/g1…27/g2…69,/g3015/g2…79/g2…69/g4679
+… … … …
+/g467…/g2034/uni2211 /uni2211 /g1…27/g3036/g303… /g1…2…/g303…/g3036 /g3015/g2…79/g2…69
+/g303…/g2……0/g2…6…/g3014/g2…79/g2…69
+/g3036/g2……0/g2…6…
+/g2034/g1…27/g3014/g2…79/g2…69,/g2…6…/g4679/g467…/g2034/uni2211 /uni2211 /g1…27/g3036/g303… /g1…2…/g303…/g3036 /g3015/g2…79/g2…69
+/g303…/g2……0/g2…6…/g3014/g2…79/g2…69
+/g3036/g2……0/g2…6…
+/g2034/g1…27/g3014/g2…79/g2…69,/g2…69/g4679… /g467…/g2034/uni2211 /uni2211 /g1…27/g3036/g303… /g1…2…/g303…/g3036 /g3015/g2…79/g2…69
+/g303…/g2……0/g2…6…/g3014/g2…79/g2…69
+/g3036/g2……0/g2…6…
+/g2034/g1…27/g3014/g2…79/g2…69,/g3015/g2…79/g2…69/g4679/g1740/g1739/g1739/g1739/g1739/g173…
+ (4) 
+ 
+  
+Mathematical Lemmas 
+4   Basic Kalman Filter Theory, 9/2015 
+ 
+Freescale Semiconductor, Inc.   By inspection: 
+/g467…/g2034/uni2211 /uni2211 /g1…27/g3036/g303… /g1…2…/g303…/g3036 /g3015/g2…79/g2…69
+/g303…/g2……0/g2…6…/g3014/g2…79/g2…69
+/g3036/g2……0/g2…6…
+/g2034/g1…27/g3039/g3040 /g4679=/g1…2…/g3040/g3039  (5) 
+ 
+Substituting equation (5) into equation (4) gives t he required proof: 
+/g2034/g466…/g1…72/g1…70 /g4666/g2157/g215… /g4667/g4669
+/g2034/g2157=/g343…/g1…2…/g2…6…,/g2…6… /g1…2…/g2…69,/g2…6… … /g1…2…/g3015/g2…79/g2…69,/g2…6…
+/g1…2…/g2…6…,/g2…69 /g1…2…/g2…69,/g2…69 … /g1…2…/g3015/g2…79/g2…69,/g2…69
+… … … …
+/g1…2…/g2…6…,/g3014/g2…79/g2…69/g1…2…/g2…69,/g3014/g2…79/g2…69… /g1…2…/g3015/g2…79/g2…69,/g3014/g2…79/g2…69/g3442= /g215…/g3021 (6) 
+ 
+2.3 Lemma 3 
+The derivative with respect to /g2157 of the trace of the matrix product /g2157/g215…/g2157/g3021 equals /g2157/g4666/g215… + /g215…/g3021/g4667. 
+/g2034/g466…/g1…72/g1…70/g4666/g2157/g215…/g2157/g3021/g4667/g4669
+/g2034/g2157=
+/g1737/g1736/g1736/g1736/g1736/g1735/g467…/g2034/g1…72/g1…70 /g4666/g2157/g215… /g2157/g3021/g4667
+/g2034/g1…27/g2…6…,/g2…6…/g4679/g467…/g2034/g1…72/g1…70 /g4666/g2157/g215… /g2157/g3021/g4667
+/g2034/g1…27/g2…6…,/g2…69/g4679… /g467…/g2034/g1…72/g1…70 /g4666/g2157/g215… /g2157/g3021/g4667
+/g2034/g1…27/g2…6…,/g3015/g2…79/g2…69/g4679
+/g467…/g2034/g1…72/g1…70/g4666/g2157/g215…/g2157/g3021/g4667
+/g2034/g1…27/g2…69,/g2…6…/g4679 /g467…/g2034/g1…72/g1…70/g4666/g2157/g215…/g2157/g3021/g4667
+/g2034/g1…27/g2…69,/g2…69/g4679… /g467…/g2034/g1…72/g1…70/g4666/g2157/g215…/g2157/g3021/g4667
+/g2034/g1…27/g2…69,/g3015/g2…79/g2…69/g4679
+… … … …
+/g467…/g2034/g1…72/g1…70/g4666/g2157/g215…/g2157/g3021/g4667
+/g2034/g1…27/g3014/g2…79/g2…69,/g2…6…/g4679/g467…/g2034/g1…72/g1…70/g4666/g2157/g215…/g2157/g3021/g4667
+/g2034/g1…27/g3014/g2…79/g2…69,/g2…69/g4679… /g467…/g2034/g1…72/g1…70/g4666/g2157/g215…/g2157/g3021/g4667
+/g2034/g1…27/g3014/g2…79/g2…69,/g3015/g2…79/g2…69/g4679/g1740/g1739/g1739/g1739/g1739/g173…
+ (7) 
+ 
+If the matrix /g2157 has dimensions /g1…39 × /g1…40 , then the matrix /g215… must be square with dimensions /g1…40 × /g1…40  in order 
+for the product /g2157/g215…/g2157/g3021 to exist. The product /g2157/g215…/g2157/g3021 is always square with dimensions /g1…39 × /g1…39 . 
+The element /g1…29/g3036/g3037  of the matrix /g2159 = /g2157/g215…  has value: 
+/g1…29/g3036/g3037 =/g3533/g1…27/g3036/g303… /g1…2…/g303…/g3037 /g3015/g2…79/g2…69
+/g303…/g2……0/g2…6… (8) 
+ 
+The element /g1…30/g3036/g3039  of matrix /g2160 = /g2157/g215…/g2157/g3021= /g2159/g2157/g3021 has value: 
+/g1…30/g3036/g3039 =/g3533/g1…29/g3036/g3037 /g1…27/g3039/g3037 /g3015/g2…79/g2…69
+/g3037/g2……0/g2…6…=/g3533 /g3533/g1…27/g3036/g303… /g1…2…/g303…/g3037 /g1…27/g3039/g3037 /g3015/g2…79/g2…69
+/g303…/g2……0/g2…6…/g3015/g2…79/g2…69
+/g3037/g2……0/g2…6… (9) 
+ 
+The trace of matrix /g2160 then equals: 
+  
+Basic Kalman Filter Theory, 1/2015  
+ /g1…72/g1…70 /g4666/g2160/g4667=/g3533/g1…30/g3036/g3036 /g3015/g2…79/g2…69
+/g3036/g2……0/g2…6…=/g3533 /g3533 /g3533/g1…27/g3036/g303… /g1…2…/g303…/g3037 /g1…27/g3036/g3037 /g3015/g2…79/g2…69
+/g303…/g2……0/g2…6…/g3015/g2…79/g2…69
+/g3037/g2……0/g2…6…/g3015/g2…79/g2…69
+/g3036/g2……0/g2…6… (10) 
+ 
+The derivative of /g1…72/g1…70 /g4666/g2160/g4667 with respect to /g1…27/g3039/g3040  is: 
+/g467…/g2034/g1…72/g1…70 /g4666/g2160/g4667
+/g2034/g1…27/g3039/g3040 /g4679=/g467…/g2034/uni2211 /uni2211 /uni2211 /g1…27/g3036/g303… /g1…2…/g303…/g3037 /g1…27/g3036/g3037 /g3015/g2…79/g2…69
+/g303…/g2……0/g2…6…/g3015/g2…79/g2…69
+/g3037/g2……0/g2…6…/g3015/g2…79/g2…69
+/g3036/g2……0/g2…6…
+/g2034/g1…27/g3039/g3040 /g4679=/g467…/g2034/uni2211 /uni2211 /g1…27/g3039/g303… /g1…2…/g303…/g3037 /g1…27/g3039/g3037 /g3015/g2…79/g2…69
+/g303…/g2……0/g2…6…/g3015/g2…79/g2…69
+/g3037/g2……0/g2…6…
+/g2034/g1…27/g3039/g3040 /g4679 (11) 
+=/g3533/g1…27/g3039/g3037 /g1…2…/g3040/g3037 /g3015/g2…79/g2…69
+/g3037/g2……0/g2…6…+/g3533/g1…27/g3039/g3037 /g1…2…/g3037/g3040 /g3015/g2…79/g2…69
+/g3037/g2……0/g2…6…=/g4666/g2157/g215…/g3021/g4667/g3039/g3040 +/g4666/g2157/g215… /g4667/g3039/g3040  (12) 
+⇒/g2034/g466…/g1…72/g1…70 /g4666/g2157/g215… /g2157/g3021/g4667/g4669
+/g2034/g2157=/g2157/g4666/g215…+/g215…/g3021/g4667 (13) 
+ 
+If /g215… is also symmetric, then: 
+/g2034/g466…/g1…72/g1…70 /g4666/g2157/g215… /g2157/g3021/g4667/g4669
+/g2034/g2157=2/g2157/g215…  /g1…61/g1…5…  /g215…=/g215…/g3021 (14) 
+ 
+3 Kalman Filter Derivation 
+3.1 Process Model 
+The Kalman filter models the vector process of inte rest /g2206/g303… with the linear and recursive model: 
+/g2206/g303…=/g2157/g303…/g2206/g303…/g2…79/g2…69+/g2205/g303… (15) 
+ 
+If  /g2206/g303… has /g1…40 degrees of freedom, then /g2157/g303… is an /g1…40 × /g1…40  linear prediction matrix (possibly time varying bu t 
+assumed known) and /g2205/g303… is an /g1…40 × 1  zero mean white noise vector. 
+The process /g2206/g303… is assumed to be not directly measurable and must be estimated from a process /g220…/g303…, 
+which can be measured. /g220…/g303… is modeled as being linearly related to /g2206/g303… with additive zero mean white 
+noise /g2204/g303…. 
+/g220…/g303…=/g2159/g303…/g2206/g303…+/g2204/g303… (16) 
+ 
+/g220…/g303… is an /g1…39 × 1  vector, /g2159/g303… is an /g1…39 × /g1…40  matrix (possibly time varying but assumed known) a nd /g2204/g303… is an 
+/g1…39 × 1  noise vector. 
+Since the noise vectors /g2205/g303… and /g2204/g303… are zero-mean white noise processes their expectat ion vector is 
+zero and their covariance matrices are uncorrelated  at different times /g1…62 and /g1…63: 
+Kalman Filter Derivation 
+6   Basic Kalman Filter Theory, 9/2015 
+ 
+Freescale Semiconductor, Inc.   /g1…31[/g2205/g303…]=/g2777 (17) 
+/g1…31[/g2204/g303…]=/g2777 (18) 
+/g1…55/g1…67/g1…74 /g466…/g2205/g303…,/g2205/g3037/g4669=/g1…31/g3427/g2205/g303…/g2205/g3037/g3021/g3431=/g2173/g3050,/g303…/g2012/g303…/g3037  (19) 
+/g1…55/g1…67/g1…74 /g466…/g2204/g303…,/g2204/g3037/g4669=/g1…31/g3427/g2204/g303…/g2204/g3037/g3021/g3431=/g2173/g3049,/g303…/g2012/g303…/g3037  (20) 
+ 
+Covariance matrices are, by definition, symmetric b ut not necessarily diagonal: 
+/g2173/g3050,/g303…/g3021=/g466…/g1…31[/g2205/g303…/g2205/g303…/g3021]/g4669/g3021=/g1…31[/g4666/g2205/g303…/g2205/g303…/g3021/g4667/g3021]=/g1…31/g3427/g2205/g303…/g2205/g3037/g3021/g3431=/g2173/g3050,/g303… (21) 
+The covariance matrices /g2173/g3050,/g303… and /g2173/g3049,/g303… need not be stationary and can, and generally will,  vary with 
+time. 
+3.2 Derivation 
+The objective of the Kalman filter is to compute an  unbiased a posterori  estimate /g2206/g3549/g303…/g2…7… of the underlying 
+process /g2206/g303… from i) extrapolation from the previous iteration' s a posteriori  estimate /g2206/g3549/g303…/g2…79/g2…69/g2…7… and ii) from the 
+current measurement /g220…/g303…: 
+/g2206/g3549/g303…/g2…7…=/g2167/g303…/g4593/g2206/g3549/g303…/g2…79/g2…69/g2…7…+/g2167/g303…/g220…/g303… (22) 
+ 
+The time-varying Kalman gain matrices /g2167/g303…/g4593 and /g2167/g303… define the relative weightings given to the previou s 
+iteration’s Kalman filter estimate /g2167/g303… and to the current measurement /g220…/g303…. If the measurements /g220…/g303… have 
+low noise then the measurement term /g2167/g303…/g220…/g303… will have a higher weighting compared to the extrap olated 
+component /g2167/g303…/g4593/g2206/g3549/g303…/g2…79/g2…69/g2…7… and vice versa. The Kalman filter is, therefore, a time varying, recursive filter. 
+Unbiased estimate constraint (determines /g2167/g2193/g4593) 
+For /g2206/g3549/g303…/g2…7… to be an unbiased estimate of /g2206/g303…, the expectation value of the a posteriori  Kalman filter error 
+/g2206/g3549/g30…4,/g303…/g2…7… must be zero: 
+/g1…31/g3427/g2206/g3549/g30…4,/g303…/g2…7…/g3431=/g1…31[/g2206/g3549/g303…/g2…7…−/g2206/g303…]=/g2777 (23) 
+ 
+Subtracting /g2206/g303… from equation (22) gives: 
+/g2206/g3549/g30…4,/g303…/g2…7…=/g2206/g3549/g303…/g2…7…−/g2206/g303…=/g2167/g303…/g4593/g2206/g3549/g303…/g2…79/g2…69/g2…7…+/g2167/g303…/g220…/g303…−/g2206/g303… (24) 
+ 
+Substituting equation (16) for the measurement /g220…/g303… gives: 
+/g2206/g3549/g30…4,/g303…/g2…7…=/g2167/g303…/g4593/g2206/g3549/g303…/g2…79/g2…69/g2…7…+/g2167/g303…/g4666/g2159/g303…/g2206/g303…+/g2204/g303…/g4667−/g2206/g303… (25) 
+ 
+Substituting for /g2206/g303… from equation (15) and re-arranging gives: 
+  
+Basic Kalman Filter Theory, 1/2015  
+ /g2206/g3549/g30…4,/g303…/g2…7…=/g2167/g303…/g4593/g3435/g2206/g3549/g30…4,/g303…/g2…79/g2…69/g2…7…+/g2206/g303…/g2…79/g2…69/g3439+/g2167/g303…/g466…/g2159/g303…/g4666/g2157/g303…/g2206/g303…/g2…79/g2…69+/g2205/g303…/g4667+/g2204/g303…/g4669−/g4666/g2157/g303…/g2206/g303…/g2…79/g2…69+/g2205/g303…/g4667 (26) 
+=/g2167/g303…/g4593/g2206/g3549/g30…4,/g303…/g2…79/g2…69/g2…7…+/g4666/g2167/g303…/g2159/g303…/g2157/g303…−/g2157/g303…+/g2167/g303…/g4593/g4667/g2206/g303…/g2…79/g2…69+/g4666/g2167/g303…/g2159/g303…−/g2165/g4667/g2205/g303…+/g2167/g303…/g2204/g303… (27) 
+ 
+Taking the expected value of equation (27) and appl ying the unbiased estimate constraint gives: 
+/g1…31/g3427/g2206/g3549/g30…4,/g303…/g2…7…/g3431=/g1…31/g3427/g2167/g303…/g4593/g2206/g3549/g30…4,/g303…/g2…79/g2…69/g2…7…/g3431+/g1…31[/g4666/g2167/g303…/g2159/g303…/g2157/g303…−/g2157/g303…+/g2167/g303…/g4593/g4667/g2206/g303…/g2…79/g2…69]+/g1…31[/g4666/g2167/g303…/g2159/g303…−/g2165/g4667/g2205/g303…]+/g1…31[/g2167/g303…/g2204/g303…]=/g2777 (28) 
+ 
+Because the noise vectors /g2205/g303… and /g2204/g303… are zero mean and uncorrelated with the Kalman mat rices for the 
+same iteration, it follows that: 
+/g1…31[/g4666/g2167/g303…/g2159/g303…−/g2165/g4667/g2205/g303…]=/g1…31[/g2167/g303…/g2204/g303…]=/g2777 (29) 
+ 
+With the additional assumption that the process /g2206/g303…/g2…79/g2…69 is independent of slowly varying matrices Ak, Ck, Kk 
+and K’ k at iteration /g1…63: 
+/g1…31[/g4666/g2167/g303…/g2159/g303…/g2157/g303…−/g2157/g303…+/g2167/g303…/g4593/g4667/g2206/g303…/g2…79/g2…69]=/g4666/g2167/g303…/g2159/g303…/g2157/g303…−/g2157/g303…+/g2167/g303…/g4593/g4667/g1…31[/g2206/g303…/g2…79/g2…69]=/g2777 (30) 
+ 
+Because /g2206/g303… is not, in general, a zero-mean process: 
+/g2167/g303…/g2159/g303…/g2157/g303…−/g2157/g303…+/g2167/g303…/g4593=/g2777⇒/g2167/g303…/g4593=/g2157/g303…−/g2167/g303…/g2159/g303…/g2157/g303…=/g4666/g2165−/g2167/g303…/g2159/g303…/g4667/g2157/g303… (31) 
+ 
+Substituting for /g2167/g303…/g4593 in equation (22) gives: 
+/g2206/g3549/g303…/g2…7…=/g4666/g2165−/g2167/g303…/g2159/g303…/g4667/g2157/g303…/g2206/g3549/g303…/g2…79/g2…69/g2…7…+/g2167/g303…/g220…/g303… (32) 
+A priori  estimate 
+The a priori  Kalman filter estimate /g2206/g3549/g303…/g2…79 is the result of applying the linear prediction mat rix /g2157/g303… to the 
+previous iteration's a posteriori  estimate /g2206/g3549/g303…/g2…79/g2…69/g2…7…: 
+ /g2206/g3549/g303…/g2…79=/g2157/g303…/g2206/g3549/g303…/g2…79/g2…69/g2…7… Kalman  equation  1 (33) 
+ 
+Definition of a posteriori  estimate 
+Substituting the a priori  estimate /g2206/g3549/g303…/g2…79 from equation (33) into equation (32) gives: 
+ /g2206/g3549/g303…/g2…7…=/g4666/g2165−/g2167/g303…/g2159/g303…/g4667/g2206/g3549/g303…/g2…79+/g2167/g303…/g220…/g303… Kalman  equation  4 (34) 
+ 
+An equivalent form is: 
+/g2206/g3549/g303…/g2…7…=/g2206/g3549/g303…/g2…79+/g2167/g303…/g4666/g220…/g303…−/g2159/g303…/g2206/g3549/g303…/g2…79/g4667 (35) 
+Kalman Filter Derivation 
+8   Basic Kalman Filter Theory, 9/2015 
+ 
+Freescale Semiconductor, Inc.   From equation (16), the term /g2159/g303…/g2206/g3549/g303…/g2…79 can  be interpreted as the a priori  estimate /g220…/g354…/g303…/g2…79 of the measurement  
+/g220…/g303… giving another form of equation (35): 
+ 
+/g2206/g3549/g303…/g2…7…=/g2206/g3549/g303…/g2…79+/g2167/g303…/g4666/g220…/g303…−/g220…/g354…/g303…/g2…79/g4667 (36) 
+ 
+/g2172/g2193/g2…79 as a function of /g2172/g2193/g2…79/g277…/g2…7… 
+The a priori and  a posteriori error covariance matrices /g2172/g303…/g2…79 and /g2172/g303…/g2…7… are defined as: 
+/g2172/g303…/g2…79=/g1…55/g1…67/g1…74 /g466…/g2206/g3549/g30…4,/g303…/g2…79,/g2206/g3549/g30…4,/g303…/g2…79/g4669=/g1…31/g3427/g2206/g3549/g30…4,/g303…/g2…79/g2206/g3549/g30…4,/g303…/g2…79/g3021/g3431=/g1…31[/g4666/g2206/g3549/g303…/g2…79−/g2206/g303…/g4667/g4666/g2206/g3549/g303…/g2…79−/g2206/g303…/g4667/g3021] (37) 
+/g2172/g303…/g2…7…=/g1…55/g1…67/g1…74 /g466…/g2206/g3549/g30…4,/g303…/g2…7…,/g2206/g3549/g30…4,/g303…/g2…7…/g4669=/g1…31/g4674/g2206/g3549/g30…4,/g303…/g2…7…/g2206/g3549/g30…4,/g303…/g2…7…/g3021/g4675=/g1…31[/g4666/g2206/g3549/g303…/g2…7…−/g2206/g303…/g4667/g4666/g2206/g3549/g303…/g2…7…−/g2206/g303…/g4667/g3021] (38) 
+ 
+Substituting the definitions of /g2206/g3549/g303…/g2…79 and /g2206/g303… into equation (37) gives an expression relating the  current a 
+priori error covariance /g2172/g303…/g2…79 to the previous iteration's a posteriori error cov ariance estimate /g2172/g303…/g2…79/g2…69/g2…7…: 
+/g2172/g303…/g2…79= /g1…31[/g4666/g2157/g303…/g2206/g3549/g303…/g2…79/g2…69/g2…7…−/g2157/g303…/g2206/g303…/g2…79/g2…69−/g2205/g303…/g4667/g4666/g2157/g303…/g2206/g3549/g303…/g2…79/g2…69/g2…7…−/g2157/g303…/g2206/g303…/g2…79/g2…69−/g2205/g303…/g4667/g3021] (38) 
+= /g1…31[/g466…/g2157/g303…/g4666/g2206/g3549/g303…/g2…79/g2…69/g2…7…−/g2206/g303…/g2…79/g2…69/g4667−/g2205/g303…/g4669/g466…/g2157/g303…/g4666/g2206/g3549/g303…/g2…79/g2…69/g2…7…−/g2206/g303…/g2…79/g2…69/g4667−/g2205/g303…/g4669/g3021] (40) 
+= /g2157/g303…/g1…31[/g4666/g2206/g3549/g303…/g2…79/g2…69/g2…7…−/g2206/g303…/g2…79/g2…69/g4667/g4666/g2206/g3549/g303…/g2…79/g2…69/g2…7…−/g2206/g303…/g2…79/g2…69/g4667/g3021]/g2157/g303…/g3021+/g2173/g3050,/g303… (41) 
+ ⇒/g2172/g303…/g2…79=/g2157/g303…/g2172/g303…/g2…79/g2…69/g2…7…/g2157/g303…/g3021+/g2173/g3050,/g303… Kalman Equation 2  (42) 
+ 
+Minimum error covariance constraint (determines /g2167/g2193) 
+The Kalman gain matrix /g2167/g303… minimizes the a posteriori  error /g2206/g3549/g30…4,/g303…/g2…7… variance via the trace of the a posteriori  
+error covariance matrix /g2172/g303…/g2…7…: 
+/g1…31/g4674/g2206/g3549/g30…4,/g303…/g2…7…/g3021/g2206/g3549/g30…4,/g303…/g2…7…/g4675=/g1…72/g1…70 /g4666/g2172/g303…/g2…7…/g4667 (39) 
+ 
+Substituting equation (16) for /g220…/g303… into equation (32) gives a relation between the a posteriori  and a priori  
+errors: 
+/g2206/g3549/g303…/g2…7…=/g2206/g3549/g30…4,/g303…/g2…7…+/g2206/g303…=/g4666/g2165−/g2167/g303…/g2159/g303…/g4667/g3435/g2206/g3549/g30…4,/g303…/g2…79+/g2206/g303…/g3439+/g2167/g303…/g4666/g2159/g303…/g2206/g303…+/g2204/g303…/g4667 (40) 
+⇒/g2206/g3549/g30…4,/g303…/g2…7…+/g2206/g303…=/g4666/g2165−/g2167/g303…/g2159/g303…/g4667/g2206/g3549/g30…4,/g303…/g2…79+/g2206/g303…−/g2167/g303…/g2159/g303…/g2206/g303…+/g2167/g303…/g4666/g2159/g303…/g2206/g303…+/g2204/g303…/g4667 (45) 
+⇒/g2206/g3549/g30…4,/g303…/g2…7…=/g4666/g2165−/g2167/g303…/g2159/g303…/g4667/g2206/g3549/g30…4,/g303…/g2…79+/g2167/g303…/g2204/g303… (46) 
+ 
+Substituting this result into the definition of the  a posteriori  covariance matrix /g2172/g303…/g2…7… in equation (38) gives: 
+  
+Basic Kalman Filter Theory, 1/2015  
+ /g2172/g303…/g2…7…=/g1…31/g4674/g3419/g4666/g2165−/g2167/g303…/g2159/g303…/g4667/g2206/g3549/g30…4,/g303…/g2…79+/g2167/g303…/g2204/g303…/g3423/g3419/g4666/g2165−/g2167/g303…/g2159/g303…/g4667/g2206/g3549/g30…4,/g303…/g2…79+/g2167/g303…/g2204/g303…/g3423/g3021/g4675 (47) 
+=/g4666/g2165−/g2167/g303…/g2159/g303…/g4667/g1…31/g3427/g2206/g3549/g30…4,/g303…/g2…79/g2206/g3549/g30…4,/g303…/g2…79/g3021/g3431/g4666/g2165−/g2167/g303…/g2159/g303…/g4667/g3021+/g2167/g303…/g1…31[/g2204/g303…/g2204/g303…/g3021]/g2167/g303…/g3021 (48) 
+=/g4666/g2165−/g2167/g303…/g2159/g303…/g4667/g2172/g303…/g2…79/g4666/g2165−/g2167/g303…/g2159/g303…/g4667/g3021+/g2167/g303…/g2173/g3049,/g303…/g2167/g303…/g3021 (49) 
+=/g2172/g303…/g2…79−/g2172/g303…/g2…79/g2159/g303…/g3021/g2167/g303…/g3021−/g2167/g303…/g2159/g303…/g2172/g303…/g2…79+/g2167/g303…/g2159/g303…/g2172/g303…/g2…79/g2159/g303…/g3021/g2167/g303…/g3021+/g2167/g303…/g2173/g3049,/g303…/g2167/g303…/g3021 (50) 
+ 
+The Kalman filter gain /g2167/g303… is that which minimizes the trace of the a posteriori  error covariance matrix /g2172/g303…/g2…7… 
+as in equation (43): 
+/g2034
+/g2034/g2167/g303…/g1…72/g1…70 /g4666/g2172/g303…/g2…7…/g4667=/g2034
+/g2034/g2167/g303…/g3419/g1…72/g1…70 /g4666/g2172/g303…/g2…79/g4667−/g1…72/g1…70 /g3435/g2172/g303…/g2…79/g2159/g303…/g3021/g2167/g303…/g3021/g3439−/g1…72/g1…70 /g4666/g2167/g303…/g2159/g303…/g2172/g303…/g2…79/g4667+/g1…72/g1…70 /g3435/g2167/g303…/g2159/g303…/g2172/g303…/g2…79/g2159/g303…/g3021/g2167/g303…/g3021/g3439+/g1…72/g1…70 /g3435/g2167/g303…/g2173/g3049,/g303…/g2167/g303…/g3021/g3439/g3423=0 (51) 
+ 
+The first term /g1…72/g1…70 /g4666/g2172/g303…/g2…79/g4667 has no dependence on /g2167/g303… giving: 
+/g2034/g466…/g1…72/g1…70 /g4666/g2172/g303…/g2…79/g4667/g4669
+/g2034/g2167/g303…=/g2034/g3419/g1…72/g1…70 /g4666/g2157/g303…/g2172/g303…/g2…79/g2…69/g2…7…/g2157/g303…/g3021+/g2173/g3050,/g303…/g4667/g3423
+/g2034/g2167/g303…=0 (52) 
+ 
+Because a matrix trace is obviously unaffected by t ransposition, the second term of equation (51) can 
+be transposed and simplified using equation (6) to give: 
+/g2034/g3419/g1…72/g1…70 /g4666/g2172/g303…/g2…79/g2159/g303…/g3021/g2167/g303…/g3021/g4667/g3423
+/g2034/g2167/g303…=/g2034/g466…/g1…72/g1…70 /g4666/g2167/g303…/g2159/g303…/g2172/g303…/g2…79/g4667/g4669
+/g2034/g2167/g303…=/g4666/g2159/g303…/g2172/g303…/g2…79/g4667/g3021=/g2172/g303…/g2…79/g2159/g303…/g3021 (53) 
+ 
+The fourth term can be simplified using equations ( 13) and (14) exploiting the fact that the covarianc e 
+matrix /g2172/g303…/g2…79 is symmetric: 
+/g2034/g3419/g1…72/g1…70 /g4666/g2167/g303…/g2159/g303…/g2172/g303…/g2…79/g2159/g303…/g3021/g2167/g303…/g3021/g4667/g3423
+/g2034/g2167/g303…=/g2167/g303…/g4676/g2159/g303…/g2172/g303…/g2…79/g2159/g303…/g3021+/g3435/g2159/g303…/g2172/g303…/g2…79/g2159/g303…/g3021/g3439/g3021/g4677=2/g2167/g303…/g2159/g303…/g2172/g303…/g2…79/g2159/g303…/g3021 (54) 
+ 
+The final term can be simplified also using equatio ns (13) and (14) and the symmetry of /g2173/g3049,/g303… to give: 
+/g2034/g3419/g1…72/g1…70 /g4666/g2167/g303…/g2173/g3049,/g303…/g2167/g303…/g3021/g4667/g3423
+/g2034/g2167/g303…=2/g2167/g303…/g2173/g3049,/g303… (55) 
+ 
+Substituting equations (52) to (55) back into equat ion (51) gives an expression for the optimal Kalman  
+filter gain matrix /g2167/g303…: 
+−2/g2172/g303…/g2…79/g2159/g303…/g3021+2/g2167/g303…/g2159/g303…/g2172/g303…/g2…79/g2159/g303…/g3021+2/g2167/g303…/g2173/g3049,/g303…=/g2777 (56) 
+Kalman Filter Derivation 
+10    Basic Kalman Filter Theory, 9/2015 
+ 
+Freescale Semiconductor, Inc.   ⇒/g2167/g303…/g3435/g2159/g303…/g2172/g303…/g2…79/g2159/g303…/g3021+/g2173/g3049,/g303…/g3439=/g2172/g303…/g2…79/g2159/g303…/g3021 (57) 
+ ⇒/g2167/g303…=/g2172/g303…/g2…79/g2159/g303…/g3021/g3435/g2159/g303…/g2172/g303…/g2…79/g2159/g303…/g3021+/g2173/g3049,/g303…/g3439/g2…79/g2…69 Kalman equation 3  (58) 
+ 
+/g2172/g2193/g2…7… as a function of /g2172/g2193/g2…79 
+Rearranging equation (57) gives: 
+/g2167/g303…/g2173/g3049,/g303…=/g2172/g303…/g2…79/g2159/g303…/g3021−/g2167/g303…/g2159/g303…/g2172/g303…/g2…79/g2159/g303…/g3021 (59) 
+ 
+Substituting /g2167/g303…/g2173/g3049,/g303… from equation (61) into equation (51) gives: 
+/g2172/g303…/g2…7…=/g4666/g2165−/g2167/g303…/g2159/g303…/g4667/g2172/g303…/g2…79/g3435/g2165−/g2159/g303…/g3021/g2167/g303…/g3021/g3439+/g4666/g2165−/g2167/g303…/g2159/g303…/g4667/g2172/g303…/g2…79/g2159/g303…/g3021/g2167/g303…/g3021 (60) 
+/g2172/g303…/g2…7…=/g4666/g2172/g303…/g2…79−/g2167/g303…/g2159/g303…/g2172/g303…/g2…79/g4667/g3435/g2165−/g2159/g303…/g3021/g2167/g303…/g3021/g3439+/g4666/g2165/g2172/g303…/g2…79−/g2167/g303…/g2159/g303…/g2172/g303…/g2…79/g4667/g2159/g303…/g3021/g2167/g303…/g3021  
+/g2172/g303…/g2…7…=/g2172/g303…/g2…79−/g2167/g303…/g2159/g303…/g2172/g303…/g2…79−/g2172/g303…/g2…79/g2159/g303…/g3021/g2167/g303…/g3021+/g2167/g303…/g2159/g303…/g2172/g303…/g2…79/g2159/g303…/g3021/g2167/g303…/g3021+/g2172/g303…/g2…79/g2159/g303…/g3021/g2167/g303…/g3021−/g2167/g303…/g2159/g303…/g2172/g303…/g2…79/g2159/g303…/g3021/g2167/g303…/g3021  
+/g2172/g303…/g2…7…=/g2172/g303…/g2…79−/g2167/g303…/g2159/g303…/g2172/g303…/g2…79  
+ ⇒/g2172/g303…/g2…7…=/g4666/g2165−/g2167/g303…/g2159/g303…/g4667/g2172/g303…/g2…79 Kalman equation 5  (61) 
+ 
+This completes the derivation of the standard Kalma n filter equations. 
+3.3 Standard Kalman Equations 
+Kalman equation 1 
+The linear prediction ( a priori ) estimate /g2206/g3549/g303…/g2…79is made by applying the linear prediction matrix /g2157/g303… to the 
+previous sample’s Kalman ( a posteriori ) filter estimate /g2206/g3549/g303…/g2…79/g2…69/g2…7…. 
+/g2206/g3549/g303…/g2…79=/g2157/g303…/g2206/g3549/g303…/g2…79/g2…69/g2…7… (33) 
+ 
+Kalman equation 2 
+The a priori  (linear extrapolation) error covariance matrix /g2172/g303…/g2…79 is then updated using the model matrix /g2157/g303… 
+and the noise matrix /g2173/g3050,/g303…. 
+/g2172/g303…/g2…79= /g2157/g303…/g2172/g303…/g2…79/g2…69/g2…7…/g2157/g303…/g3021+/g2173/g3050,/g303… (42) 
+ 
+Kalman equations 2 and 5 can be combined to give a recursive update of /g2172/g303…/g2…79 without explicit calculation 
+of the a posteriori  error covariance matrix /g2172/g303…/g2…7… in Kalman equation 5: 
+  
+Basic Kalman Filter Theory, 1/2015  
+ /g2172/g303…/g2…79= /g2157/g303…/g4666/g2165−/g2167/g303…/g2…79/g2…69/g2159/g303…/g2…79/g2…69/g4667/g2172/g303…/g2…79/g2…69/g2…79/g2157/g303…/g3021+/g2173/g3050,/g303… (62) 
+The only purpose of /g2172/g303…/g2…79 is to permit the calculation of the Kalman gain ma trix /g2167/g303… for the determination 
+of the a posteriori estimate /g2206/g3549/g303…/g2…7…. 
+Kalman equation 3 
+The Kalman filter gain matrix /g2167/g303… is updated: 
+/g2167/g303…=/g2172/g303…/g2…79/g2159/g303…/g3021/g3435/g2159/g303…/g2172/g303…/g2…79/g2159/g303…/g3021+/g2173/g3049,/g303…/g3439/g2…79/g2…69 (58) 
+ 
+Kalman equation 4 
+The Kalman filter ( a posteriori ) estimate /g2206/g3549/g303…/g2…7… is computed from the current a priori  estimate /g2206/g3549/g303…/g2…79 and the 
+current measurement /g220…/g303….   
+/g2206/g3549/g303…/g2…7…=/g2206/g3549/g303…/g2…79+/g2167/g303…/g4666/g220…/g303…−/g2159/g303…/g2206/g3549/g303…/g2…79/g4667=/g4666/g2165−/g2167/g303…/g2159/g303…/g4667/g2206/g3549/g303…/g2…79+/g2167/g303…/g220…/g303… (34) 
+ 
+Kalman equation 5 
+The a posteriori  Kalman error covariance matrix /g2172/g303…/g2…7… is updated and ready for the next iteration. This 
+equation can be skipped if /g2172/g303…/g2…79 is updated recursively in terms of itself as in eq uation (62). 
+/g2172/g303…/g2…7…=/g4666/g2165−/g2167/g303…/g2159/g303…/g4667/g2172/g303…/g2…79 (61) 
+3.4 Limiting Cases 
+From (59), we can see that as the measurement noise  covariance /g2173/g3049,/g303… decreases relative to the 
+process noise covariance /g2173/g3050,/g303…, the Kalman gain matrix /g2167/g303… then satisfies: 
+ 
+/g2167/g303…/g2159/g303…/g2172/g303…/g2…79/g2159/g303…/g3021=/g2172/g303…/g2…79/g2159/g303…/g3021⇒/g2167/g303…/g2159/g303…=/g2165 (63) 
+  
+Using (34), we see that the a posteriori process es timate /g2206/g3549/g303…/g2…7… is then only dependent on the 
+measurement /g220…/g303…: 
+/g2206/g3549/g303…/g2…7…=/g4666/g2165−/g2167/g303…/g2159/g303…/g4667/g2206/g3549/g303…/g2…79+/g2167/g303…/g220…/g303…=/g2167/g303…/g220…/g303… (64) 
+ 
+From (59), we can see that as the measurement noise  covariance /g2173/g3049,/g303… increases relative to the 
+process noise covariance /g2173/g3050,/g303…, the Kalman gain matrix /g2167/g303… approaches zero: 
+ 
+/g2167/g303…=/g2172/g303…/g2…79/g2159/g303…/g3021/g3435/g2173/g3049,/g303…/g3439/g2…79/g2…69=/g2777 (65) 
+ 
+Kalman Filter Derivation 
+12    Basic Kalman Filter Theory, 9/2015 
+ 
+Freescale Semiconductor, Inc.   Using (34), the a posteriori process estimate /g2206/g3549/g303…/g2…7… then approximates the a priori estimate /g2206/g3549/g303…/g2…79: 
+ 
+/g2206/g3549/g303…/g2…7…=/g2206/g3549/g303…/g2…79+/g2167/g303…/g4666/g220…/g303…−/g2159/g303…/g2206/g3549/g303…/g2…79/g4667=/g2206/g3549/g303…/g2…79 (66) 
+ 
+Basic Kalman Filter Theory, 1/2015  
+  
+How to Reach Us: 
+Home Page: 
+freescale.com 
+Web Support: 
+freescale.com/support Information in this document is provided solely to enable system and 
+software implementers to use Freescale products. Th ere are no 
+express or implied copyright licenses granted hereu nder to design or 
+fabricate any integrated circuits based on the info rmation in this 
+document. Freescale reserves the right to make chan ges without 
+further notice to any products herein. 
+Freescale makes no warranty, representation, or gua rantee regarding 
+the suitability of its products for any particular purpose, nor does 
+Freescale assume any liability arising out of the a pplication or use of 
+any product or circuit, and specifically disclaims any and all liability, 
+including without limitation consequential or incid ental damages. 
+“Typical” parameters that may be provided in Freesc ale data sheets 
+and/or specifications can and do vary in different applications, and 
+actual performance may vary over time. All operatin g parameters, 
+including “typicals,” must be validated for each cu stomer application 
+by customer's technical experts. Freescale does not  convey any 
+license under its patent rights nor the rights of o thers. Freescale sells 
+products pursuant to standard terms and conditions of sale, which can 
+be found at the following address: 
+freescale.com/SalesTermsandConditions. 
+Freescale and the Freescale logo, are trademarks of  Freescale 
+Semiconductor, Inc., Reg. U.S. Pat. & Tm. Off. All other product or 
+service names are the property of their respective owners. 
+© 2015 Freescale Semiconductor, Inc. 
+ 

@@ -1,6 +1,6 @@
 # Synthetic IMU Datasets
 
-**Generated:** 2025-10-13 22:02:23
+**Generated:** 2025-10-13 21:08:03
 **Sensor:** MPU9250 (Accel + Gyro) + AK8963 (Magnetometer)
 **Sample Rate:** 100.0 Hz
 
