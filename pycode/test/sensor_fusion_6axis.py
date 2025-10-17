@@ -523,6 +523,40 @@ class SensorFusion6Axis:
             print(f"Qw[1][2]:")
             print(self.proc_noise_var[1, 2])
 
+        # Adaptive R matrix: Detect high linear acceleration and increase measurement noise
+        # Compute acceleration magnitude
+        accel_mps2 = self.acc_data.count_buff[SF_OVERSAMPLE_RATIO - 1] * self.acc_data.scale_factor * GTOMSEC2
+        accel_mag = np.linalg.norm(accel_mps2)
+
+        # Expected gravity magnitude
+        expected_gravity = GTOMSEC2
+
+        # Deviation from expected gravity (indicates linear acceleration)
+        accel_deviation = abs(accel_mag - expected_gravity)
+
+        # Adaptive R: increase measurement noise when deviation is high
+        # Base R value
+        R_base = self.meas_noise_var_acc
+
+        # Scale factor: 1.0 for small deviation, higher for large deviation
+        # Threshold: 2.0 m/s² deviation triggers increased R
+        if accel_deviation > 2.0:
+            # Linear scaling: R increases by factor of 10 for every 5 m/s² deviation
+            R_scale = 1.0 + (accel_deviation - 2.0) * 2.0
+        else:
+            R_scale = 1.0
+
+        # Clamp scale to reasonable range [1.0, 100.0]
+        R_scale = min(100.0, max(1.0, R_scale))
+
+        # Adaptive R value
+        R_adaptive = R_base * R_scale
+
+        if debug or accel_deviation > 2.0:
+            print(f"\n[ADAPTIVE R] Accel mag: {accel_mag:.2f} m/s², Expected: {expected_gravity:.2f} m/s²")
+            print(f"[ADAPTIVE R] Deviation: {accel_deviation:.2f} m/s², R_scale: {R_scale:.2f}x")
+            print(f"[ADAPTIVE R] R_base: {R_base:.6f}, R_adaptive: {R_adaptive:.6f}")
+
         # Compute gravity error
         # Following C code exactly:
         # GravErr = -AccCounts * Scale * G + LinAccTC * AccPostS - GravGyrPri
@@ -589,8 +623,8 @@ class SensorFusion6Axis:
             for i in range(3):
                 print(f"  [{F[2][i,0]:.15e}, {F[2][i,1]:.15e}, {F[2][i,2]:.15e}]")
 
-        # G = C[3]*F[3] + Qv
-        G = np.eye(3) * self.meas_noise_var_acc
+        # G = C[3]*F[3] + Qv (use adaptive R)
+        G = np.eye(3) * R_adaptive
         for i in range(3):
             G += C[i] @ F[i]
 
