@@ -52,6 +52,7 @@ set(COMMON_ALGO_SOURCES
     ${ALGO_SRC_DIR}/algo_sf_quatmath.c
     ${ALGO_SRC_DIR}/algo_sf_sensordata.c
     ${ALGO_SRC_DIR}/algo_sf_mag_cal.c
+    ${ALGO_SRC_DIR}/algo_sf_mag_cal_integration.c
 )
 
 # Fusion-specific algorithm sources - conditional compilation
@@ -206,6 +207,18 @@ if(BUILD_TESTS)
         RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/bin
     )
 
+    # Test: Magnetometer Calibration
+    add_executable(test_mag_cal
+        ../test/tests/unit_tests/test_mag_cal.c
+        ${UNITY_SRC}
+        ${ALGO_SRC_DIR}/algo_sf_mag_cal.c
+    )
+    target_compile_definitions(test_mag_cal PRIVATE UNITY_INCLUDE_DOUBLE)
+    target_link_libraries(test_mag_cal m)
+    set_target_properties(test_mag_cal PROPERTIES
+        RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/bin
+    )
+
     # --------------------------------------------------------------------------
     # INTEGRATION TESTS
     # --------------------------------------------------------------------------
@@ -249,6 +262,28 @@ if(BUILD_TESTS)
     target_compile_definitions(test_6axis_simple PRIVATE USE_6AXIS_FUSION USE_9AXIS_FUSION)
     target_link_libraries(test_6axis_simple m)
     set_target_properties(test_6axis_simple PROPERTIES
+        RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/bin
+    )
+
+    # Test: Magnetometer Calibration Example
+    add_executable(test_mag_cal_example
+        ../test/tests/validation_tests/test_mag_cal_example.c
+        ${ALL_ALGO_SOURCES}
+    )
+    target_compile_definitions(test_mag_cal_example PRIVATE USE_6AXIS_FUSION USE_9AXIS_FUSION)
+    target_link_libraries(test_mag_cal_example m)
+    set_target_properties(test_mag_cal_example PROPERTIES
+        RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/bin
+    )
+
+    # Test: 9-Axis Fusion with Mag Calibration Integration
+    add_executable(test_9axis_with_mag_cal
+        ../test/tests/validation_tests/test_9axis_with_mag_cal.c
+        ${ALL_ALGO_SOURCES}
+    )
+    target_compile_definitions(test_9axis_with_mag_cal PRIVATE USE_6AXIS_FUSION USE_9AXIS_FUSION)
+    target_link_libraries(test_9axis_with_mag_cal m)
+    set_target_properties(test_9axis_with_mag_cal PROPERTIES
         RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/bin
     )
 
@@ -431,6 +466,7 @@ if(BUILD_TESTS)
     # Unit Tests
     add_test(NAME QuaternionMath COMMAND test_quatmath)
     add_test(NAME MatrixMath COMMAND test_matrixmath)
+    add_test(NAME MagnetometerCalibration COMMAND test_mag_cal)
 
     # Integration Tests
     add_test(NAME 6AxisFusionIntegration COMMAND test_6axis_fusion)

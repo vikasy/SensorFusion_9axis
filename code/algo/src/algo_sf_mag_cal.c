@@ -400,10 +400,12 @@ bool mag_cal_compute(mag_cal_state_t *state) {
     if (quality < 0.0f) quality = 0.0f;
     if (quality > 1.0f) quality = 1.0f;
 
+    // Store quality even if failed (for debugging)
+    state->params.quality = quality;
+
     // Accept calibration if quality is good
     if (quality < MAG_CAL_QUALITY_THRESHOLD) {
         state->params.status = MAG_CAL_STATUS_POOR_QUALITY;
-        state->params.quality = quality;
         return false;
     }
 

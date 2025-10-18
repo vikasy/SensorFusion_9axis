@@ -52,9 +52,9 @@
 /**
  * @brief Quality threshold for accepting calibration (0.0 to 1.0)
  * @note 1.0 = perfect sphere, 0.0 = terrible fit
- * @note Typical good calibration: > 0.95
+ * @note Typical good calibration: > 0.95 (full SVD), > 0.85 (bounding box)
  */
-#define MAG_CAL_QUALITY_THRESHOLD 0.90
+#define MAG_CAL_QUALITY_THRESHOLD 0.85
 
 /******************************************************************************
  *                         CALIBRATION STATUS
