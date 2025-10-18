@@ -51,6 +51,7 @@ set(COMMON_ALGO_SOURCES
     ${ALGO_SRC_DIR}/algo_sf_orientation.c
     ${ALGO_SRC_DIR}/algo_sf_quatmath.c
     ${ALGO_SRC_DIR}/algo_sf_sensordata.c
+    ${ALGO_SRC_DIR}/algo_sf_mag_cal.c
 )
 
 # Fusion-specific algorithm sources - conditional compilation
