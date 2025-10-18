@@ -287,6 +287,17 @@ if(BUILD_TESTS)
         RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/bin
     )
 
+    # Test: Automatic Mag Calibration Integration
+    add_executable(test_auto_mag_cal_integration
+        ../test/tests/validation_tests/test_auto_mag_cal_integration.c
+        ${ALL_ALGO_SOURCES}
+    )
+    target_compile_definitions(test_auto_mag_cal_integration PRIVATE USE_6AXIS_FUSION USE_9AXIS_FUSION)
+    target_link_libraries(test_auto_mag_cal_integration m)
+    set_target_properties(test_auto_mag_cal_integration PROPERTIES
+        RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/bin
+    )
+
     # # Test: Realistic Validation
     # add_executable(test_realistic_validation
     #     ../test/validation/test_realistic_validation.c

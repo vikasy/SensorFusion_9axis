@@ -69,9 +69,10 @@ typedef struct state_vec_9XAGM {
 	double                  ProcNoiseVarLinAcc;
 	double                  ProcNoiseVarBiasOrient;
 	double                  ProcNoiseVarMagDist;     // magnetic disturbance process noise
-	double                  MagCalOffset[3];         // magnetometer calibration offsets
+	double                  MagCalOffset[3];         // magnetometer calibration offsets (DEPRECATED - use mag_cal_state)
 	double                  MagFieldRef[3];          // reference magnetic field vector
-	double                  MagCalMatrix[3][3];      // soft iron calibration matrix
+	double                  MagCalMatrix[3][3];      // soft iron calibration matrix (DEPRECATED - use mag_cal_state)
+	void*                   mag_cal_state;           // pointer to mag_cal_state_t (online calibration)
 	blk_mtx_3x3_t           ProcNoiseVar[4][4];      // 4x4 for 9-axis (includes mag disturbance)
 	blk_mtx_3x3_t           ErrCovMtxPost[4][4];     // 4x4 for 9-axis (includes mag disturbance)
 	blk_mtx_3x3_t           KalmanGain[4]; 

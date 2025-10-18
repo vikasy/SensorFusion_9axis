@@ -65,6 +65,7 @@
 
 #include "algo_sf_9x_sensor_fusion.h"
 #include "algo_sf_sensordata.h"
+#include "algo_sf_mag_cal.h"
 
 /*==============================================================================
  * Private Constants
@@ -331,6 +332,17 @@ uintptr_t sf_9xagm_algo_init(sf_algo_init_data_t *algo_init_data)
 
 	// set the reset flag
 	sf_9xagm_algo_reset(ptr_state_vec_9XAGM);
+
+	// Initialize magnetometer calibration module (online calibration)
+	mag_cal_state_t *mag_cal = (mag_cal_state_t*)calloc(1, sizeof(mag_cal_state_t));
+	if (mag_cal != NULL) {
+		mag_cal_init(mag_cal);
+		ptr_state_vec_9XAGM->mag_cal_state = (void*)mag_cal;
+		printf("9-axis SF algo: magnetometer calibration module initialized\n");
+	} else {
+		ptr_state_vec_9XAGM->mag_cal_state = NULL;
+		printf("Warning: Failed to allocate memory for mag calibration\n");
+	}
 
     printf("\n9-axis SF algo initialized \n");
 	printf("start 9-axis SF algo with algo id = %zu (0x%zx)\n", ptr_state_vec_9XAGM->AlgoID, ptr_state_vec_9XAGM->AlgoID);
@@ -1236,10 +1248,54 @@ static void sf_9xagm_algo_measupdate_mag(state_vec_9XAGM_t *ptr_state_vec_9XAGM,
 	inv_exist = 1;
 
 	// Get measured magnetometer data (average of buffered samples)
+	float mag_raw[3];
 	for(i = CHX; i <= CHZ; i++) {
-		mag_measured[i] = ptr_mag_data->CountAvg[i] * ptr_mag_data->ScaleFactor;
-		// Apply hard iron calibration offset
-		mag_measured[i] -= ptr_state_vec_9XAGM->MagCalOffset[i];
+		mag_raw[i] = ptr_mag_data->CountAvg[i] * ptr_mag_data->ScaleFactor;
+	}
+
+	// Online magnetometer calibration: Add sample and auto-compute if ready
+	if (ptr_state_vec_9XAGM->mag_cal_state != NULL) {
+		mag_cal_state_t *mag_cal = (mag_cal_state_t*)ptr_state_vec_9XAGM->mag_cal_state;
+
+		// Add raw sample to calibration buffer (uses current timestamp)
+		uint64_t timestamp_us = ptr_state_vec_9XAGM->MagMeasupdtTS * 1000ULL; // Convert ms to us
+		mag_cal_add_sample(mag_cal, mag_raw, timestamp_us);
+
+		// Auto-trigger calibration computation if enough diverse samples collected
+		mag_cal_status_t status = mag_cal_get_status(mag_cal);
+		if (status == MAG_CAL_STATUS_COLLECTING) {
+			// Try to compute calibration (will only succeed if samples are diverse enough)
+			if (mag_cal_compute(mag_cal)) {
+				// Calibration successful - sync parameters to legacy fields for backward compatibility
+				mag_cal_params_t params;
+				if (mag_cal_get_params(mag_cal, &params)) {
+					for (i = 0; i < 3; i++) {
+						ptr_state_vec_9XAGM->MagCalOffset[i] = params.offset[i];
+						for (j = 0; j < 3; j++) {
+							ptr_state_vec_9XAGM->MagCalMatrix[i][j] = params.matrix[i][j];
+						}
+					}
+					printf("9-axis SF: Magnetometer auto-calibration complete (quality: %.2f)\n",
+					       mag_cal_get_quality(mag_cal));
+				}
+			}
+		}
+
+		// Apply calibration to raw data (or pass through if uncalibrated)
+		float mag_calibrated[3];
+		mag_cal_apply(mag_cal, mag_raw, mag_calibrated);
+
+		// Use calibrated data
+		for(i = CHX; i <= CHZ; i++) {
+			mag_measured[i] = mag_calibrated[i];
+		}
+	} else {
+		// Fallback: Use legacy manual calibration if mag_cal module not available
+		for(i = CHX; i <= CHZ; i++) {
+			mag_measured[i] = mag_raw[i];
+			// Apply hard iron calibration offset
+			mag_measured[i] -= ptr_state_vec_9XAGM->MagCalOffset[i];
+		}
 	}
 
 	// Normalize measured magnetic field for direction-only comparison
@@ -1728,6 +1784,13 @@ void sf_9xagm_algo_stop(uintptr_t sf_algo_id)
 	}
 
 	printf("stop algo with algo id = %zu\n", sf_algo_id);
+
+	// Free magnetometer calibration module
+	if (ptr_state_vec_9XAGM->mag_cal_state != NULL) {
+		free(ptr_state_vec_9XAGM->mag_cal_state);
+		ptr_state_vec_9XAGM->mag_cal_state = NULL;
+	}
+
 	free(ptr_state_vec_9XAGM);
 
 	return;
