@@ -7,10 +7,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
-#include "../code/algo/inc/algo_sf_fusion.h"
-#include "../code/algo/inc/algo_sf_6x_sensor_fusion.h"
-#include "../code/app/inc/main.h"
-#include "../test/data/testdata/fusion/test_input_output_0922.h"
+#include "algo_sf_fusion.h"
+#include "algo_sf_6x_sensor_fusion.h"
+#include "sensor_spec_agm.h"
+#include "test_input_output_0922.h"
 
 #define QUAT_TOLERANCE 3e-5  // Floating point tolerance for quaternion comparison (accounts for accumulating numerical differences)
 
